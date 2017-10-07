@@ -1,0 +1,8 @@
+[package]
+name = "voting"
+version = "0.1.0"
+authors = ["Topher Cawlfield <ccawlfield@gogoair.com>"]
+
+[dependencies]
+rand = "0.3"
+lazy_static = "0.2"
