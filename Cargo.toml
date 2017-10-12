@@ -6,3 +6,4 @@ authors = ["Topher Cawlfield <ccawlfield@gogoair.com>"]
 [dependencies]
 rand = "0.3"
 lazy_static = "0.2"
+ndarray = "0.9.0"
