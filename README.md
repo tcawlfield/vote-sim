@@ -21,7 +21,7 @@ Simulate some voting methods.
   * Consideration / axis
     * Issue / Persuasion / Position
     * Likability
-  * Score
+  * Score / utility
 * How are scores combined?
   * At the top level we have a list of Considerations
     * Combine with Addition / Multiplication / Quadrature/distance

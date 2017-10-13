@@ -58,6 +58,7 @@ impl Consideration for Issue {
         for _ in 0..ncand {
             cand_position.push(NORMAL.ind_sample(rng) * self.sigma);
         }
+        println!("Candidate positions: {:?}", cand_position);
         for j in 0..ncit {
             let cit_position = NORMAL.ind_sample(rng) * self.sigma;
             for i in 0..ncand {
