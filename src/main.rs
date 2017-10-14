@@ -3,13 +3,15 @@ extern crate rand;
 extern crate lazy_static;
 //#[macro_use(s)]
 extern crate ndarray;
-use ndarray::{Array2, Array1};
+use ndarray::{Array2};
 
 mod consideration;
+mod methods;
 
 use consideration::*;
+use methods::*;
 
-const CITIZENS: usize = 100000;
+const CITIZENS: usize = 11;
 const CANDIDATES: usize = 5;
 
 fn main() {
@@ -32,35 +34,31 @@ fn main() {
             *nsc += *sc;
         }
     }
+
+    let regs = regrets(&net_scores);
+
     //println!("Net scores:\n{:?}", net_scores);
-    let plurality_winner = elect_plurality_honest(&net_scores);
-    println!("The winner is {}", plurality_winner);
+    let plh_result = elect_plurality_honest(&net_scores);
+    println!("Plurality, honest:");
+    print_score(&plh_result, &regs);
+
+    let pls_result = elect_plurality_strategic(&net_scores, 1.0, &plh_result);
+    println!("Plurality, strategic:");
+    print_score(&pls_result, &regs);
+
+    let r10h_result = elect_range_honest(&net_scores, 10);
+    println!("Range<10>, honest:");
+    print_score(&r10h_result, &regs);
+
+    let r10s_result = elect_range_strategic(&net_scores, 10, 1.0, &r10h_result);
+    println!("Range<10>, strategic:");
+    print_score(&r10s_result, &regs);
 }
 
-fn elect_plurality_honest(net_scores: &Array2<f64>) -> usize {
-    //let (ncit, ncand) = net_scores.dim();
-    //let mut votes<u32> = Array2::zeros((CANDIDATES));
-    let mut votes = [0; CANDIDATES];
-    for i in 0..CITIZENS {
-        let mut best_cand = 0usize;
-        let mut best_score = *net_scores.get((i, 0)).unwrap();
-        for j in 1..CANDIDATES {
-            let sc = *net_scores.get((i, j)).unwrap();
-            if sc > best_score {
-                best_score = sc;
-                best_cand = j;
-            }
-        }
-        votes[best_cand] += 1;
-    }
-    println!("votes: {:?}", votes);
-    let mut electee = 0usize;
-    let mut most_votes = votes[0];
-    for j in 1..CANDIDATES {
-        if votes[j] > most_votes {
-            electee = j;
-            most_votes = votes[j];
-        }
-    }
-    electee
+fn print_score(result: &(Result, Result), regs: &Vec<f64>) {
+    let r1 = regs[result.0.cand];
+    let vic_margin = (result.0.score - result.1.score) / result.0.score;
+    println!("  cand {} won, {} is runup, {:.2}% margin, {:.4} regret",
+        result.0.cand, result.1.cand, vic_margin * 100.0, r1
+    )
 }
