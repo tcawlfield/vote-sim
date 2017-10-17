@@ -3,7 +3,7 @@ extern crate rand;
 extern crate lazy_static;
 //#[macro_use(s)]
 extern crate ndarray;
-use ndarray::{Array2};
+use ndarray::{Array2, Axis};
 
 mod consideration;
 mod methods;
@@ -11,27 +11,41 @@ mod methods;
 use consideration::*;
 use methods::*;
 
-const CITIZENS: usize = 11;
+const CITIZENS: usize = 10001;
+const CANDIDATES_PRE: usize = 30;
 const CANDIDATES: usize = 5;
 
 fn main() {
     let mut rng = rand::thread_rng();
 
-    let axes: [&Consideration; 2] = [
+    let axes: [&Consideration; 3] = [
         &Likability{
-            stretch_factor: 1.0,
+            stretch_factor: 0.5,
         },
         &Issue{
             sigma: 2.0,
-        }
+        },
+        &Issue{
+            sigma: 0.5,
+        },
     ];
-    let mut net_scores: Array2<f64> = Array2::zeros((CITIZENS, CANDIDATES));
-    let mut scores = unsafe { Array2::uninitialized((CITIZENS, CANDIDATES)) };
-    for ax in axes.iter() {
-        ax.gen_scores(&mut scores, &mut rng);
-        //println!("scores:\n{:?}", scores);
-        for (sc, nsc) in scores.iter().zip(net_scores.iter_mut()) {
-            *nsc += *sc;
+    let mut net_scores = unsafe { Array2::uninitialized((CITIZENS, CANDIDATES)) };
+    {
+        let mut net_scores_pre: Array2<f64> = Array2::zeros((CITIZENS, CANDIDATES_PRE));
+        let mut scores = unsafe { Array2::uninitialized((CITIZENS, CANDIDATES_PRE)) };
+        for ax in axes.iter() {
+            ax.gen_scores(&mut scores, &mut rng);
+            //println!("scores:\n{:?}", scores);
+            for (sc, nsc) in scores.iter().zip(net_scores_pre.iter_mut()) {
+                *nsc += *sc;
+            }
+        }
+        let final_candidates = rrv(&net_scores_pre, 10, CANDIDATES);
+        println!("Pre-election winners: {:?}", final_candidates);
+        for (i, sv) in net_scores_pre.axis_iter(Axis(0)).enumerate() {
+            for (jidx, j) in final_candidates.iter().enumerate() {
+                net_scores[(i, jidx)] = sv[*j];
+            }
         }
     }
 

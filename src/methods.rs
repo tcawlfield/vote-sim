@@ -117,13 +117,13 @@ pub fn elect_range_honest(net_scores: &Array2<f64>, ranks: u32) -> (Result, Resu
     let (ncit, ncand) = net_scores.dim();
     let mut ttl_rankings = vec![0u32; ncand];
     for i in 0..ncit {
-        range_score_honest(&mut ttl_rankings, &net_scores.subview(Axis(0), i), ranks);
+        range_score_honest(ttl_rankings.as_mut_slice(), &net_scores.subview(Axis(0), i), ranks);
     }
     println!("honest range<{}> votes: {:?}", ranks, &ttl_rankings);
     tally_votes(&ttl_rankings)
 }
 
-fn range_score_honest(ttl_rankings: &mut Vec<u32>, scores: &ArrayView<f64, Ix1>, ranks: u32) {
+fn range_score_honest(ttl_rankings: &mut [u32], scores: &ArrayView<f64, Ix1>, ranks: u32) {
     let ncand = scores.dim();
     let mut min = scores[0];
     let mut max = scores[0];
@@ -171,13 +171,63 @@ pub fn elect_range_strategic(net_scores: &Array2<f64>, ranks: u32, frac_strategi
             }
             //println!();
         } else {
-            range_score_honest(&mut ttl_rankings, &net_scores.subview(Axis(0), i), ranks);
+            range_score_honest(ttl_rankings.as_mut_slice(), &net_scores.subview(Axis(0), i), ranks);
         }
     }
     println!("strategic range<{}> votes: {:?}", ranks, &ttl_rankings);
     tally_votes(&ttl_rankings)
 }
 
-pub fn rrv(net_scores: &Array2<f64>, ranks: u32, winners: u32) -> Vec<u32> {
-    
+// K = 1.0 favors large political parties. K = 0.5 favors smaller parties.
+// I'm using this purely as a method of spreading out candidates across the position axes.
+const K: f64 = 1.0;
+
+// Reweighted Ranve Voting -- a system for proportional representation.
+// See http://rangevoting.org/RRV.html
+pub fn rrv(net_scores: &Array2<f64>, ranks: u32, num_winners: usize) -> Vec<usize> {
+    let (ncit, ncand) = net_scores.dim();
+    let mut remaining = (0..ncand).collect::<Vec<usize>>();
+    let mut winners = Vec::with_capacity(num_winners as usize);
+    let mut score_cards: Array2<u32> = Array2::zeros((ncit, ncand));
+    for i in 0..ncit {
+        range_score_honest(score_cards.subview_mut(Axis(0), i).as_slice_mut().unwrap(),
+            &net_scores.subview(Axis(0), i), ranks);
+    }
+    //println!("{:?}", score_cards);
+
+    while winners.len() < num_winners {
+        //println!("Round {}", winners.len());
+        let mut ttl_scores = vec![0.0; ncand];
+        for i in 0..ncit {
+            // Weight is K / (K + SUM/MAX)
+            let sum = winners.iter()
+                             .fold(0, |sum, &j| sum + score_cards[(i, j)]);
+            let wt = K / (K + (sum as f64)/((ranks-1) as f64));
+            for j in remaining.iter() {
+                ttl_scores[*j] += wt * (score_cards[(i, *j)] as f64);
+            }
+        }
+        //println!("ttl_scores = {:?}", ttl_scores);
+        // let winner = remaining.iter()
+        //                       .max_by_key(|&j| ttl_scores[*j]).unwrap();
+        // let winner_idx = remaining.iter().find(|&j| j == winner).unwrap();
+        let winner_idx = {
+            let mut rem_iter = remaining.iter();
+            let mut winner_idx = 0;
+            let mut winner_score = ttl_scores[*rem_iter.next().unwrap()];
+            //println!("     winner = {}, score = {}", remaining[winner_idx], winner_score);
+            for (idx, j) in rem_iter.enumerate() {
+                if ttl_scores[*j] > winner_score {
+                    winner_idx = idx+1;
+                    winner_score = ttl_scores[*j];
+                    //println!("     New winner={}, score={}", remaining[winner_idx], winner_score);
+                }
+            }
+            winner_idx
+        };
+        winners.push(remaining.swap_remove(winner_idx));
+        //println!("winners = {:?}, remaining = {:?}", winners, remaining);
+    }
+
+    winners
 }
