@@ -3,12 +3,12 @@ use ndarray::{Array2, ArrayView, Axis, Ix1};
 use std::f64;
 
 #[derive(Debug)]
-pub struct Result {
+pub struct ElectResult {
     pub cand: usize,
     pub score: f64,
 }
 
-pub fn elect_plurality_honest(net_scores: &Array2<f64>) -> (Result, Result) {
+pub fn elect_plurality_honest(net_scores: &Array2<f64>) -> (ElectResult , ElectResult ) {
     let (ncit, ncand) = net_scores.dim();
     //let mut votes<u32> = Array2::zeros((CANDIDATES));
     //let mut votes = [0; CANDIDATES];
@@ -29,7 +29,7 @@ pub fn elect_plurality_honest(net_scores: &Array2<f64>) -> (Result, Result) {
     tally_votes(&votes)
 }
 
-fn tally_votes(votes: &Vec<u32>) -> (Result, Result) {
+fn tally_votes(votes: &Vec<u32>) -> (ElectResult , ElectResult ) {
     let ncand = votes.len();
     let mut electee = 0usize;
     let mut most_votes = votes[0];
@@ -52,11 +52,11 @@ fn tally_votes(votes: &Vec<u32>) -> (Result, Result) {
             runup_votes = votes[j];
         }
     }
-    (Result{cand: electee, score: most_votes as f64}, Result{cand: runup, score: runup_votes as f64})
+    (ElectResult {cand: electee, score: most_votes as f64}, ElectResult {cand: runup, score: runup_votes as f64})
 }
 
 pub fn elect_plurality_strategic(net_scores: &Array2<f64>, frac_strategic: f64,
-        pre_results: &(Result, Result)) -> (Result, Result) {
+        pre_results: &(ElectResult , ElectResult )) -> (ElectResult , ElectResult ) {
     let (ncit, ncand) = net_scores.dim();
     //let mut votes<u32> = Array2::zeros((CANDIDATES));
     //let mut votes = [0; CANDIDATES];
@@ -113,7 +113,7 @@ pub fn regrets(net_scores: &Array2<f64>) -> Vec<f64> {
     utilities
 }
 
-pub fn elect_range_honest(net_scores: &Array2<f64>, ranks: u32) -> (Result, Result) {
+pub fn elect_range_honest(net_scores: &Array2<f64>, ranks: u32) -> (ElectResult , ElectResult ) {
     let (ncit, ncand) = net_scores.dim();
     let mut ttl_rankings = vec![0u32; ncand];
     for i in 0..ncit {
@@ -145,7 +145,7 @@ fn range_score_honest(ttl_rankings: &mut [u32], scores: &ArrayView<f64, Ix1>, ra
 }
 
 pub fn elect_range_strategic(net_scores: &Array2<f64>, ranks: u32, frac_strategic: f64,
-        pre_results: &(Result, Result)) -> (Result, Result) {
+        pre_results: &(ElectResult , ElectResult )) -> (ElectResult , ElectResult) {
     let (ncit, ncand) = net_scores.dim();
     let mut ttl_rankings = vec![0u32; ncand];
     let last_strategic = (ncit as f64 * frac_strategic).round() as usize;
