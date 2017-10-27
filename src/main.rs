@@ -9,7 +9,6 @@ extern crate csv;
 use ndarray::{Array2, Axis};
 use docopt::Docopt;
 use std::error::Error;
-use std::io;
 use std::process;
 use std::fs::File;
 use std::io::prelude::*;
@@ -32,7 +31,7 @@ Options:
     -v NCIT --voters=NCIT        Number of voters [default: 11]
     -c NCAND --candidates=NCAND  Number of candidates [default: 5]
     -p NPCAND --primcand=NPCAND  Number of preelection candidates [default: 7]
-    --likefctr=FACT              Likeability factor [default: 1.0]
+    --likefctr=FACT              Likeability factor [default: 0.0]
     -o CSVFILE --out CSVFILE     CSV output file [default: out.csv]
     -t TRIALS                    Run TRIALS elections [default: 1]
 ";
@@ -65,68 +64,111 @@ fn run() -> Result<(), Box<Error>> {
     }
     ofile.write_all(b"\n")?;
 
-    let axes: [&Consideration; 3] = [
+    let axes: [&Consideration; 2] = [
         &Likability{
             stretch_factor: lfact,
         },
-        &Issue{
-            sigma: 2.0,
-        },
-        &Issue{
-            sigma: 0.5,
-        },
+        // &Issue{
+        //     sigma: 2.0,
+        //     halfcsep: 0.0,
+        //     halfvsep: 0.0,
+        // },
+        // &Issue{
+        //     sigma: 0.5,
+        //     halfcsep: 0.0,
+        //     halfvsep: 0.0,
+        // },
+        &MDIssue{
+            issues: vec![
+                Issue{
+                    sigma: 1.0,
+                    halfcsep: 1.0,
+                    halfvsep: 1.0,
+                },
+                Issue{
+                    sigma: 0.5,
+                    halfcsep: 0.0,
+                    halfvsep: 0.0,
+                },
+            ],
+        }
     ];
 
     let mut net_scores = unsafe { Array2::uninitialized((ncit, ncand)) };
     let mut rng = rand::thread_rng();
     let mut wtr = csv::Writer::from_writer(&ofile);
-    wtr.write_record(&["SPlMargin", "PlRegret", "SPlRegret", "R10Regret", "SR10Regret"])?;
+    wtr.write_record(&["SPlMargin", "PlRegret", "SPlRegret", "R10Regret", "SR10Regret", "IRVRegret"])?;
 
     for itrial in 0..trials {
         {
             let mut net_scores_pre: Array2<f64> = Array2::zeros((ncit, npcand));
             let mut scores = unsafe { Array2::uninitialized((ncit, npcand)) };
             for ax in axes.iter() {
-                ax.gen_scores(&mut scores, &mut rng);
-                //println!("scores:\n{:?}", scores);
+                ax.gen_scores(&mut scores, &mut rng, itrial==0);
+                if itrial == 0 && ncit < 20 {
+                    println!("scores for {:?}:\n{:?}", ax, scores);
+                }
                 for (sc, nsc) in scores.iter().zip(net_scores_pre.iter_mut()) {
                     *nsc += *sc;
                 }
             }
             let final_candidates = rrv(&net_scores_pre, 10, ncand);
-            println!("Pre-election winners: {:?}", final_candidates);
+            if itrial == 0 {
+                println!("Pre-election winners: {:?}", final_candidates);
+            }
             for (i, sv) in net_scores_pre.axis_iter(Axis(0)).enumerate() {
                 for (jidx, j) in final_candidates.iter().enumerate() {
                     net_scores[(i, jidx)] = sv[*j];
                 }
             }
         }
+        if itrial == 0 && ncit < 20 {
+            println!("net_scores:\n{:?}", net_scores)
+        }
 
         let regs = regrets(&net_scores);
+        if itrial == 0 {
+            println!("Regrets: {:?}", regs);
+        }
 
         //println!("Net scores:\n{:?}", net_scores);
-        let plh_result = elect_plurality_honest(&net_scores);
+        let plh_result = elect_plurality_honest(&net_scores, itrial==0);
         if itrial == 0 {
             println!("Plurality, honest:");
             print_score(&plh_result, &regs);
         }
 
-        let pls_result = elect_plurality_strategic(&net_scores, 1.0, &plh_result);
+        let pls_result = elect_plurality_strategic(&net_scores, 1.0, &plh_result, itrial==0);
         if itrial == 0 {
             println!("Plurality, strategic:");
             print_score(&pls_result, &regs);
         }
 
-        let r10h_result = elect_range_honest(&net_scores, 10);
+        let r10h_result = elect_range_honest(&net_scores, 10, itrial==0);
         if itrial == 0 {
             println!("Range<10>, honest:");
             print_score(&r10h_result, &regs);
         }
 
-        let r10s_result = elect_range_strategic(&net_scores, 10, 1.0, &r10h_result);
+        let r10s_result = elect_range_strategic(&net_scores, 10, 1.0, &r10h_result, itrial==0);
         if itrial == 0 {
             println!("Range<10>, strategic:");
             print_score(&r10s_result, &regs);
+        }
+
+        let ranked_ballots = get_ranked_ballots(&net_scores);
+        if itrial == 0 {
+            println!("Ranked ballots:\n{:?}", ranked_ballots);
+        }
+        let irv_result = elect_irv_honest(&ranked_ballots, itrial==0);
+        let mut irv_winner = ncand;
+        if let Some(winner) = irv_result {
+            if itrial == 0 {
+                println!("IRV winner is {}, {:.4} regret", winner, regs[winner]);
+            }
+            irv_winner = winner;
+        } else {
+            println!("No IRV winner -- Huh??");
         }
 
         let spl_margin = (pls_result.0.score - pls_result.1.score) / pls_result.0.score;
@@ -135,6 +177,7 @@ fn run() -> Result<(), Box<Error>> {
             regs[pls_result.0.cand],
             regs[r10h_result.0.cand],
             regs[r10s_result.0.cand],
+            regs[irv_winner],
         ))?;
     }
     Ok(())
