@@ -98,7 +98,8 @@ fn run() -> Result<(), Box<Error>> {
     let mut net_scores = unsafe { Array2::uninitialized((ncit, ncand)) };
     let mut rng = rand::thread_rng();
     let mut wtr = csv::Writer::from_writer(&ofile);
-    wtr.write_record(&["SPlMargin", "PlRegret", "SPlRegret", "R10Regret", "SR10Regret", "IRVRegret"])?;
+    wtr.write_record(&["SPlMargin", "PlRegret", "SPlRegret", "R10Regret", "SR10Regret",
+        "AppRegret", "SAppRegret", "IRVRegret"])?;
 
     for itrial in 0..trials {
         println!("Starting trial {}", itrial);
@@ -168,6 +169,18 @@ fn run() -> Result<(), Box<Error>> {
             print_score(&r10s_result, &regs);
         }
 
+        let r2h_result = elect_range_honest(&net_scores, 2, itrial==0);
+        if itrial == 0 {
+            println!("Approval, honest:");
+            print_score(&r2h_result, &regs);
+        }
+
+        let r2s_result = elect_range_strategic(&net_scores, 2, 1.0, &r2h_result, itrial==0);
+        if itrial == 0 {
+            println!("Approval, strategic:");
+            print_score(&r2s_result, &regs);
+        }
+
         let ranked_ballots = get_ranked_ballots(&net_scores);
         if itrial == 0 && ncit < 20 {
             println!("Ranked ballots:\n{:?}", ranked_ballots);
@@ -189,6 +202,8 @@ fn run() -> Result<(), Box<Error>> {
             regs[pls_result.0.cand],
             regs[r10h_result.0.cand],
             regs[r10s_result.0.cand],
+            regs[r2h_result.0.cand],
+            regs[r2s_result.0.cand],
             regs[irv_winner],
         ))?;
     }
