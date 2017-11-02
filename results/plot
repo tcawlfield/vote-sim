@@ -6,26 +6,11 @@ import csv
 import numpy
 import matplotlib.pyplot as plt
 
+from read import read_csv
+
 in_csv = sys.argv[1]
-with open(in_csv) as fin:
-    hrdr = csv.DictReader(fin)
-    metadata = hrdr.__next__()
-    fin.readline()
-    print(metadata)
-
-    data_rdr = csv.reader(fin)
-    data_cols = data_rdr.__next__()
-    results = dict()
-    for vm in data_cols:
-        results[vm] = []
-    for row in data_rdr:
-        for i, col in enumerate(row):
-            if i < len(data_cols):
-                results[data_cols[i]].append(float(col))
-            else:
-                print("Too many values in a row")
-
-ys = list(range(1, len(data_cols)))
+(metadata, data_cols, results, regrets, cov) = read_csv(in_csv)
+print(metadata)
 
 results_nz = dict()
 for vm in data_cols[1:]:
@@ -35,11 +20,6 @@ for vm in data_cols[1:]:
     results_nz[vm] = nonzero
     frac_nz = float(len(nonzero)) / float(len(results[vm]))
     print("{:16s}: avg {:.3f}  {:.3f}% non-zero  {:.3f} mean-non-zero".format(vm, mean, frac_nz*100, mean_nz))
-
-# fig, ax = plt.subplots()
-# ax.errorbar(xs, ys, xerr=x_errs, fmt='o')
-# ax.set_yticks(ys)
-# ax.set_yticklabels(data_cols)
 
 fig, (mva, rega) = plt.subplots(2)
 mva.hist(results['SPlMargin'], histtype='step')

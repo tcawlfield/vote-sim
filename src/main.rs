@@ -56,6 +56,7 @@ fn run() -> Result<(), Box<Error>> {
     let csvfile = args.get_str("--out");
     let trials: usize = args.get_str("-t").parse().unwrap();
 
+    println!("Creating CSV file {}", csvfile);
     let mut ofile = File::create(csvfile)?;
     {
         let mut wtr = csv::Writer::from_writer(&ofile);
@@ -100,6 +101,7 @@ fn run() -> Result<(), Box<Error>> {
     wtr.write_record(&["SPlMargin", "PlRegret", "SPlRegret", "R10Regret", "SR10Regret", "IRVRegret"])?;
 
     for itrial in 0..trials {
+        println!("Starting trial {}", itrial);
         {
             let mut net_scores_pre: Array2<f64> = Array2::zeros((ncit, npcand));
             let mut scores = unsafe { Array2::uninitialized((ncit, npcand)) };
@@ -123,12 +125,22 @@ fn run() -> Result<(), Box<Error>> {
             }
         }
         if itrial == 0 && ncit < 20 {
-            println!("net_scores:\n{:?}", net_scores)
+            println!("net_scores:\n{:?}", net_scores);
         }
 
         let regs = regrets(&net_scores);
-        if itrial == 0 {
-            println!("Regrets: {:?}", regs);
+        // if itrial == 0 {
+        println!("Regrets: {:?}", regs);
+        // }
+
+        let cov_mat = get_cov_matrix(&net_scores);
+        println!("Covariance matrix for candidates:");
+        for ix in 0..ncand {
+            print!(" [{}] ", ix);
+            for iy in 0..(ix+1) {
+                print!(" {:11.6}", cov_mat[(ix, iy)]);
+            }
+            println!("");
         }
 
         //println!("Net scores:\n{:?}", net_scores);
@@ -157,7 +169,7 @@ fn run() -> Result<(), Box<Error>> {
         }
 
         let ranked_ballots = get_ranked_ballots(&net_scores);
-        if itrial == 0 {
+        if itrial == 0 && ncit < 20 {
             println!("Ranked ballots:\n{:?}", ranked_ballots);
         }
         let irv_result = elect_irv_honest(&ranked_ballots, itrial==0);

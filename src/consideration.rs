@@ -130,3 +130,26 @@ impl Consideration for MDIssue {
         }
     }
 }
+
+pub fn get_cov_matrix(scores: &Array2<f64>) -> Array2<f64> {
+    let (ncit, ncand) = scores.dim();
+    let mut mean = vec![0.0; ncand];
+    let mut cov_mat: Array2<f64> = Array2::zeros((ncand, ncand));
+    for icit in 0..ncit {
+        let n = (icit+1) as f64;
+        for ix in 0..ncand {
+            let dx = scores[(icit, ix)] - mean[ix];
+            mean[ix] += dx / n;
+            for iy in 0..(ix+1) {
+                cov_mat[(ix, iy)] += dx * (scores[(icit, iy)] - mean[iy]);
+            }
+        }
+    }
+    for ix in 0..ncand {
+        for iy in 0..(ix+1) {
+            cov_mat[(ix, iy)] /= (ncit - 1) as f64;
+        }
+    }
+
+    cov_mat
+}

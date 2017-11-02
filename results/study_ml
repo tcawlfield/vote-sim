@@ -1,0 +1,90 @@
+#!/usr/bin/python3
+
+import sys
+import re
+
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+import mglearn
+
+from as_sk import SimvoteDataset
+
+in_csv = sys.argv[1]
+svd = SimvoteDataset.read(in_csv)
+ds = svd.get_sk_dataset('Pl')
+#print(ds)
+
+good = ds.data[ds.target == 0]
+subopt = ds.data[ds.target == 1]
+
+if True:
+    fig, axes = plt.subplots(svd.ncand+1, svd.ncand, figsize=(10.5*1.4, 7.5*1.4))
+    #ax = axes.ravel()
+    for i, fname in enumerate(ds.feature_names):
+        m = re.search(r'\[(\d+)\]', fname)
+        if m:
+            ix = 0
+            iy = int(m.group(1))
+        else:
+            m = re.search(r'\[(\d+),(\d+)\]', fname)
+            if m:
+                ix = int(m.group(2))+1
+                iy = int(m.group(1))
+            else:
+                print("Ugh cannot grok feature name", fn)
+                continue
+        _, bins = np.histogram(ds.data[:, i], bins=50)
+        axes[ix, iy].hist(good[:, i], bins=bins, alpha=0.5)
+        axes[ix, iy].hist(subopt[:, i], bins=bins, alpha=0.5)
+        axes[ix, iy].set_title(fname)
+        axes[ix, iy].set_yticks(())
+    # axes[0,0].set_xlabel("Feature magnitude")
+    # axes[0,0].set_ylabel("Frequency")
+    axes[0,0].legend(["optimal", "suboptimal"], loc='best')
+    fig.tight_layout()
+
+scaler = StandardScaler()
+scaler.fit(ds.data)
+X_scaled = scaler.transform(ds.data)
+
+pca = PCA(n_components=10, whiten=True)
+pca.fit(X_scaled)
+X_pca = pca.transform(X_scaled)
+print("Original shape:", X_scaled.shape)
+print("Reduced shape:", X_pca.shape)
+
+if False:
+    plt.figure()
+    mglearn.discrete_scatter(X_pca[:, 0], X_pca[:, 1], ds.target)
+    plt.legend(ds.target_names)
+    plt.gca().set_aspect("equal")
+
+    plt.figure()
+    mglearn.discrete_scatter(X_pca[:, 1], X_pca[:, 2], ds.target)
+    plt.legend(ds.target_names)
+    plt.gca().set_aspect("equal")
+
+    plt.figure()
+    mglearn.discrete_scatter(X_pca[:, 0], X_pca[:, 2], ds.target)
+    plt.legend(ds.target_names)
+    plt.gca().set_aspect("equal")
+
+if True:
+    x_train, x_test, y_train, y_test = train_test_split(ds.data, ds.target)
+    svc = SVC(kernel='rbf', C=10, gamma=0.1)
+    svc.fit(x_train, y_train)
+    print("SVC accuracy on training set: {:.4f}".format(svc.score(x_train, y_train)))
+    print("SVC accuracy on test set: {:.4f}".format(svc.score(x_test, y_test)))
+
+    print("Applying PCA...")
+    x_train, x_test, y_train, y_test = train_test_split(X_pca, ds.target)
+    svc = SVC(kernel='rbf', C=10, gamma=0.1)
+    svc.fit(x_train, y_train)
+    print("SVC accuracy on training set: {:.4f}".format(svc.score(x_train, y_train)))
+    print("SVC accuracy on test set: {:.4f}".format(svc.score(x_test, y_test)))
+
+plt.show()
