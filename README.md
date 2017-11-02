@@ -4,7 +4,8 @@ Simulate some voting methods.
 * Does strategic voting do better or worse for plurality? Even when issue-space is 1-D?
 * How does dimensionality of issue space affect things?
 * Can we generate candidates in a way that mimics real election results?
-  * Try generating candidates in position-space by doing a multi-seat pre-election
+  * Try generating candidates in position-space by doing a multi-seat pre-election. This
+    might help distribute candidates more uniformly in position space.
 * How does candidate generation affect regret?
 * Resistance against manipulation
   * If one point in issue space correlates with (encourages) strategic voting, does this influence election results?
