@@ -115,10 +115,12 @@ fn run() -> Result<(), Box<Error>> {
                     *nsc += *sc;
                 }
             }
-            let final_candidates = rrv(&net_scores_pre, 10, ncand);
+            let regs_pre = regrets(&net_scores_pre);
+            let mut final_candidates = rrv(&net_scores_pre, 10, ncand);
             if itrial == 0 {
                 println!("Pre-election winners: {:?}", final_candidates);
             }
+            final_candidates.sort_by(|&a, &b| regs_pre[a].partial_cmp(&regs_pre[b]).unwrap());
             for (i, sv) in net_scores_pre.axis_iter(Axis(0)).enumerate() {
                 for (jidx, j) in final_candidates.iter().enumerate() {
                     net_scores[(i, jidx)] = sv[*j];

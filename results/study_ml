@@ -2,6 +2,7 @@
 
 import sys
 import re
+import os
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,6 +14,8 @@ import mglearn
 
 from as_sk import SimvoteDataset
 
+my_dpi = 96
+
 in_csv = sys.argv[1]
 svd = SimvoteDataset.read(in_csv)
 ds = svd.get_sk_dataset('Pl')
@@ -22,7 +25,7 @@ good = ds.data[ds.target == 0]
 subopt = ds.data[ds.target == 1]
 
 if True:
-    fig, axes = plt.subplots(svd.ncand+1, svd.ncand, figsize=(10.5*1.4, 7.5*1.4))
+    fig, axes = plt.subplots(svd.ncand+1, svd.ncand, figsize=(10.5, 7.5))
     #ax = axes.ravel()
     for i, fname in enumerate(ds.feature_names):
         m = re.search(r'\[(\d+)\]', fname)
@@ -38,13 +41,16 @@ if True:
                 print("Ugh cannot grok feature name", fn)
                 continue
         _, bins = np.histogram(ds.data[:, i], bins=50)
-        axes[ix, iy].hist(good[:, i], bins=bins, alpha=0.5)
-        axes[ix, iy].hist(subopt[:, i], bins=bins, alpha=0.5)
+        axes[ix, iy].hist([good[:, i], subopt[:, i]], bins=bins, alpha=0.5, histtype='stepfilled', normed=True)
+        #axes[ix, iy].hist(, bins=bins, alpha=0.5, histtype='stepfilled', normed=True)
         axes[ix, iy].set_title(fname)
         axes[ix, iy].set_yticks(())
     # axes[0,0].set_xlabel("Feature magnitude")
     # axes[0,0].set_ylabel("Frequency")
     axes[0,0].legend(["optimal", "suboptimal"], loc='best')
+    for ix in range(2, svd.ncand+1):
+        for iy in range(0, ix-1):
+            axes[ix, iy].axis('off')
     fig.tight_layout()
 
 scaler = StandardScaler()
@@ -87,4 +93,8 @@ if True:
     print("SVC accuracy on training set: {:.4f}".format(svc.score(x_train, y_train)))
     print("SVC accuracy on test set: {:.4f}".format(svc.score(x_test, y_test)))
 
-plt.show()
+if False:
+    plt.show()
+else:
+    (base, extn) = os.path.splitext(in_csv)
+    plt.savefig(base+'.png', dpi=my_dpi)

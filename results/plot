@@ -3,12 +3,17 @@
 import sys
 import re
 import csv
+import argparse
 import numpy
-import matplotlib.pyplot as plt
 
 from read import read_csv
 
-in_csv = sys.argv[1]
+parser = argparse.ArgumentParser(description='plot regrets')
+parser.add_argument('-n', '--no-plot', action='store_true', help='no plots')
+parser.add_argument('csvfile', help='.csv file')
+args = parser.parse_args()
+
+in_csv = args.csvfile
 (metadata, data_cols, results, regrets, cov) = read_csv(in_csv)
 print(metadata)
 
@@ -21,6 +26,10 @@ for vm in data_cols[1:]:
     frac_nz = float(len(nonzero)) / float(len(results[vm]))
     print("{:16s}: avg {:.3f}  {:.3f}% non-zero  {:.3f} mean-non-zero".format(vm, mean, frac_nz*100, mean_nz))
 
+if args.no_plot:
+    sys.exit(0)
+
+import matplotlib.pyplot as plt
 fig, (mva, rega) = plt.subplots(2)
 mva.hist(results['SPlMargin'], histtype='step')
 mva.set_title('Margin of victory, strategic plurality')
