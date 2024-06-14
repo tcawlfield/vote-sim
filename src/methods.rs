@@ -8,7 +8,10 @@ pub struct ElectResult {
     pub score: f64,
 }
 
-pub fn elect_plurality_honest(net_scores: &Array2<f64>, verbose: bool) -> (ElectResult , ElectResult ) {
+pub fn elect_plurality_honest(
+    net_scores: &Array2<f64>,
+    verbose: bool,
+) -> (ElectResult, ElectResult) {
     let (ncit, ncand) = net_scores.dim();
     //let mut votes<u32> = Array2::zeros((CANDIDATES));
     //let mut votes = [0; CANDIDATES];
@@ -31,7 +34,7 @@ pub fn elect_plurality_honest(net_scores: &Array2<f64>, verbose: bool) -> (Elect
     tally_votes(&votes)
 }
 
-fn tally_votes(votes: &Vec<u32>) -> (ElectResult , ElectResult ) {
+fn tally_votes(votes: &Vec<u32>) -> (ElectResult, ElectResult) {
     let ncand = votes.len();
     let mut electee = 0usize;
     let mut most_votes = votes[0];
@@ -54,11 +57,24 @@ fn tally_votes(votes: &Vec<u32>) -> (ElectResult , ElectResult ) {
             runup_votes = votes[j];
         }
     }
-    (ElectResult {cand: electee, score: most_votes as f64}, ElectResult {cand: runup, score: runup_votes as f64})
+    (
+        ElectResult {
+            cand: electee,
+            score: most_votes as f64,
+        },
+        ElectResult {
+            cand: runup,
+            score: runup_votes as f64,
+        },
+    )
 }
 
-pub fn elect_plurality_strategic(net_scores: &Array2<f64>, frac_strategic: f64,
-        pre_results: &(ElectResult , ElectResult), verbose: bool) -> (ElectResult , ElectResult ) {
+pub fn elect_plurality_strategic(
+    net_scores: &Array2<f64>,
+    frac_strategic: f64,
+    pre_results: &(ElectResult, ElectResult),
+    verbose: bool,
+) -> (ElectResult, ElectResult) {
     let (ncit, ncand) = net_scores.dim();
     //let mut votes<u32> = Array2::zeros((CANDIDATES));
     //let mut votes = [0; CANDIDATES];
@@ -108,7 +124,7 @@ pub fn regrets(net_scores: &Array2<f64>) -> Vec<f64> {
         if ttl > max_util {
             max_util = ttl;
         }
-        avg_util += (ttl - avg_util) / ((j+1) as f64);
+        avg_util += (ttl - avg_util) / ((j + 1) as f64);
     }
     // Turn into regrets
     for u in utilities.iter_mut() {
@@ -117,12 +133,19 @@ pub fn regrets(net_scores: &Array2<f64>) -> Vec<f64> {
     utilities
 }
 
-pub fn elect_range_honest(net_scores: &Array2<f64>, ranks: u32, verbose: bool)
-        -> (ElectResult , ElectResult ) {
+pub fn elect_range_honest(
+    net_scores: &Array2<f64>,
+    ranks: u32,
+    verbose: bool,
+) -> (ElectResult, ElectResult) {
     let (ncit, ncand) = net_scores.dim();
     let mut ttl_rankings = vec![0u32; ncand];
     for i in 0..ncit {
-        range_score_honest(ttl_rankings.as_mut_slice(), &net_scores.subview(Axis(0), i), ranks);
+        range_score_honest(
+            ttl_rankings.as_mut_slice(),
+            &net_scores.index_axis(Axis(0), i),
+            ranks,
+        );
     }
     if verbose {
         println!("honest range<{}> votes: {:?}", ranks, &ttl_rankings);
@@ -151,8 +174,13 @@ fn range_score_honest(ttl_rankings: &mut [u32], scores: &ArrayView<f64, Ix1>, ra
     //println!();
 }
 
-pub fn elect_range_strategic(net_scores: &Array2<f64>, ranks: u32, frac_strategic: f64,
-        pre_results: &(ElectResult , ElectResult), verbose: bool) -> (ElectResult , ElectResult) {
+pub fn elect_range_strategic(
+    net_scores: &Array2<f64>,
+    ranks: u32,
+    frac_strategic: f64,
+    pre_results: &(ElectResult, ElectResult),
+    verbose: bool,
+) -> (ElectResult, ElectResult) {
     let (ncit, ncand) = net_scores.dim();
     let mut ttl_rankings = vec![0u32; ncand];
     let last_strategic = (ncit as f64 * frac_strategic).round() as usize;
@@ -170,15 +198,23 @@ pub fn elect_range_strategic(net_scores: &Array2<f64>, ranks: u32, frac_strategi
             min -= rsz / 2.0;
             for j in 0..ncand {
                 let mut rf = ((net_scores[(i, j)] - min) / rsz).floor();
-                if rf < 0.0 { rf = 0.0 }
-                if rf > (ranks-1) as f64 { rf = (ranks-1) as f64 }
+                if rf < 0.0 {
+                    rf = 0.0
+                }
+                if rf > (ranks - 1) as f64 {
+                    rf = (ranks - 1) as f64
+                }
                 let r = rf as u32;
                 ttl_rankings[j] += r;
                 //print!("   c{}: {:.2} = {}", j, net_scores[(i, j)], r);
             }
             //println!();
         } else {
-            range_score_honest(ttl_rankings.as_mut_slice(), &net_scores.subview(Axis(0), i), ranks);
+            range_score_honest(
+                ttl_rankings.as_mut_slice(),
+                &net_scores.index_axis(Axis(0), i),
+                ranks,
+            );
         }
     }
     if verbose {
@@ -199,8 +235,14 @@ pub fn rrv(net_scores: &Array2<f64>, ranks: u32, num_winners: usize) -> Vec<usiz
     let mut winners = Vec::with_capacity(num_winners as usize);
     let mut score_cards: Array2<u32> = Array2::zeros((ncit, ncand));
     for i in 0..ncit {
-        range_score_honest(score_cards.subview_mut(Axis(0), i).as_slice_mut().unwrap(),
-            &net_scores.subview(Axis(0), i), ranks);
+        range_score_honest(
+            score_cards
+                .index_axis_mut(Axis(0), i)
+                .as_slice_mut()
+                .unwrap(),
+            &net_scores.index_axis(Axis(0), i),
+            ranks,
+        );
     }
     //println!("{:?}", score_cards);
 
@@ -209,9 +251,8 @@ pub fn rrv(net_scores: &Array2<f64>, ranks: u32, num_winners: usize) -> Vec<usiz
         let mut ttl_scores = vec![0.0; ncand];
         for i in 0..ncit {
             // Weight is K / (K + SUM/MAX)
-            let sum = winners.iter()
-                             .fold(0, |sum, &j| sum + score_cards[(i, j)]);
-            let wt = K / (K + (sum as f64)/((ranks-1) as f64));
+            let sum = winners.iter().fold(0, |sum, &j| sum + score_cards[(i, j)]);
+            let wt = K / (K + (sum as f64) / ((ranks - 1) as f64));
             for j in remaining.iter() {
                 ttl_scores[*j] += wt * (score_cards[(i, *j)] as f64);
             }
@@ -227,7 +268,7 @@ pub fn rrv(net_scores: &Array2<f64>, ranks: u32, num_winners: usize) -> Vec<usiz
             //println!("     winner = {}, score = {}", remaining[winner_idx], winner_score);
             for (idx, j) in rem_iter.enumerate() {
                 if ttl_scores[*j] > winner_score {
-                    winner_idx = idx+1;
+                    winner_idx = idx + 1;
                     winner_score = ttl_scores[*j];
                     //println!("     New winner={}, score={}", remaining[winner_idx], winner_score);
                 }
@@ -243,14 +284,14 @@ pub fn rrv(net_scores: &Array2<f64>, ranks: u32, num_winners: usize) -> Vec<usiz
 
 pub fn get_ranked_ballots(net_scores: &Array2<f64>) -> Array2<usize> {
     let (ncit, ncand) = net_scores.dim();
-    let mut ranks = unsafe { Array2::uninitialized((ncit, ncand)) };
+    let mut ranks = Array2::zeros((ncit, ncand));
     let mut my_ranks = Vec::with_capacity(ncand);
     for j in 0..ncand {
         my_ranks.push(j);
     }
     for i in 0..ncit {
         // my_ranks.sort_unstable_by(|a, b| net_scores[(i,b)].cmp(net_scores[(i,a)]));
-        my_ranks.sort_by(|&a, &b| net_scores[(i,b)].partial_cmp(&net_scores[(i,a)]).unwrap());
+        my_ranks.sort_by(|&a, &b| net_scores[(i, b)].partial_cmp(&net_scores[(i, a)]).unwrap());
         for j in 0..ncand {
             ranks[(i, j)] = my_ranks[j];
         }
@@ -275,7 +316,7 @@ pub fn elect_irv_honest(ballots: &Array2<usize>, verbose: bool) -> Option<usize>
             for j in 0..ncand {
                 let ranked_next = ballots[(i, j)];
                 // if !eliminated.iter().any(|&k| k == ranked_next) {
-                if ! eliminated[ranked_next] {
+                if !eliminated[ranked_next] {
                     best = Some(ranked_next);
                     break;
                 }
@@ -291,7 +332,7 @@ pub fn elect_irv_honest(ballots: &Array2<usize>, verbose: bool) -> Option<usize>
         let mut best = ncand; // invalid index
         let mut worst = ncand;
         for j in 0..ncand {
-            if ! eliminated[j] {
+            if !eliminated[j] {
                 if best == ncand {
                     best = j;
                 } else {
@@ -310,7 +351,7 @@ pub fn elect_irv_honest(ballots: &Array2<usize>, verbose: bool) -> Option<usize>
         }
         let mut best_votes = votes[best];
         let mut worst_votes = votes[worst];
-        for j in (start_idx+1)..ncand {
+        for j in (start_idx + 1)..ncand {
             if !eliminated[j] {
                 if votes[j] > best_votes {
                     best_votes = votes[j];
@@ -321,7 +362,7 @@ pub fn elect_irv_honest(ballots: &Array2<usize>, verbose: bool) -> Option<usize>
                 }
             }
         }
-        if best_votes >= (active_voters+1) / 2 {
+        if best_votes >= (active_voters + 1) / 2 {
             return Some(best);
         } else {
             // We have a run-off!
