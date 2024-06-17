@@ -119,6 +119,9 @@ fn run() -> Result<(), Box<dyn Error>> {
         "AppRegret",
         "SAppRegret",
         "IRVRegret",
+        "BordaRegret",
+        "Borda2Regret",
+        "ApvTiesRegret",
     ])?;
 
     for itrial in 0..trials {
@@ -222,6 +225,24 @@ fn run() -> Result<(), Box<dyn Error>> {
             println!("No IRV winner -- Huh??");
         }
 
+        let bordah_result = elect_borda_honest(&net_scores, &ranked_ballots, None, itrial == 0);
+        if itrial == 0 && !quiet {
+            println!("Borda, honest:");
+            print_score(&bordah_result, &regs);
+        }
+
+        let borda2_result = elect_borda_honest(&net_scores, &ranked_ballots, Some(2), itrial == 0);
+        if itrial == 0 && !quiet {
+            println!("Borda, top-2 only:");
+            print_score(&borda2_result, &regs);
+        }
+
+        let apv_ties_result = elect_range_honest_with_tie_runoff(&net_scores, 2, itrial == 0);
+        if itrial == 0 && !quiet {
+            println!("Approval with tie runoff:");
+            print_score(&borda2_result, &regs);
+        }
+
         let spl_margin = (pls_result.0.score - pls_result.1.score) / pls_result.0.score;
         wtr.serialize((
             spl_margin,
@@ -232,6 +253,9 @@ fn run() -> Result<(), Box<dyn Error>> {
             regs[r2h_result.0.cand],
             regs[r2s_result.0.cand],
             regs[irv_winner],
+            regs[bordah_result.0.cand],
+            regs[borda2_result.0.cand],
+            regs[apv_ties_result.0.cand],
         ))?;
     }
     Ok(())

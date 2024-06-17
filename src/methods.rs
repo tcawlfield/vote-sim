@@ -1,5 +1,6 @@
 // Voting methods
 use ndarray::{Array2, ArrayView, Axis, Ix1};
+use rand::Rng;
 use std::f64;
 
 #[derive(Debug)]
@@ -57,6 +58,14 @@ fn tally_votes(votes: &Vec<u32>) -> (ElectResult, ElectResult) {
             runup_votes = votes[j];
         }
     }
+    if most_votes == runup_votes {
+        if rand::random() {
+            // 50/50 chance
+            (electee, runup) = (runup, electee);
+            (most_votes, runup_votes) = (runup_votes, most_votes);
+        }
+    }
+    // TODO: We still are flubbing cases where there's a tie for runner-up or 3+-way for 1st.
     (
         ElectResult {
             cand: electee,
@@ -369,4 +378,136 @@ pub fn elect_irv_honest(ballots: &Array2<usize>, verbose: bool) -> Option<usize>
             eliminated[worst] = true;
         }
     }
+}
+
+pub fn elect_borda_honest(
+    net_scores: &Array2<f64>,
+    ballots: &Array2<usize>,
+    top_n: Option<usize>,
+    verbose: bool,
+) -> (ElectResult, ElectResult) {
+    let (ncit, ncand) = ballots.dim();
+    let top_n = if let Some(n) = top_n { n } else { ncand };
+    let mut points: Vec<u32> = vec![0; ncand];
+    for icit in 0..ncit {
+        for icandrank in 0..top_n {
+            points[ballots[(icit, icandrank)]] += (top_n - icandrank) as u32;
+        }
+    }
+    if verbose {
+        println!("Borda point totals for top {}: {:?}", top_n, points);
+    }
+    tally_votes_with_plurality_for_ties(&points, &net_scores, verbose)
+}
+
+fn tally_votes_with_plurality_for_ties(
+    votes: &Vec<u32>,
+    net_scores: &Array2<f64>,
+    verbose: bool,
+) -> (ElectResult, ElectResult) {
+    let (ncit, ncand) = net_scores.dim();
+    let mut ntop: usize = 1;
+    let mut top_cands: Vec<usize> = vec![0; ncand];
+    let mut most_votes = votes[0];
+
+    let mut nsecond: usize = 0;
+    let mut second_cands: Vec<usize> = vec![0; ncand];
+    let mut runup_votes: u32 = 0;
+
+    for icand in 1..ncand {
+        if votes[icand] > most_votes {
+            // New best
+            nsecond = ntop; // Previous best becomes runner-up
+            for i in 0..ntop {
+                second_cands[i] = top_cands[i];
+            }
+            runup_votes = most_votes;
+
+            ntop = 1;
+            top_cands[0] = icand;
+            most_votes = votes[icand];
+        } else if votes[icand] == most_votes {
+            // new tie for top
+            top_cands[ntop] = icand;
+            ntop += 1;
+        } else if votes[icand] > runup_votes {
+            // new runner-up candidate
+            nsecond = 1;
+            second_cands[0] = icand;
+            runup_votes = votes[icand];
+        } else if votes[icand] == runup_votes {
+            // new tie for runner-up
+            second_cands[nsecond] = icand;
+            nsecond += 1;
+        }
+    }
+    if ntop > 1 {
+        // Do a runoff
+        let mut some_scores = Array2::zeros((ncit, ntop));
+        for icit in 0..ncit {
+            for icand in 0..ntop {
+                some_scores[(icit, icand)] = net_scores[(icit, top_cands[icand])];
+            }
+        }
+        let mut runoff_results = elect_plurality_honest(&some_scores, verbose);
+        runoff_results.0.cand = top_cands[runoff_results.0.cand];
+        runoff_results.1.cand = top_cands[runoff_results.1.cand];
+        runoff_results
+    } else if nsecond > 1 {
+        // Don't bother to do a runoff.
+        let mut rng = rand::thread_rng();
+        let chosen_second = rng.gen_range(0..nsecond);
+        (
+            ElectResult {
+                cand: top_cands[0],
+                score: most_votes as f64,
+            },
+            ElectResult {
+                cand: second_cands[chosen_second],
+                score: runup_votes as f64,
+            },
+        )
+    } else if nsecond == 0 {
+        (
+            ElectResult {
+                cand: top_cands[0],
+                score: most_votes as f64,
+            },
+            ElectResult {
+                cand: 0,
+                score: -1.0,
+            },
+        )
+    } else {
+        (
+            ElectResult {
+                cand: top_cands[0],
+                score: most_votes as f64,
+            },
+            ElectResult {
+                cand: second_cands[0],
+                score: runup_votes as f64,
+            },
+        )
+    }
+}
+
+pub fn elect_range_honest_with_tie_runoff(
+    net_scores: &Array2<f64>,
+    ranks: u32,
+    verbose: bool,
+) -> (ElectResult, ElectResult) {
+    let (ncit, ncand) = net_scores.dim();
+    let mut ttl_rankings = vec![0u32; ncand];
+    for i in 0..ncit {
+        range_score_honest(
+            ttl_rankings.as_mut_slice(),
+            &net_scores.index_axis(Axis(0), i),
+            ranks,
+        );
+    }
+    if verbose {
+        println!("honest range<{}> votes: {:?}", ranks, &ttl_rankings);
+    }
+    tally_votes_with_plurality_for_ties(&ttl_rankings, &net_scores, verbose)
 }
