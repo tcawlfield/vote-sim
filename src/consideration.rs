@@ -5,7 +5,7 @@ use rand_distr::StandardNormal;
 use std::fmt;
 
 pub trait Consideration: fmt::Debug {
-    fn gen_scores(&self, scores: &mut Array2<f64>, rng: &mut ThreadRng, verbose: bool);
+    fn add_to_scores(&mut self, scores: &mut Array2<f64>, rng: &mut ThreadRng, verbose: bool);
 }
 
 //////////////////////////////////////////
@@ -23,7 +23,7 @@ pub struct Likability {
 
 impl Consideration for Likability {
     #[allow(unused_variables)]
-    fn gen_scores(&self, scores: &mut Array2<f64>, rng: &mut ThreadRng, verbose: bool) {
+    fn add_to_scores(&mut self, scores: &mut Array2<f64>, rng: &mut ThreadRng, verbose: bool) {
         let (ncit, ncand) = scores.dim();
         // All citizens are the same in this regard.
         // Or at least we assume there are enough citizens that every representative
@@ -37,7 +37,7 @@ impl Consideration for Likability {
             let cand_like = cand_like * self.stretch_factor;
             for j in 0..ncit {
                 //*scores.get_mut((j, i)).unwrap() = *candidates.get(i).unwrap();
-                *scores.get_mut((j, i)).unwrap() = cand_like;
+                *scores.get_mut((j, i)).unwrap() += cand_like;
             }
         }
     }
@@ -50,6 +50,18 @@ pub struct Issue {
     pub sigma: f64,
     pub halfcsep: f64,
     pub halfvsep: f64,
+    cand_position: Vec<f64>,
+}
+
+impl Issue {
+    pub fn new(sigma: f64, halfcsep: f64, halfvsep: f64, ncand: usize) -> Issue {
+        Issue {
+            sigma,
+            halfcsep,
+            halfvsep,
+            cand_position: Vec::with_capacity(ncand),
+        }
+    }
 }
 
 fn gen_bimodal_gauss<R: Rng>(sigma: f64, halfsep: f64, rng: &mut R) -> f64 {
@@ -63,24 +75,24 @@ fn gen_bimodal_gauss<R: Rng>(sigma: f64, halfsep: f64, rng: &mut R) -> f64 {
 }
 
 impl Consideration for Issue {
-    fn gen_scores(&self, scores: &mut Array2<f64>, mut rng: &mut ThreadRng, verbose: bool) {
+    fn add_to_scores(&mut self, scores: &mut Array2<f64>, mut rng: &mut ThreadRng, verbose: bool) {
         let (ncit, ncand) = scores.dim();
         // All citizens are the same in this regard.
         // Or at least we assume there are enough citizens that every representative
         // group in position-space spans all degrees of likability alignment.
-        let mut cand_position = Vec::with_capacity(ncand);
         for _ in 0..ncand {
-            cand_position.push(gen_bimodal_gauss(self.sigma, self.halfcsep, &mut rng))
+            self.cand_position
+                .push(gen_bimodal_gauss(self.sigma, self.halfcsep, &mut rng))
         }
         if verbose {
-            println!("Candidate positions: {:?}", cand_position);
+            println!("Candidate positions: {:?}", self.cand_position);
         }
         for j in 0..ncit {
             let cit_position = gen_bimodal_gauss(self.sigma, self.halfvsep, &mut rng);
             for i in 0..ncand {
-                *scores.get_mut((j, i)).unwrap() =
-                    -(*cand_position.get(i).unwrap() - cit_position).powi(2);
-                //-(*cand_position.get(i).unwrap() - cit_position).abs(2);
+                *scores.get_mut((j, i)).unwrap() +=
+                    -(*self.cand_position.get(i).unwrap() - cit_position).powi(2);
+                //-(*self.cand_position.get(i).unwrap() - cit_position).abs(2);
             }
         }
     }
@@ -91,24 +103,34 @@ impl Consideration for Issue {
 #[derive(Debug)]
 pub struct MDIssue {
     pub issues: Vec<Issue>,
+    cand_position: Array2<f64>,
+}
+
+impl MDIssue {
+    pub fn new(issues: Vec<Issue>, ncand: usize) -> MDIssue {
+        let npos = issues.len();
+        MDIssue {
+            issues,
+            cand_position: Array2::zeros((ncand, npos)),
+        }
+    }
 }
 
 impl Consideration for MDIssue {
-    fn gen_scores(&self, scores: &mut Array2<f64>, mut rng: &mut ThreadRng, verbose: bool) {
+    fn add_to_scores(&mut self, scores: &mut Array2<f64>, mut rng: &mut ThreadRng, verbose: bool) {
         let (ncit, ncand) = scores.dim();
         // All citizens are the same in this regard.
         // Or at least we assume there are enough citizens that every representative
         // group in position-space spans all degrees of likability alignment.
         let npos = self.issues.len();
-        let mut cand_position = Array2::zeros((ncand, npos));
         for i in 0..ncand {
             for p in 0..npos {
-                cand_position[(i, p)] =
+                self.cand_position[(i, p)] =
                     gen_bimodal_gauss(self.issues[p].sigma, self.issues[p].halfcsep, &mut rng);
             }
         }
         if verbose {
-            println!("Candidate positions: {:?}", cand_position);
+            println!("Candidate positions: {:?}", self.cand_position);
         }
         let mut cit_position = vec![0.0; npos];
         for j in 0..ncit {
@@ -122,33 +144,10 @@ impl Consideration for MDIssue {
             for i in 0..ncand {
                 let mut distsq = 0.0;
                 for p in 0..npos {
-                    distsq += (cand_position[(i, p)] - cit_position[p]).powi(2);
+                    distsq += (self.cand_position[(i, p)] - cit_position[p]).powi(2);
                 }
                 scores[(j, i)] = -distsq.sqrt();
             }
         }
     }
-}
-
-pub fn get_cov_matrix(scores: &Array2<f64>) -> Array2<f64> {
-    let (ncit, ncand) = scores.dim();
-    let mut mean = vec![0.0; ncand];
-    let mut cov_mat: Array2<f64> = Array2::zeros((ncand, ncand));
-    for icit in 0..ncit {
-        let n = (icit + 1) as f64;
-        for ix in 0..ncand {
-            let dx = scores[(icit, ix)] - mean[ix];
-            mean[ix] += dx / n;
-            for iy in 0..(ix + 1) {
-                cov_mat[(ix, iy)] += dx * (scores[(icit, iy)] - mean[iy]);
-            }
-        }
-    }
-    for ix in 0..ncand {
-        for iy in 0..(ix + 1) {
-            cov_mat[(ix, iy)] /= (ncit - 1) as f64;
-        }
-    }
-
-    cov_mat
 }
