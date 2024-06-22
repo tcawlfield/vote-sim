@@ -69,6 +69,22 @@ fn run() -> Result<(), Box<dyn Error>> {
             Box::new(Plurality::new(&sim, Strategy::Strategic)),
             args.trials,
         ),
+        MethodTracker::new(
+            Box::new(RangeVoting::new(&sim, 10, Strategy::Honest)),
+            args.trials,
+        ),
+        MethodTracker::new(
+            Box::new(RangeVoting::new(&sim, 10, Strategy::Strategic)),
+            args.trials,
+        ),
+        MethodTracker::new(
+            Box::new(RangeVoting::new(&sim, 2, Strategy::Honest)),
+            args.trials,
+        ),
+        MethodTracker::new(
+            Box::new(RangeVoting::new(&sim, 2, Strategy::Strategic)),
+            args.trials,
+        ),
     ];
 
     run::run(

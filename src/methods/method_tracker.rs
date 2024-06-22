@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use arrow_array::builder::{Float64Builder, Int32Builder, ListBuilder, PrimitiveBuilder};
-use arrow_array::types::Float64Type;
-use arrow_array::{Float64Array, ListArray, RecordBatch};
-use arrow_schema::{DataType, Field, SchemaBuilder};
+use arrow_array::builder::PrimitiveBuilder;
+use arrow_array::types::{Float64Type, Int32Type};
+use arrow_array::{ArrayRef, Float64Array, Int32Array, StructArray};
+use arrow_schema::{DataType, Field, Fields};
 use meansd::MeanSD;
 // use std::{error::Error, sync::Arc};
 
@@ -17,6 +17,8 @@ pub struct MethodTracker {
     mean_regret: MeanSD,
     mean_subopt_regret: MeanSD,
     result_bldr: PrimitiveBuilder<Float64Type>,
+    winner_bldr: PrimitiveBuilder<Int32Type>,
+    struct_array: Option<StructArray>,
 }
 
 impl MethodTracker {
@@ -28,6 +30,8 @@ impl MethodTracker {
             mean_regret: MeanSD::default(),
             mean_subopt_regret: MeanSD::default(),
             result_bldr: Float64Array::builder(max_trials),
+            winner_bldr: Int32Array::builder(max_trials),
+            struct_array: None,
         }
     }
 
@@ -48,17 +52,35 @@ impl MethodTracker {
         }
 
         self.result_bldr.append_value(regret);
+        self.winner_bldr.append_value(result.winner.cand as i32);
 
         result
     }
 
     pub fn get_field(&self) -> Field {
-        Field::new(self.method.colname(), DataType::Float64, false)
+        let dt = DataType::Struct(Fields::from(vec![
+            Arc::new(Field::new("winner", DataType::Int32, false)),
+            Arc::new(Field::new("regret", DataType::Float64, false)),
+        ]));
+        Field::new(self.method.colname(), dt, false)
     }
 
     pub fn get_column(&mut self) -> arrow_array::ArrayRef {
-        Arc::new(self.result_bldr.finish())
+        // Arc::new(self.result_bldr.finish())
+        let struct_array = StructArray::from(vec![
+            (
+                Arc::new(Field::new("winner", DataType::Int32, false)),
+                Arc::new(self.winner_bldr.finish()) as ArrayRef,
+            ),
+            (
+                Arc::new(Field::new("regret", DataType::Float64, false)),
+                Arc::new(self.result_bldr.finish()) as ArrayRef,
+            ),
+        ]);
+        Arc::new(struct_array)
     }
+
+    // fn fields(&self)
 
     pub fn report(&self) {
         let frac_suboptimal = self.ntrials_subopt as f64 / self.ntrials as f64;
