@@ -25,6 +25,10 @@ struct Args {
     #[arg(short, long, default_value_t = 4)]
     candidates: usize,
 
+    /// number of candidates in a primary (RRV) election. (No primary by default.)
+    #[arg(short, long)]
+    primary_candidates: Option<usize>,
+
     /// Number of trials
     #[arg(short, long, default_value_t = 1)]
     trials: usize,
@@ -60,6 +64,12 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     let mut sim = Sim::new(ncand, ncit);
 
+    let mut primary_sim = if let Some(pcand) = args.primary_candidates {
+        Some(Sim::new(pcand, ncit))
+    } else {
+        None
+    };
+
     let mut methods: Vec<MethodTracker> = vec![
         MethodTracker::new(
             Box::new(Plurality::new(&sim, Strategy::Honest)),
@@ -93,5 +103,6 @@ fn run() -> Result<(), Box<dyn Error>> {
         &mut methods[..],
         args.trials,
         &args.outfile,
+        &mut primary_sim,
     )
 }

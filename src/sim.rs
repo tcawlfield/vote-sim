@@ -1,4 +1,4 @@
-use crate::consideration::*;
+use crate::{consideration::*, ElectResult};
 use ndarray::Array2;
 use rand::rngs::ThreadRng;
 
@@ -31,6 +31,29 @@ impl Sim {
         rng: &mut ThreadRng,
         verbose: bool,
     ) {
+        self.get_scores(axes, rng, verbose);
+        self.compute_regrets();
+        self.rank_candidates();
+    }
+
+    pub fn take_from_primary(&mut self, primary: &Sim, winners: &[ElectResult]) {
+        assert!(primary.ncit == self.ncit);
+        assert!(winners.len() == self.ncand);
+        for (icand, winner) in winners.iter().enumerate() {
+            for icit in 0..self.ncit {
+                self.scores[(icit, icand)] = primary.scores[(icit, winner.cand)];
+            }
+        }
+        self.compute_regrets();
+        self.rank_candidates();
+    }
+
+    fn get_scores(
+        &mut self,
+        axes: &mut [&mut dyn Consideration],
+        rng: &mut ThreadRng,
+        verbose: bool,
+    ) {
         self.scores.fill(0.0);
         for ax in axes.iter_mut() {
             ax.add_to_scores(&mut self.scores, rng, verbose);
@@ -38,8 +61,6 @@ impl Sim {
                 println!("scores for {:?}:\n{:?}", ax, &mut self.scores);
             }
         }
-        self.compute_regrets();
-        self.rank_candidates();
     }
 
     fn compute_regrets(&mut self) {

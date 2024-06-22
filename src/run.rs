@@ -1,5 +1,5 @@
-use arrow_array::builder::{Float64Builder, Int32Builder, ListBuilder};
-use arrow_array::{Float64Array, ListArray, RecordBatch};
+use arrow_array::builder::{Float64Builder, ListBuilder};
+use arrow_array::RecordBatch;
 use parquet::{arrow::ArrowWriter, basic::Compression, file::properties::WriterProperties};
 
 use arrow_schema::{DataType, Field, SchemaBuilder};
@@ -8,8 +8,9 @@ use std::{error::Error, sync::Arc};
 
 use crate::consideration::Consideration;
 use crate::cov_matrix::CovMatrix;
-use crate::methods::{Method, MethodTracker, Strategy};
+use crate::methods::{MethodTracker, Strategy};
 use crate::sim::Sim;
+use crate::methods::RRV;
 
 pub fn run(
     axes: &mut [&mut dyn Consideration],
@@ -17,6 +18,7 @@ pub fn run(
     methods: &mut [MethodTracker],
     trials: usize,
     outfile: &Option<std::ffi::OsString>,
+    sim_primary: &mut Option<Sim>,
 ) -> Result<(), Box<dyn Error>> {
     let mut rng = rand::thread_rng();
 
@@ -24,9 +26,25 @@ pub fn run(
     let mut cov_bld = ListBuilder::new(ListBuilder::new(Float64Builder::new()));
     let mut cov_matrix = CovMatrix::new(sim.ncand);
 
+    let mut rrv = if let Some(sim_primary) = &sim_primary {
+        Some(RRV::new(&sim_primary, 10, Strategy::Honest))
+    } else {
+        None
+    };
+
     for itrial in 0..trials {
         // println!("Sim election {}", itrial + 1);
-        sim.election(axes, &mut rng, itrial == 0);
+
+        if let Some(rrv) = &mut rrv {
+            let sim_primary: &mut Sim = sim_primary.as_mut().unwrap();
+            sim_primary.election(axes, &mut rng, itrial==0);
+            let final_candidates = rrv.multi_elect(&sim_primary, None, sim.ncand, itrial==0);
+            sim.take_from_primary(sim_primary, &final_candidates);
+
+        } else {
+            sim.election(axes, &mut rng, itrial == 0);
+        }
+
         let mut prev_rslt = None;
         for method in methods.iter_mut() {
             let rslt = method.elect(&sim, prev_rslt, itrial == 0);

@@ -33,7 +33,7 @@ impl Method for RangeVoting {
         self.scratch_tallies.fill(0);
         // for icit in 0..sim.ncit {
         for vscores in sim.scores.outer_iter() {
-            self.fill_ballot(&vscores);
+            fill_range_ballot(&vscores, self.nranks, &mut self.ballot);
             match self.strat {
                 Strategy::Honest => {
                     for icand in 0..vscores.len() {
@@ -91,15 +91,13 @@ impl Method for RangeVoting {
     }
 }
 
-impl RangeVoting {
-    fn fill_ballot(&mut self, scores: &ArrayView<f64, Ix1>) {
-        let min_score = scores.iter().map(|x| *x).reduce(f64::min).unwrap();
-        let max_score = scores.iter().map(|x| *x).reduce(f64::max).unwrap();
-        let ranksz = (max_score - min_score) / ((self.nranks - 1) as f64);
-        for (icand, score) in scores.iter().enumerate() {
-            // We use a half rank size for scores of 0 and nranks-1.
-            let r = ((score - min_score) / ranksz + 0.5).floor() as i32;
-            self.ballot[icand] = r;
-        }
+pub fn fill_range_ballot(scores: &ArrayView<f64, Ix1>, ranks: i32, ballot: &mut [i32]) {
+    let min_score = scores.iter().map(|x| *x).reduce(f64::min).unwrap();
+    let max_score = scores.iter().map(|x| *x).reduce(f64::max).unwrap();
+    let ranksz = (max_score - min_score) / ((ranks - 1) as f64);
+    for (icand, score) in scores.iter().enumerate() {
+        // We use a half rank size for scores of 0 and nranks-1.
+        let r = ((score - min_score) / ranksz + 0.5).floor() as i32;
+        ballot[icand] = r;
     }
 }
