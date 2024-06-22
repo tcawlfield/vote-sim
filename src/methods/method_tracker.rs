@@ -5,7 +5,6 @@ use arrow_array::types::{Float64Type, Int32Type};
 use arrow_array::{ArrayRef, Float64Array, Int32Array, StructArray};
 use arrow_schema::{DataType, Field, Fields};
 use meansd::MeanSD;
-// use std::{error::Error, sync::Arc};
 
 use super::method::{Method, WinnerAndRunnerup};
 use crate::sim::Sim;
@@ -18,7 +17,6 @@ pub struct MethodTracker {
     mean_subopt_regret: MeanSD,
     result_bldr: PrimitiveBuilder<Float64Type>,
     winner_bldr: PrimitiveBuilder<Int32Type>,
-    struct_array: Option<StructArray>,
 }
 
 impl MethodTracker {
@@ -31,7 +29,6 @@ impl MethodTracker {
             mean_subopt_regret: MeanSD::default(),
             result_bldr: Float64Array::builder(max_trials),
             winner_bldr: Int32Array::builder(max_trials),
-            struct_array: None,
         }
     }
 

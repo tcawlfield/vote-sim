@@ -52,7 +52,6 @@ impl RRV {
         self.winners.clear();
         while self.winners.len() < nwinners {
             self.wtd_scores.fill(0.0);
-            let ttl_scores = vec![0.0; sim.ncand];
             for i in 0..sim.ncit {
                 // Weight is K / (K + SUM/MAX)
                 let sum = self.winners.iter().fold(0, |sum, j| sum + self.ballots[(i, j.cand)]);
