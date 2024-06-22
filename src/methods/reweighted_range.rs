@@ -1,7 +1,6 @@
-use ndarray::{Array2, ArrayView, Axis, Ix1};
+use ndarray::{Array2, Axis};
 
 use super::method::{Strategy, WinnerAndRunnerup};
-use super::tallies::{tally_votes, Tallies};
 use crate::sim::Sim;
 use crate::ElectResult;
 use super::rangevoting::fill_range_ballot;
@@ -53,7 +52,7 @@ impl RRV {
         self.winners.clear();
         while self.winners.len() < nwinners {
             self.wtd_scores.fill(0.0);
-            let mut ttl_scores = vec![0.0; sim.ncand];
+            let ttl_scores = vec![0.0; sim.ncand];
             for i in 0..sim.ncit {
                 // Weight is K / (K + SUM/MAX)
                 let sum = self.winners.iter().fold(0, |sum, j| sum + self.ballots[(i, j.cand)]);

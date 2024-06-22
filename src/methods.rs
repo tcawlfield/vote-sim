@@ -5,7 +5,7 @@ mod rangevoting;
 mod tallies;
 mod reweighted_range;
 
-pub use method::{ElectResult, Method, Strategy, WinnerAndRunnerup};
+pub use method::{ElectResult, Strategy};
 pub use method_tracker::MethodTracker;
 pub use plurality::Plurality;
 pub use rangevoting::RangeVoting;
