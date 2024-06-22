@@ -39,6 +39,9 @@ pub fn run(
             let sim_primary: &mut Sim = sim_primary.as_mut().unwrap();
             sim_primary.election(axes, &mut rng, itrial==0);
             let final_candidates = rrv.multi_elect(&sim_primary, None, sim.ncand, itrial==0);
+            if itrial == 0 {
+                println!("primary election winners: {:?}", final_candidates);
+            }
             sim.take_from_primary(sim_primary, &final_candidates);
 
         } else {
