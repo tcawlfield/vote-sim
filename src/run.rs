@@ -25,6 +25,11 @@ pub fn run(
     // Create Arrow array builders:
     let mut cov_bld = ListBuilder::new(ListBuilder::new(Float64Builder::new()));
     let mut cov_matrix = CovMatrix::new(sim.ncand);
+    // TODO: add column(s) for candidates: ideal candidate, candidate regrets (FixedSizeList), position arrays
+    // Prepend "m_" to method column names to identify these.
+    // Position arrays: StructArray: likeability, p0, p1, ... (1 value per candidate)
+    // TODO: Use position arrays to demonstrate that RRV primaries spread out the candidates
+    //   in position space and improve likeability.
 
     let mut rrv = if let Some(sim_primary) = &sim_primary {
         Some(RRV::new(&sim_primary, 10, Strategy::Honest))
