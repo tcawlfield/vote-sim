@@ -1,4 +1,4 @@
-use arrow_array::builder::{Float64Builder, Int32Builder, ListBuilder};
+use arrow_array::builder::{FixedSizeListBuilder, Float64Builder, Int32Builder, ListBuilder};
 use arrow_array::RecordBatch;
 use parquet::{arrow::ArrowWriter, basic::Compression, file::properties::WriterProperties};
 
@@ -25,8 +25,12 @@ pub fn run(
     // Create Arrow array builders:
     let mut cov_bld = ListBuilder::new(ListBuilder::new(Float64Builder::new()));
     let mut ideal_cnd_bld = Int32Builder::with_capacity(trials);
+    let mut cand_regret_bld = FixedSizeListBuilder::new(
+        Float64Builder::with_capacity(trials * sim.ncand),
+        sim.ncand as i32,
+    );
 
-    // TODO: add column(s) for candidates: ideal candidate, candidate regrets (FixedSizeList), position arrays
+    // TODO: add column(s) for candidates: position arrays
     // Prepend "m_" to method column names to identify these.
     // Position arrays: StructArray: likeability, p0, p1, ... (1 value per candidate)
     // TODO: Use position arrays to demonstrate that RRV primaries spread out the candidates
@@ -75,6 +79,10 @@ pub fn run(
         }
 
         ideal_cnd_bld.append_value(sim.cand_by_regret[0] as i32);
+        for rgrt in sim.regrets.iter() {
+            cand_regret_bld.values().append_value(*rgrt);
+        }
+        cand_regret_bld.append(true);
         cov_matrix.compute(&sim.scores);
         for ix in 0..sim.ncand {
             for iy in 0..(ix + 1) {
@@ -90,12 +98,21 @@ pub fn run(
 
     let mut columns: Vec<arrow_array::ArrayRef> = Vec::new();
     columns.push(Arc::new(ideal_cnd_bld.finish()) as arrow_array::ArrayRef);
+    columns.push(Arc::new(cand_regret_bld.finish()) as arrow_array::ArrayRef);
     columns.push(Arc::new(cov_bld.finish()) as arrow_array::ArrayRef);
     for method in methods.iter_mut() {
         columns.push(method.get_column());
     }
     let mut schema = SchemaBuilder::new();
     schema.push(Field::new("ideal_cand", DataType::Int32, true));
+    schema.push(Field::new(
+        "cand_regret",
+        DataType::FixedSizeList(
+            Arc::new(Field::new("item", DataType::Float64, true)),
+            sim.ncand as i32,
+        ),
+        true,
+    ));
     schema.push(Field::new(
         "cov_matrix",
         DataType::List(Arc::new(Field::new(
