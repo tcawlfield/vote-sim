@@ -21,6 +21,8 @@ pub struct Likability {
 //     }
 // }
 
+// TODO: Perhaps add a kind of Likability for which some voters care more about than others.
+
 impl Consideration for Likability {
     #[allow(unused_variables)]
     fn add_to_scores(&mut self, scores: &mut Array2<f64>, rng: &mut ThreadRng, verbose: bool) {

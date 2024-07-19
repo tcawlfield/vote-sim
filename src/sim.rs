@@ -8,6 +8,7 @@ pub struct Sim {
     pub scores: Array2<f64>,
     pub ranks: Array2<usize>,
     pub regrets: Vec<f64>,
+    pub cand_by_regret: Vec<usize>,
     scratch_ranks: Vec<usize>,
 }
 
@@ -21,6 +22,7 @@ impl Sim {
             scores,
             ranks,
             regrets: vec![0.0; ncand],
+            cand_by_regret: (0..ncand).collect(),
             scratch_ranks: (0..ncand).collect(),
         }
     }
@@ -63,6 +65,7 @@ impl Sim {
         }
     }
 
+    // Side-effects: compute self.regrets and self.cand_by_regret
     fn compute_regrets(&mut self) {
         let mut max_util = f64::MIN;
         let mut avg_util = 0.0;
@@ -81,6 +84,8 @@ impl Sim {
         for u in self.regrets.iter_mut() {
             *u = (max_util - *u) / (max_util - avg_util);
         }
+        self.cand_by_regret
+            .sort_by(|&a, &b| self.regrets[a].partial_cmp(&self.regrets[b]).unwrap());
     }
 
     fn rank_candidates(&mut self) {

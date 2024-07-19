@@ -1,4 +1,4 @@
-use arrow_array::builder::{Float64Builder, ListBuilder};
+use arrow_array::builder::{Float64Builder, Int32Builder, ListBuilder};
 use arrow_array::RecordBatch;
 use parquet::{arrow::ArrowWriter, basic::Compression, file::properties::WriterProperties};
 
@@ -8,9 +8,9 @@ use std::{error::Error, sync::Arc};
 
 use crate::consideration::Consideration;
 use crate::cov_matrix::CovMatrix;
+use crate::methods::RRV;
 use crate::methods::{MethodTracker, Strategy};
 use crate::sim::Sim;
-use crate::methods::RRV;
 
 pub fn run(
     axes: &mut [&mut dyn Consideration],
@@ -24,12 +24,15 @@ pub fn run(
 
     // Create Arrow array builders:
     let mut cov_bld = ListBuilder::new(ListBuilder::new(Float64Builder::new()));
-    let mut cov_matrix = CovMatrix::new(sim.ncand);
+    let mut ideal_cnd_bld = Int32Builder::with_capacity(trials);
+
     // TODO: add column(s) for candidates: ideal candidate, candidate regrets (FixedSizeList), position arrays
     // Prepend "m_" to method column names to identify these.
     // Position arrays: StructArray: likeability, p0, p1, ... (1 value per candidate)
     // TODO: Use position arrays to demonstrate that RRV primaries spread out the candidates
     //   in position space and improve likeability.
+
+    let mut cov_matrix = CovMatrix::new(sim.ncand);
 
     let mut rrv = if let Some(sim_primary) = &sim_primary {
         Some(RRV::new(&sim_primary, 10, Strategy::Honest))
@@ -42,13 +45,12 @@ pub fn run(
 
         if let Some(rrv) = &mut rrv {
             let sim_primary: &mut Sim = sim_primary.as_mut().unwrap();
-            sim_primary.election(axes, &mut rng, itrial==0);
-            let final_candidates = rrv.multi_elect(&sim_primary, None, sim.ncand, itrial==0);
+            sim_primary.election(axes, &mut rng, itrial == 0);
+            let final_candidates = rrv.multi_elect(&sim_primary, None, sim.ncand, itrial == 0);
             if itrial == 0 {
                 println!("primary election winners: {:?}", final_candidates);
             }
             sim.take_from_primary(sim_primary, &final_candidates);
-
         } else {
             sim.election(axes, &mut rng, itrial == 0);
         }
@@ -72,6 +74,7 @@ pub fn run(
             }
         }
 
+        ideal_cnd_bld.append_value(sim.cand_by_regret[0] as i32);
         cov_matrix.compute(&sim.scores);
         for ix in 0..sim.ncand {
             for iy in 0..(ix + 1) {
@@ -86,11 +89,13 @@ pub fn run(
     }
 
     let mut columns: Vec<arrow_array::ArrayRef> = Vec::new();
+    columns.push(Arc::new(ideal_cnd_bld.finish()) as arrow_array::ArrayRef);
     columns.push(Arc::new(cov_bld.finish()) as arrow_array::ArrayRef);
     for method in methods.iter_mut() {
         columns.push(method.get_column());
     }
     let mut schema = SchemaBuilder::new();
+    schema.push(Field::new("ideal_cand", DataType::Int32, true));
     schema.push(Field::new(
         "cov_matrix",
         DataType::List(Arc::new(Field::new(
