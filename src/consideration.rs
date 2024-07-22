@@ -1,3 +1,4 @@
+use crate::methods::ElectResult;
 use ndarray::Array2;
 use rand::rngs::ThreadRng;
 use rand::Rng;
@@ -6,6 +7,13 @@ use std::fmt;
 
 pub trait Consideration: fmt::Debug {
     fn add_to_scores(&mut self, scores: &mut Array2<f64>, rng: &mut ThreadRng, verbose: bool);
+    fn get_dim(&self) -> usize;
+    fn get_name(&self) -> String;
+    fn push_posn_elements(
+        &self,
+        report: &mut dyn FnMut(f64, bool),
+        final_candidates: Option<&Vec<ElectResult>>,
+    );
 }
 
 //////////////////////////////////////////
@@ -13,13 +21,17 @@ pub trait Consideration: fmt::Debug {
 #[derive(Debug)]
 pub struct Likability {
     pub stretch_factor: f64,
+    scores: Vec<f64>,
 }
 
-// impl Likability {
-//     fn gen_cand_like<R: Rng>(&self, rng: &mut R) -> f64 {
-//         NORMAL.ind_sample(rng) * self.stretch_factor
-//     }
-// }
+impl Likability {
+    pub fn new(stretch_factor: f64, ncand: usize) -> Likability {
+        Likability {
+            stretch_factor,
+            scores: Vec::with_capacity(ncand),
+        }
+    }
+}
 
 // TODO: Perhaps add a kind of Likability for which some voters care more about than others.
 
@@ -34,12 +46,38 @@ impl Consideration for Likability {
         // for _ in 0..ncand {
         //     candidates.push(self.gen_cand_like(&mut rng));
         // }
+        self.scores.clear();
         for i in 0..ncand {
             let cand_like: f64 = rng.sample(StandardNormal);
             let cand_like = cand_like * self.stretch_factor;
+            self.scores.push(cand_like);
             for j in 0..ncit {
                 //*scores.get_mut((j, i)).unwrap() = *candidates.get(i).unwrap();
                 *scores.get_mut((j, i)).unwrap() += cand_like;
+            }
+        }
+    }
+
+    fn get_dim(&self) -> usize {
+        1
+    }
+
+    fn get_name(&self) -> String {
+        "likability".to_string()
+    }
+
+    fn push_posn_elements(
+        &self,
+        report: &mut dyn FnMut(f64, bool),
+        final_candidates: Option<&Vec<ElectResult>>,
+    ) {
+        if let Some(final_candidates) = final_candidates {
+            for fc in final_candidates.iter() {
+                report(self.scores[fc.cand], true);
+            }
+        } else {
+            for &score in self.scores.iter() {
+                report(score, true);
             }
         }
     }
@@ -98,6 +136,30 @@ impl Consideration for Issue {
             }
         }
     }
+
+    fn get_dim(&self) -> usize {
+        1
+    }
+
+    fn get_name(&self) -> String {
+        "issue".to_string()
+    }
+
+    fn push_posn_elements(
+        &self,
+        report: &mut dyn FnMut(f64, bool),
+        final_candidates: Option<&Vec<ElectResult>>,
+    ) {
+        if let Some(final_candidates) = final_candidates {
+            for fc in final_candidates.iter() {
+                report(self.cand_position[fc.cand], true);
+            }
+        } else {
+            for &posn in self.cand_position.iter() {
+                report(posn, true);
+            }
+        }
+    }
 }
 
 //////////////////////////////////////////
@@ -149,6 +211,35 @@ impl Consideration for MDIssue {
                     distsq += (self.cand_position[(i, p)] - cit_position[p]).powi(2);
                 }
                 scores[(j, i)] = -distsq.sqrt();
+            }
+        }
+    }
+
+    fn get_dim(&self) -> usize {
+        self.issues.len()
+    }
+
+    fn get_name(&self) -> String {
+        "issues".to_string()
+    }
+
+    fn push_posn_elements(
+        &self,
+        report: &mut dyn FnMut(f64, bool),
+        final_candidates: Option<&Vec<ElectResult>>,
+    ) {
+        let (ncand, npos) = self.cand_position.dim();
+        if let Some(final_candidates) = final_candidates {
+            for fc in final_candidates.iter() {
+                for ipos in 0..npos {
+                    report(self.cand_position[(fc.cand, ipos)], ipos == npos - 1);
+                }
+            }
+        } else {
+            for icand in 0..ncand {
+                for ipos in 0..npos {
+                    report(self.cand_position[(icand, ipos)], ipos == npos - 1);
+                }
             }
         }
     }

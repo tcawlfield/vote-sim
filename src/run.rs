@@ -29,10 +29,17 @@ pub fn run(
         Float64Builder::with_capacity(trials * sim.ncand),
         sim.ncand as i32,
     );
+    let mut cand_posn_blds = Vec::new();
+    for consid in axes.iter() {
+        cand_posn_blds.push(FixedSizeListBuilder::new(
+            FixedSizeListBuilder::new(
+                Float64Builder::with_capacity(trials * sim.ncand * consid.get_dim()),
+                consid.get_dim() as i32,
+            ),
+            sim.ncand as i32,
+        ));
+    }
 
-    // TODO: add column(s) for candidates: position arrays
-    // Prepend "m_" to method column names to identify these.
-    // Position arrays: StructArray: likeability, p0, p1, ... (1 value per candidate)
     // TODO: Use position arrays to demonstrate that RRV primaries spread out the candidates
     //   in position space and improve likeability.
 
@@ -47,7 +54,7 @@ pub fn run(
     for itrial in 0..trials {
         // println!("Sim election {}", itrial + 1);
 
-        if let Some(rrv) = &mut rrv {
+        let final_candidates = if let Some(rrv) = &mut rrv {
             let sim_primary: &mut Sim = sim_primary.as_mut().unwrap();
             sim_primary.election(axes, &mut rng, itrial == 0);
             let final_candidates = rrv.multi_elect(&sim_primary, None, sim.ncand, itrial == 0);
@@ -55,9 +62,11 @@ pub fn run(
                 println!("primary election winners: {:?}", final_candidates);
             }
             sim.take_from_primary(sim_primary, &final_candidates);
+            Some(final_candidates)
         } else {
             sim.election(axes, &mut rng, itrial == 0);
-        }
+            None
+        };
 
         let mut prev_rslt = None;
         for method in methods.iter_mut() {
@@ -94,11 +103,27 @@ pub fn run(
             cov_bld.values().append(true); // End of row
         }
         cov_bld.append(true); // End of matrix
+
+        for (consid, pos_bld) in axes.iter().zip(cand_posn_blds.iter_mut()) {
+            consid.push_posn_elements(
+                &mut |x, next_row| {
+                    pos_bld.values().values().append_value(x);
+                    if next_row {
+                        pos_bld.values().append(true);
+                    }
+                },
+                final_candidates,
+            );
+            pos_bld.append(true);
+        }
     }
 
     let mut columns: Vec<arrow_array::ArrayRef> = Vec::new();
     columns.push(Arc::new(ideal_cnd_bld.finish()) as arrow_array::ArrayRef);
     columns.push(Arc::new(cand_regret_bld.finish()) as arrow_array::ArrayRef);
+    for cpb in cand_posn_blds.iter_mut() {
+        columns.push(Arc::new(cpb.finish()) as arrow_array::ArrayRef);
+    }
     columns.push(Arc::new(cov_bld.finish()) as arrow_array::ArrayRef);
     for method in methods.iter_mut() {
         columns.push(method.get_column());
@@ -113,6 +138,23 @@ pub fn run(
         ),
         true,
     ));
+    for consid in axes.iter() {
+        schema.push(Field::new(
+            consid.get_name(),
+            DataType::FixedSizeList(
+                Arc::new(Field::new(
+                    "item",
+                    DataType::FixedSizeList(
+                        Arc::new(Field::new("item", DataType::Float64, true)),
+                        consid.get_dim() as i32,
+                    ),
+                    true,
+                )),
+                sim.ncand as i32,
+            ),
+            true,
+        ));
+    }
     schema.push(Field::new(
         "cov_matrix",
         DataType::List(Arc::new(Field::new(

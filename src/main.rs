@@ -51,9 +51,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let ncand = args.candidates;
     let ncit = args.voters;
     let max_cand = args.primary_candidates.unwrap_or(ncand);
-    let mut likability = Likability {
-        stretch_factor: 0.2,
-    };
+    let mut likability = Likability::new(0.2, max_cand);
     let mut issues = MDIssue::new(
         vec![
             Issue::new(1.0, 1.0, 1.0, max_cand),
