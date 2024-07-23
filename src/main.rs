@@ -36,6 +36,10 @@ struct Args {
     /// Output file
     #[arg(short, long)]
     outfile: Option<std::ffi::OsString>,
+
+    // Likability factor
+    #[arg(long, default_value_t=0.4)]
+    likefactor: f64,
 }
 
 fn main() {
@@ -51,7 +55,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let ncand = args.candidates;
     let ncit = args.voters;
     let max_cand = args.primary_candidates.unwrap_or(ncand);
-    let mut likability = Likability::new(0.2, max_cand);
+    let mut likability = Likability::new(args.likefactor, max_cand);
     let mut issues = MDIssue::new(
         vec![
             Issue::new(1.0, 1.0, 1.0, max_cand),

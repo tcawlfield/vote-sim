@@ -210,7 +210,7 @@ impl Consideration for MDIssue {
                 for p in 0..npos {
                     distsq += (self.cand_position[(i, p)] - cit_position[p]).powi(2);
                 }
-                scores[(j, i)] = -distsq.sqrt();
+                *scores.get_mut((j, i)).unwrap() += -distsq.sqrt();
             }
         }
     }
