@@ -1,0 +1,5 @@
+seaborn
+pyarrow
+awkward
+s3fs
+ipyleaflet
