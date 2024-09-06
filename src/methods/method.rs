@@ -1,6 +1,6 @@
 use crate::sim::Sim;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ElectResult {
     pub cand: usize,
     pub score: f64,

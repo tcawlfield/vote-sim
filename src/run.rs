@@ -46,7 +46,7 @@ pub fn run(
     let mut cov_matrix = CovMatrix::new(sim.ncand);
 
     let mut rrv = if let Some(sim_primary) = &sim_primary {
-        Some(RRV::new(&sim_primary, 10, Strategy::Honest))
+        Some(RRV::new(&sim_primary, 10, 0.5, Strategy::Honest))
     } else {
         None
     };
