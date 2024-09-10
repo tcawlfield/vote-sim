@@ -1,5 +1,6 @@
 use arrow_array::builder::{FixedSizeListBuilder, Float64Builder, Int32Builder, ListBuilder};
 use arrow_array::RecordBatch;
+use parquet::file::metadata::KeyValue;
 use parquet::{arrow::ArrowWriter, basic::Compression, file::properties::WriterProperties};
 
 use arrow_schema::{DataType, Field, SchemaBuilder};
@@ -11,6 +12,7 @@ use crate::cov_matrix::CovMatrix;
 use crate::methods::RRV;
 use crate::methods::{MethodTracker, Strategy};
 use crate::sim::Sim;
+use crate::config::Config;
 
 pub fn run(
     axes: &mut [&mut dyn Consideration],
@@ -19,6 +21,7 @@ pub fn run(
     trials: usize,
     outfile: &Option<std::ffi::OsString>,
     sim_primary: &mut Option<Sim>,
+    config: &Config,
 ) -> Result<(), Box<dyn Error>> {
     let mut rng = rand::thread_rng();
 
@@ -170,9 +173,13 @@ pub fn run(
     }
     let batch = RecordBatch::try_new(Arc::new(schema.finish()), columns).unwrap();
 
+    let config_str = serde_json::to_string(config).unwrap();
     if let Some(filename) = outfile {
         let props = WriterProperties::builder()
             .set_compression(Compression::SNAPPY)
+            .set_key_value_metadata(Some(
+                vec![KeyValue::new("voting_config".to_owned(), config_str)]
+            ))
             .build();
         let file = fs::File::create(&filename)?;
         let mut writer = ArrowWriter::try_new(file, batch.schema(), Some(props)).unwrap();

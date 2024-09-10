@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::ffi::OsString;
 
 use clap::Parser;
 use std::process;
@@ -9,33 +10,38 @@ mod cov_matrix;
 mod methods;
 mod run;
 mod sim;
+mod config;
 
 use consideration::*;
 use methods::*;
 use sim::Sim;
 
-#[derive(Parser, Debug)]
+#[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// Number of voters
-    #[arg(short, long, default_value_t = 7)]
-    voters: usize,
-
-    /// Number of candidates
-    #[arg(short, long, default_value_t = 4)]
-    candidates: usize,
-
-    /// number of candidates in a primary (RRV) election. (No primary by default.)
-    #[arg(short, long)]
-    primary_candidates: Option<usize>,
-
     /// Number of trials
     #[arg(short, long, default_value_t = 1)]
     trials: usize,
 
+    /// Config file
+    #[arg(short, long, default_value = OsString::from("configs/default.toml"))]
+    config: OsString,
+
     /// Output file
     #[arg(short, long)]
-    outfile: Option<std::ffi::OsString>,
+    outfile: Option<OsString>,
+
+    /// Number of voters (override config)
+    #[arg(short, long)]
+    voters: Option<usize>,
+
+    /// Number of candidates (override config)
+    #[arg(short='C', long)]
+    candidates: Option<usize>,
+
+    /// number of candidates in a primary (RRV) election. (No primary by default.)
+    #[arg(short, long)]
+    primary_candidates: Option<usize>,
 
     // Likability factor
     #[arg(long, default_value_t=0.4)]
@@ -52,14 +58,21 @@ fn main() {
 fn run() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
 
-    let ncand = args.candidates;
-    let ncit = args.voters;
+    let mut config = config::Config::from_file(args.config)?;
+    if let Some(ncand) = args.candidates {
+        config.candidates = ncand;
+    }
+    if let Some(ncit) = args.voters {
+        config.voters = ncit;
+    }
+    let ncand = config.candidates;
+    let ncit = config.voters;
     let max_cand = args.primary_candidates.unwrap_or(ncand);
     let mut likability = Likability::new(args.likefactor, max_cand);
     let mut issues = MDIssue::new(
         vec![
-            Issue::new(1.0, 1.0, 1.0, max_cand),
-            Issue::new(0.5, 0.0, 0.0, max_cand),
+            Issue::new(1.0, 2.0, 2.0, max_cand),
+            Issue::new(0.5, 1.5, 1.5, max_cand),
         ],
         max_cand,
     );
@@ -107,5 +120,6 @@ fn run() -> Result<(), Box<dyn Error>> {
         args.trials,
         &args.outfile,
         &mut primary_sim,
+        &config,
     )
 }
