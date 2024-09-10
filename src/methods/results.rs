@@ -1,4 +1,4 @@
-use crate::sim::Sim;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ElectResult {
@@ -13,20 +13,8 @@ pub struct WinnerAndRunnerup {
     pub runnerup: ElectResult,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum Strategy {
     Honest,
     Strategic,
-}
-
-pub trait Method {
-    fn elect(
-        &mut self,
-        sim: &Sim,
-        honest_rslt: Option<WinnerAndRunnerup>,
-        verbose: bool,
-    ) -> WinnerAndRunnerup;
-    fn name(&self) -> String;
-    fn colname(&self) -> String;
-    fn strat(&self) -> Strategy;
 }

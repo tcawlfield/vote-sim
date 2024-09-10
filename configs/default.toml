@@ -1,2 +1,30 @@
 voters = 1000
 candidates = 5
+
+[[methods]]
+[methods.Plurality]
+strat = "Honest"
+
+[[methods]]
+[methods.Plurality]
+strat = "Strategic"
+
+[[methods]]
+[methods.Range]
+strat = "Honest"
+nranks = 10
+
+[[methods]]
+[methods.Range]
+strat = "Strategic"
+nranks = 10
+
+[[methods]]  # Approval voting, honest
+[methods.Range]
+strat = "Honest"
+nranks = 2
+
+[[methods]]  # Approval voting, strategic
+[methods.Range]
+strat = "Strategic"
+nranks = 2

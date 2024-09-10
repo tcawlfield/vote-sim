@@ -1,51 +1,58 @@
-use super::method::{Method, Strategy, WinnerAndRunnerup};
+use super::method_sim::MethodSim;
+use super::results::{Strategy, WinnerAndRunnerup};
 use super::tallies::{tally_votes, Tallies};
 use crate::sim::Sim;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Plurality {
     pub strat: Strategy,
-    scratch_tallies: Tallies,
+}
+
+#[derive(Debug)]
+pub struct PluralitySim {
+    params: Plurality,
+    tallies: Tallies,
 }
 
 impl Plurality {
-    pub fn new(sim: &Sim, strat: Strategy) -> Plurality {
-        Plurality {
-            strat,
-            scratch_tallies: vec![0; sim.ncand],
+    pub fn new_sim(&self, sim: &Sim) -> PluralitySim {
+        PluralitySim {
+            params: self.clone(),
+            tallies: vec![0; sim.ncand],
         }
     }
 }
 
-impl Method for Plurality {
+impl MethodSim for PluralitySim {
     fn elect(
         &mut self,
         sim: &Sim,
         honest_rslt: Option<WinnerAndRunnerup>,
         verbose: bool,
     ) -> WinnerAndRunnerup {
-        match self.strat {
+        match self.params.strat {
             Strategy::Honest => {
-                self.scratch_tallies.fill(0);
+                self.tallies.fill(0);
                 for icit in 0..sim.ncit {
-                    self.scratch_tallies[sim.ranks[(icit, 0)]] += 1;
+                    self.tallies[sim.ranks[(icit, 0)]] += 1;
                 }
             }
             Strategy::Strategic => {
                 let pre_poll = if let Some(prev) = honest_rslt {
                     prev
                 } else {
-                    self.strat = Strategy::Honest;
+                    self.params.strat = Strategy::Honest;
                     let prev = self.elect(&sim, None, false);
-                    self.strat = Strategy::Strategic;
+                    self.params.strat = Strategy::Strategic;
                     prev
                 };
-                self.scratch_tallies.fill(0);
+                self.tallies.fill(0);
                 for icit in 0..sim.ncit {
                     for rank in 0..sim.ncand {
                         let icand = sim.ranks[(icit, rank)];
                         if icand == pre_poll.winner.cand || icand == pre_poll.runnerup.cand {
-                            self.scratch_tallies[icand] += 1;
+                            self.tallies[icand] += 1;
                             break;
                         }
                     }
@@ -55,25 +62,25 @@ impl Method for Plurality {
         if verbose {
             println!(
                 "Plurality votes ({:?}): {:?}",
-                self.strat, self.scratch_tallies
+                self.params.strat, self.tallies
             );
         }
-        tally_votes(&self.scratch_tallies)
+        tally_votes(&self.tallies)
     }
 
     fn name(&self) -> String {
-        format!("Plurality, {:?}", self.strat)
+        format!("Plurality, {:?}", self.params.strat)
     }
 
     fn colname(&self) -> String {
-        match self.strat {
+        match self.params.strat {
             Strategy::Honest => format!("pl_h"),
             Strategy::Strategic => format!("pl_s"),
         }
     }
 
     fn strat(&self) -> Strategy {
-        self.strat
+        self.params.strat
     }
 }
 

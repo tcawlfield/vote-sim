@@ -1,10 +1,9 @@
 use ndarray::{Array2, Axis};
-use float_eq::{assert_float_eq, float_eq};
 
-use super::method::{Strategy, WinnerAndRunnerup};
+use super::rangevoting::fill_range_ballot;
+use super::results::{Strategy, WinnerAndRunnerup};
 use crate::sim::Sim;
 use crate::ElectResult;
-use super::rangevoting::fill_range_ballot;
 
 #[derive(Debug)]
 pub struct RRV {
@@ -47,7 +46,10 @@ impl RRV {
             fill_range_ballot(
                 &sim.scores.index_axis(Axis(0), icit),
                 self.ranks,
-                self.ballots.index_axis_mut(Axis(0), icit).as_slice_mut().unwrap()
+                self.ballots
+                    .index_axis_mut(Axis(0), icit)
+                    .as_slice_mut()
+                    .unwrap(),
             );
         }
 
@@ -58,7 +60,10 @@ impl RRV {
             self.wtd_scores.fill(0.0);
             for i in 0..sim.ncit {
                 // Weight is K / (K + SUM/MAX)
-                let sum = self.winners.iter().fold(0, |sum, j| sum + self.ballots[(i, j.cand)]);
+                let sum = self
+                    .winners
+                    .iter()
+                    .fold(0, |sum, j| sum + self.ballots[(i, j.cand)]);
                 let wt = self.k / (self.k + (sum as f64) / ((self.ranks - 1) as f64));
                 for j in self.remaining.iter() {
                     self.wtd_scores[*j] += wt * (self.ballots[(i, *j)] as f64);
@@ -83,7 +88,10 @@ impl RRV {
                 (winner_idx, winner_score)
             };
             let winner = self.remaining.swap_remove(winner_idx);
-            self.winners.push(ElectResult{cand: winner, score: winner_score});
+            self.winners.push(ElectResult {
+                cand: winner,
+                score: winner_score,
+            });
         }
         &self.winners
     }
@@ -91,7 +99,8 @@ impl RRV {
 
 #[cfg(test)]
 mod tests {
-    // Note this useful idiom: importing names from outer (for mod tests) scope.
+    use float_eq::assert_float_eq;
+
     use super::*;
     use crate::sim::Sim;
     use crate::ElectResult;
@@ -101,17 +110,19 @@ mod tests {
         // Using a situation described here: https://rangevoting.org/RRVr.html
         let mut sim = Sim::new(5, 100);
         let mut rrv = RRV::new(&sim, 11, 1.0, Strategy::Honest);
-        for icit in 0..60 {  // Team A
+        for icit in 0..60 {
+            // Team A
             sim.scores[(icit, 0)] = 10.; // A1
-            sim.scores[(icit, 1)] = 9.;  // A2
-            sim.scores[(icit, 2)] = 8.;  // A3
-            sim.scores[(icit, 3)] = 1.;  // B1
-            sim.scores[(icit, 4)] = 0.;  // B2
+            sim.scores[(icit, 1)] = 9.; // A2
+            sim.scores[(icit, 2)] = 8.; // A3
+            sim.scores[(icit, 3)] = 1.; // B1
+            sim.scores[(icit, 4)] = 0.; // B2
         }
-        for icit in 60..100 {  // Team B
-            sim.scores[(icit, 0)] = 0.;  // A1
-            sim.scores[(icit, 1)] = 0.;  // A2
-            sim.scores[(icit, 2)] = 0.;  // A3
+        for icit in 60..100 {
+            // Team B
+            sim.scores[(icit, 0)] = 0.; // A1
+            sim.scores[(icit, 1)] = 0.; // A2
+            sim.scores[(icit, 2)] = 0.; // A3
             sim.scores[(icit, 3)] = 10.; // B1
             sim.scores[(icit, 4)] = 10.; // B2
         }
@@ -120,16 +131,28 @@ mod tests {
         assert_eq!(results.len(), 3);
 
         // First round, full weights, cand A1 wins with 600 pts (60 * 10 + 40 * 0)
-        assert_eq!(results[0], ElectResult{cand: 0, score: 600.});
+        assert_eq!(
+            results[0],
+            ElectResult {
+                cand: 0,
+                score: 600.
+            }
+        );
 
         // Round 2
         // Team A got their favorite and are now all deweighted by half: 10 / (10 + 10)
         // Team B got nothing, no deweighting.
         // Cand B1 (idx 3) has 30 downweighted points from Team A, 400 pts from team B
-        assert_eq!(results[1], ElectResult{cand: 3, score: 430.},);
+        assert_eq!(
+            results[1],
+            ElectResult {
+                cand: 3,
+                score: 430.
+            },
+        );
 
         // Round 3
-        let a_weight = 10. / (10. + 10. + 1.);  // Winner B1 had score of 1 for A group
+        let a_weight = 10. / (10. + 10. + 1.); // Winner B1 had score of 1 for A group
         let a2_score = a_weight * 9. * 60.;
         // assert_eq!(results[2], ElectResult{cand: 1, score: a2_score});
         assert_eq!(results[2].cand, 1);
@@ -140,4 +163,3 @@ mod tests {
         assert_eq!(rrv.ballots[(0, 4)], 0);
     }
 }
- 

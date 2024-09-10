@@ -6,11 +6,11 @@ use arrow_array::{ArrayRef, Float64Array, Int32Array, StructArray};
 use arrow_schema::{DataType, Field, Fields};
 use meansd::MeanSD;
 
-use super::method::{Method, WinnerAndRunnerup};
+use crate::methods::{Method, MethodSim, WinnerAndRunnerup};
 use crate::sim::Sim;
 
 pub struct MethodTracker {
-    pub method: Box<dyn Method>,
+    pub method: Box<dyn MethodSim>,
     ntrials: usize,
     ntrials_subopt: usize,
     mean_regret: MeanSD,
@@ -20,9 +20,9 @@ pub struct MethodTracker {
 }
 
 impl MethodTracker {
-    pub fn new(method: Box<dyn Method>, max_trials: usize) -> MethodTracker {
+    pub fn new(method: &Method, sim: &Sim, max_trials: usize) -> MethodTracker {
         MethodTracker {
-            method,
+            method: method.as_sim(sim),
             ntrials: 0,
             ntrials_subopt: 0,
             mean_regret: MeanSD::default(),

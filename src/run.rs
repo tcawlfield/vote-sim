@@ -7,12 +7,13 @@ use arrow_schema::{DataType, Field, SchemaBuilder};
 use std::fs;
 use std::{error::Error, sync::Arc};
 
+use crate::config::Config;
 use crate::consideration::Consideration;
 use crate::cov_matrix::CovMatrix;
+use crate::methods::Strategy;
 use crate::methods::RRV;
-use crate::methods::{MethodTracker, Strategy};
 use crate::sim::Sim;
-use crate::config::Config;
+use crate::MethodTracker;
 
 pub fn run(
     axes: &mut [&mut dyn Consideration],
@@ -177,9 +178,10 @@ pub fn run(
     if let Some(filename) = outfile {
         let props = WriterProperties::builder()
             .set_compression(Compression::SNAPPY)
-            .set_key_value_metadata(Some(
-                vec![KeyValue::new("voting_config".to_owned(), config_str)]
-            ))
+            .set_key_value_metadata(Some(vec![KeyValue::new(
+                "voting_config".to_owned(),
+                config_str,
+            )]))
             .build();
         let file = fs::File::create(&filename)?;
         let mut writer = ArrowWriter::try_new(file, batch.schema(), Some(props)).unwrap();

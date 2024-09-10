@@ -1,4 +1,4 @@
-use super::method::{ElectResult, WinnerAndRunnerup};
+use super::results::{ElectResult, WinnerAndRunnerup};
 
 pub type Tallies = Vec<i32>;
 

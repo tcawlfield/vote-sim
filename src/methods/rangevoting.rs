@@ -1,43 +1,49 @@
 use ndarray::{ArrayView, Ix1};
+use serde::{Deserialize, Serialize};
 
-use super::method::{Method, Strategy, WinnerAndRunnerup};
+use super::method_sim::MethodSim;
+use super::results::{Strategy, WinnerAndRunnerup};
 use super::tallies::{tally_votes, Tallies};
 use crate::sim::Sim;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RangeVoting {
     pub strat: Strategy,
     nranks: i32,
-    scratch_tallies: Tallies,
+}
+
+#[derive(Debug)]
+pub struct RangeVotingSim {
+    params: RangeVoting,
+    tallies: Tallies,
     ballot: Tallies,
 }
 
 impl RangeVoting {
-    pub fn new(sim: &Sim, ranks: i32, strat: Strategy) -> RangeVoting {
-        RangeVoting {
-            strat,
-            nranks: ranks,
-            scratch_tallies: vec![0; sim.ncand],
+    pub fn new_sim(&self, sim: &Sim) -> RangeVotingSim {
+        RangeVotingSim {
+            params: self.clone(),
+            tallies: vec![0; sim.ncand],
             ballot: vec![0; sim.ncand],
         }
     }
 }
 
-impl Method for RangeVoting {
+impl MethodSim for RangeVotingSim {
     fn elect(
         &mut self,
         sim: &Sim,
         honest_rslt: Option<WinnerAndRunnerup>,
         verbose: bool,
     ) -> WinnerAndRunnerup {
-        self.scratch_tallies.fill(0);
+        self.tallies.fill(0);
         // for icit in 0..sim.ncit {
         for vscores in sim.scores.outer_iter() {
-            fill_range_ballot(&vscores, self.nranks, &mut self.ballot);
-            match self.strat {
+            fill_range_ballot(&vscores, self.params.nranks, &mut self.ballot);
+            match self.params.strat {
                 Strategy::Honest => {
                     for icand in 0..vscores.len() {
-                        self.scratch_tallies[icand] += self.ballot[icand];
+                        self.tallies[icand] += self.ballot[icand];
                         // if verbose {
                         //     println!("cand {} has ballot {:?}", icand, self.ballot);
                         // }
@@ -51,7 +57,7 @@ impl Method for RangeVoting {
                     };
                     for icand in 0..vscores.len() {
                         if icand != runnerup {
-                            self.scratch_tallies[icand] += self.ballot[icand];
+                            self.tallies[icand] += self.ballot[icand];
                         }
                         // We score the runner-up in the pre-election a zero, not affecting the tallies.
                     }
@@ -59,35 +65,35 @@ impl Method for RangeVoting {
             }
         }
         if verbose {
-            println!("{} tallies: {:?}", self.name(), self.scratch_tallies);
+            println!("{} tallies: {:?}", self.name(), self.tallies);
         }
-        tally_votes(&self.scratch_tallies)
+        tally_votes(&self.tallies)
     }
 
     fn name(&self) -> String {
-        if self.nranks == 2 {
-            format!("Approval, {:?}", self.strat)
+        if self.params.nranks == 2 {
+            format!("Approval, {:?}", self.params.strat)
         } else {
-            format!("Range 1-{}, {:?}", self.nranks, self.strat)
+            format!("Range 1-{}, {:?}", self.params.nranks, self.params.strat)
         }
     }
 
     fn colname(&self) -> String {
-        if self.nranks == 2 {
-            match self.strat {
+        if self.params.nranks == 2 {
+            match self.params.strat {
                 Strategy::Honest => format!("aprv_h"),
                 Strategy::Strategic => format!("aprv_s"),
             }
         } else {
-            match self.strat {
-                Strategy::Honest => format!("range_{}_h", self.nranks),
-                Strategy::Strategic => format!("range_{}_s", self.nranks),
+            match self.params.strat {
+                Strategy::Honest => format!("range_{}_h", self.params.nranks),
+                Strategy::Strategic => format!("range_{}_s", self.params.nranks),
             }
         }
     }
 
     fn strat(&self) -> Strategy {
-        self.strat
+        self.params.strat
     }
 }
 

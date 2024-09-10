@@ -5,14 +5,16 @@ use clap::Parser;
 use std::process;
 
 // Local libraries
+mod config;
 mod consideration;
 mod cov_matrix;
+mod method_tracker;
 mod methods;
 mod run;
 mod sim;
-mod config;
 
 use consideration::*;
+use method_tracker::MethodTracker;
 use methods::*;
 use sim::Sim;
 
@@ -36,7 +38,7 @@ struct Args {
     voters: Option<usize>,
 
     /// Number of candidates (override config)
-    #[arg(short='C', long)]
+    #[arg(short = 'C', long)]
     candidates: Option<usize>,
 
     /// number of candidates in a primary (RRV) election. (No primary by default.)
@@ -44,7 +46,7 @@ struct Args {
     primary_candidates: Option<usize>,
 
     // Likability factor
-    #[arg(long, default_value_t=0.4)]
+    #[arg(long, default_value_t = 0.4)]
     likefactor: f64,
 }
 
@@ -86,32 +88,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         None
     };
 
-    let mut methods: Vec<MethodTracker> = vec![
-        MethodTracker::new(
-            Box::new(Plurality::new(&sim, Strategy::Honest)),
-            args.trials,
-        ),
-        MethodTracker::new(
-            Box::new(Plurality::new(&sim, Strategy::Strategic)),
-            args.trials,
-        ),
-        MethodTracker::new(
-            Box::new(RangeVoting::new(&sim, 10, Strategy::Honest)),
-            args.trials,
-        ),
-        MethodTracker::new(
-            Box::new(RangeVoting::new(&sim, 10, Strategy::Strategic)),
-            args.trials,
-        ),
-        MethodTracker::new(
-            Box::new(RangeVoting::new(&sim, 2, Strategy::Honest)),
-            args.trials,
-        ),
-        MethodTracker::new(
-            Box::new(RangeVoting::new(&sim, 2, Strategy::Strategic)),
-            args.trials,
-        ),
-    ];
+    let mut methods: Vec<MethodTracker> = config
+        .methods
+        .iter()
+        .map(|m| MethodTracker::new(m, &sim, args.trials))
+        .collect();
 
     run::run(
         &mut axes,

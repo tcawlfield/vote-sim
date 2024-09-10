@@ -1,16 +1,17 @@
-use std::path::Path;
 use std::error::Error;
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
 use crate::consideration::*;
-use crate::methods::*;
+use crate::methods::Method;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub voters: usize,
     pub candidates: usize,
     pub primary_candidates: Option<usize>,
+    pub methods: Vec<Method>,
 }
 
 impl Config {
