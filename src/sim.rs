@@ -1,4 +1,5 @@
-use crate::{consideration::*, ElectResult};
+use crate::consideration::*;
+use crate::methods::ElectResult;
 use ndarray::Array2;
 use rand::rngs::ThreadRng;
 

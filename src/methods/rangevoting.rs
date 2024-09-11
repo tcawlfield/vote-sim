@@ -9,7 +9,7 @@ use crate::sim::Sim;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RangeVoting {
     pub strat: Strategy,
-    nranks: i32,
+    pub nranks: i32,
 }
 
 #[derive(Debug)]

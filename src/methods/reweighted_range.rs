@@ -1,19 +1,25 @@
 use ndarray::{Array2, Axis};
+use serde::{Deserialize, Serialize};
 
+use super::method_sim::MWMethodSim;
 use super::rangevoting::fill_range_ballot;
 use super::results::{Strategy, WinnerAndRunnerup};
+use crate::methods::ElectResult;
 use crate::sim::Sim;
-use crate::ElectResult;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RRV {
     pub strat: Strategy,
-    ranks: i32,
+    pub ranks: i32,
+    pub k: f64,
+}
+
+pub struct RRVSim {
+    p: RRV,
     wtd_scores: Vec<f64>,
     ballots: Array2<i32>,
     winners: Vec<ElectResult>,
     remaining: Vec<usize>,
-    k: f64,
 }
 
 /*
@@ -22,19 +28,19 @@ I'm using this purely as a method of spreading out candidates across the positio
 */
 
 impl RRV {
-    pub fn new(sim: &Sim, ranks: i32, k: f64, strat: Strategy) -> RRV {
-        RRV {
-            strat,
-            ranks,
+    pub fn new_sim(&self, sim: &Sim) -> RRVSim {
+        RRVSim {
+            p: self.clone(),
             wtd_scores: vec![0.; sim.ncand],
             ballots: Array2::zeros((sim.ncit, sim.ncand)),
             winners: Vec::with_capacity(sim.ncand),
             remaining: Vec::with_capacity(sim.ncand),
-            k,
         }
     }
+}
 
-    pub fn multi_elect(
+impl MWMethodSim for RRVSim {
+    fn multi_elect(
         &mut self,
         sim: &Sim,
         _honest_rslt: Option<WinnerAndRunnerup>,
@@ -45,7 +51,7 @@ impl RRV {
         for icit in 0..sim.ncit {
             fill_range_ballot(
                 &sim.scores.index_axis(Axis(0), icit),
-                self.ranks,
+                self.p.ranks,
                 self.ballots
                     .index_axis_mut(Axis(0), icit)
                     .as_slice_mut()
@@ -64,7 +70,7 @@ impl RRV {
                     .winners
                     .iter()
                     .fold(0, |sum, j| sum + self.ballots[(i, j.cand)]);
-                let wt = self.k / (self.k + (sum as f64) / ((self.ranks - 1) as f64));
+                let wt = self.p.k / (self.p.k + (sum as f64) / ((self.p.ranks - 1) as f64));
                 for j in self.remaining.iter() {
                     self.wtd_scores[*j] += wt * (self.ballots[(i, *j)] as f64);
                 }
@@ -103,13 +109,18 @@ mod tests {
 
     use super::*;
     use crate::sim::Sim;
-    use crate::ElectResult;
+    use crate::methods::ElectResult;
 
     #[test]
     fn test_rrv() {
         // Using a situation described here: https://rangevoting.org/RRVr.html
         let mut sim = Sim::new(5, 100);
-        let mut rrv = RRV::new(&sim, 11, 1.0, Strategy::Honest);
+        let mut rrv = RRV {
+            strat: Strategy::Honest,
+            ranks: 11,
+            k: 1.0,
+        }
+        .new_sim(&sim);
         for icit in 0..60 {
             // Team A
             sim.scores[(icit, 0)] = 10.; // A1

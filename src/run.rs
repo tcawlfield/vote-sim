@@ -9,22 +9,45 @@ use std::{error::Error, sync::Arc};
 
 use crate::config::Config;
 use crate::consideration::Consideration;
+use crate::consideration::*;
 use crate::cov_matrix::CovMatrix;
+use crate::method_tracker::MethodTracker;
 use crate::methods::Strategy;
-use crate::methods::RRV;
 use crate::sim::Sim;
-use crate::MethodTracker;
 
 pub fn run(
-    axes: &mut [&mut dyn Consideration],
-    sim: &mut Sim,
-    methods: &mut [MethodTracker],
+    config: &Config,
     trials: usize,
     outfile: &Option<std::ffi::OsString>,
-    sim_primary: &mut Option<Sim>,
-    config: &Config,
 ) -> Result<(), Box<dyn Error>> {
     let mut rng = rand::thread_rng();
+
+    let ncand = config.candidates;
+    let ncit = config.voters;
+    let max_cand = config.primary_candidates.unwrap_or(ncand);
+    let mut likability = Likability::new(config.likefactor, max_cand);
+    let mut issues = MDIssue::new(
+        vec![
+            Issue::new(1.0, 2.0, 2.0, max_cand),
+            Issue::new(0.5, 1.5, 1.5, max_cand),
+        ],
+        max_cand,
+    );
+    let mut axes: [&mut dyn Consideration; 2] = [&mut likability, &mut issues];
+
+    let mut sim = Sim::new(ncand, ncit);
+
+    let mut sim_primary = if let Some(pcand) = config.primary_candidates {
+        Some(Sim::new(pcand, ncit))
+    } else {
+        None
+    };
+
+    let mut methods: Vec<MethodTracker> = config
+        .methods
+        .iter()
+        .map(|m| MethodTracker::new(m, &sim, trials))
+        .collect();
 
     // Create Arrow array builders:
     let mut cov_bld = ListBuilder::new(ListBuilder::new(Float64Builder::new()));
@@ -49,8 +72,8 @@ pub fn run(
 
     let mut cov_matrix = CovMatrix::new(sim.ncand);
 
-    let mut rrv = if let Some(sim_primary) = &sim_primary {
-        Some(RRV::new(&sim_primary, 10, 0.5, Strategy::Honest))
+    let mut mwms = if let Some(sim_primary) = &sim_primary {
+        Some(config.primary_method.as_sim(&sim_primary))
     } else {
         None
     };
@@ -58,9 +81,9 @@ pub fn run(
     for itrial in 0..trials {
         // println!("Sim election {}", itrial + 1);
 
-        let final_candidates = if let Some(rrv) = &mut rrv {
+        let final_candidates = if let Some(rrv) = &mut mwms {
             let sim_primary: &mut Sim = sim_primary.as_mut().unwrap();
-            sim_primary.election(axes, &mut rng, itrial == 0);
+            sim_primary.election(&mut axes, &mut rng, itrial == 0);
             let final_candidates = rrv.multi_elect(&sim_primary, None, sim.ncand, itrial == 0);
             if itrial == 0 {
                 println!("primary election winners: {:?}", final_candidates);
@@ -68,7 +91,7 @@ pub fn run(
             sim.take_from_primary(sim_primary, &final_candidates);
             Some(final_candidates)
         } else {
-            sim.election(axes, &mut rng, itrial == 0);
+            sim.election(&mut axes, &mut rng, itrial == 0);
             None
         };
 

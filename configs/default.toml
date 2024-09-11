@@ -1,13 +1,17 @@
-voters = 1000
-candidates = 5
+voters = 100
+candidates = 4
+likefactor = 0.4
 
-[[methods]]
-[methods.Plurality]
+[primary_method.RRV]
 strat = "Honest"
+ranks = 21
+k = 0.5
 
 [[methods]]
-[methods.Plurality]
-strat = "Strategic"
+Plurality = { strat = "Honest" }
+
+[[methods]]
+Plurality = { strat = "Strategic" }
 
 [[methods]]
 [methods.Range]

@@ -3,15 +3,17 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use crate::consideration::*;
-use crate::methods::Method;
+// use crate::consideration::*;
+use crate::methods::{Method, MultiWinMethod};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub voters: usize,
     pub candidates: usize,
     pub primary_candidates: Option<usize>,
+    pub likefactor: f64,
     pub methods: Vec<Method>,
+    pub primary_method: MultiWinMethod,
 }
 
 impl Config {

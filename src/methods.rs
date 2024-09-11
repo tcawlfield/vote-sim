@@ -5,7 +5,7 @@ mod results;
 mod reweighted_range;
 mod tallies;
 
-pub use method_sim::MethodSim;
+pub use method_sim::{MWMethodSim, MethodSim};
 pub use plurality::Plurality;
 pub use rangevoting::RangeVoting;
 pub use results::{ElectResult, Strategy, WinnerAndRunnerup};
@@ -29,6 +29,15 @@ impl Method {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub enum MultiWinMethod {
-    RangeVoting,
+    RRV(RRV),
+}
+
+impl MultiWinMethod {
+    pub fn as_sim(&self, sim: &Sim) -> Box<dyn MWMethodSim> {
+        match self {
+            MultiWinMethod::RRV(m) => Box::new(m.new_sim(sim)),
+        }
+    }
 }

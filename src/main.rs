@@ -13,11 +13,6 @@ mod methods;
 mod run;
 mod sim;
 
-use consideration::*;
-use method_tracker::MethodTracker;
-use methods::*;
-use sim::Sim;
-
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Args {
@@ -44,10 +39,6 @@ struct Args {
     /// number of candidates in a primary (RRV) election. (No primary by default.)
     #[arg(short, long)]
     primary_candidates: Option<usize>,
-
-    // Likability factor
-    #[arg(long, default_value_t = 0.4)]
-    likefactor: f64,
 }
 
 fn main() {
@@ -67,40 +58,9 @@ fn run() -> Result<(), Box<dyn Error>> {
     if let Some(ncit) = args.voters {
         config.voters = ncit;
     }
-    let ncand = config.candidates;
-    let ncit = config.voters;
-    let max_cand = args.primary_candidates.unwrap_or(ncand);
-    let mut likability = Likability::new(args.likefactor, max_cand);
-    let mut issues = MDIssue::new(
-        vec![
-            Issue::new(1.0, 2.0, 2.0, max_cand),
-            Issue::new(0.5, 1.5, 1.5, max_cand),
-        ],
-        max_cand,
-    );
-    let mut axes: [&mut dyn Consideration; 2] = [&mut likability, &mut issues];
+    if let Some(pcand) = args.primary_candidates {
+        config.primary_candidates = Some(pcand);
+    }
 
-    let mut sim = Sim::new(ncand, ncit);
-
-    let mut primary_sim = if let Some(pcand) = args.primary_candidates {
-        Some(Sim::new(pcand, ncit))
-    } else {
-        None
-    };
-
-    let mut methods: Vec<MethodTracker> = config
-        .methods
-        .iter()
-        .map(|m| MethodTracker::new(m, &sim, args.trials))
-        .collect();
-
-    run::run(
-        &mut axes,
-        &mut sim,
-        &mut methods[..],
-        args.trials,
-        &args.outfile,
-        &mut primary_sim,
-        &config,
-    )
+    run::run(&config, args.trials, &args.outfile)
 }
