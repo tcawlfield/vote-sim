@@ -1,4 +1,4 @@
-use crate::consideration::*;
+use crate::considerations::*;
 use crate::methods::ElectResult;
 use ndarray::Array2;
 use rand::rngs::ThreadRng;
@@ -30,7 +30,7 @@ impl Sim {
 
     pub fn election(
         &mut self,
-        axes: &mut [&mut dyn Consideration],
+        axes: &mut [Box<dyn ConsiderationSim>],
         rng: &mut ThreadRng,
         verbose: bool,
     ) {
@@ -53,7 +53,7 @@ impl Sim {
 
     fn get_scores(
         &mut self,
-        axes: &mut [&mut dyn Consideration],
+        axes: &mut [Box<dyn ConsiderationSim>],
         rng: &mut ThreadRng,
         verbose: bool,
     ) {

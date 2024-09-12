@@ -8,8 +8,7 @@ use std::fs;
 use std::{error::Error, sync::Arc};
 
 use crate::config::Config;
-use crate::consideration::Consideration;
-use crate::consideration::*;
+use crate::considerations::ConsiderationSim;
 use crate::cov_matrix::CovMatrix;
 use crate::method_tracker::MethodTracker;
 use crate::methods::Strategy;
@@ -24,16 +23,6 @@ pub fn run(
 
     let ncand = config.candidates;
     let ncit = config.voters;
-    let max_cand = config.primary_candidates.unwrap_or(ncand);
-    let mut likability = Likability::new(config.likefactor, max_cand);
-    let mut issues = MDIssue::new(
-        vec![
-            Issue::new(1.0, 2.0, 2.0, max_cand),
-            Issue::new(0.5, 1.5, 1.5, max_cand),
-        ],
-        max_cand,
-    );
-    let mut axes: [&mut dyn Consideration; 2] = [&mut likability, &mut issues];
 
     let mut sim = Sim::new(ncand, ncit);
 
@@ -41,6 +30,14 @@ pub fn run(
         Some(Sim::new(pcand, ncit))
     } else {
         None
+    };
+
+    let mut axes: Vec<Box<dyn ConsiderationSim>> = {
+        let max_sim = sim_primary.as_ref().unwrap_or(&sim);
+        config.considerations
+        .iter()
+        .map(|c| c.as_sim(max_sim))
+        .collect()
     };
 
     let mut methods: Vec<MethodTracker> = config

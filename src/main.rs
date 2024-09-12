@@ -6,7 +6,7 @@ use std::process;
 
 // Local libraries
 mod config;
-mod consideration;
+mod considerations;
 mod cov_matrix;
 mod method_tracker;
 mod methods;
