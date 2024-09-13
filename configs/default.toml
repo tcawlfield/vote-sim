@@ -1,9 +1,12 @@
 voters = 100
 candidates = 4
 
+# Candidates can be drawn from a larger population using a multi-winner method
+# primary_candidates = 7
 [primary_method.RRV]
 strat = "Honest"
 ranks = 21
+# 0.5 <= k <= 1.0 -- smaller values downweight appeased ballots more.
 k = 0.5
 
 [[considerations]]
