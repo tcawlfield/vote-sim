@@ -100,7 +100,7 @@ pub fn run(
             if let Strategy::Honest = method.method.strat() {
                 prev_rslt = Some(rslt);
             } else {
-                prev_rslt = None;
+                // prev_rslt = None;
             }
             if itrial == 0 {
                 println!(
