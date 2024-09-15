@@ -16,8 +16,7 @@ as a population, always performed worse for themselves (collectively) than
 honest voters. But for the *plurality* voting method, that seems like an irrational
 result, and [other voting simulations](https://electionscience.github.io/vse-sim/)
 gave opposite results. I wanted to weigh in on this, and my simulation here produces
-the result that in plurality voting (and only that method of the ones I simulated),
-a population of strategic voters do better for themselves.
+the result that in *plurality* voting, a population of strategic voters do better for themselves.
 
 For all other methods considered here, strategic voters tend to get worse results for the
 whole population.
@@ -26,7 +25,7 @@ Consider STAR voting. STAR uses a score-based ballot. The suggested scale is 0-5
 possible scores for each candidate. Step one: Add up the scores for each candidate. Find the
 *two* highest-scoring candidates. Step two: do an (instant) runoff between these, using
 every ballot where these two finalists were given different scores. This runoff is
-a plurality vote, counting the number of ballots that favor one candidate over the other.
+a plurality vote, counting the numbers of ballots that favor each one candidate over the other.
 * Using plurality to pick the final winner helps minimize strategic effects in two ways:
   * Degree of score-separation no longer is considered
   * Voters are encouraged to differentiate between candidates, especially any who are
@@ -40,22 +39,6 @@ a plurality vote, counting the number of ballots that favor one candidate over t
 
 So by reason of that, plurality voting with strategic voters is much less horrible than it
 is with honest voters.
-
-### More questions:
-
-* How does dimensionality of issue space affect things?
-* Can we generate candidates in a way that mimics real election results?
-  * Try generating candidates in position-space by doing a multi-seat pre-election. This
-    might help distribute candidates more uniformly in position space.
-* How does candidate generation affect regret?
-* Resistance against manipulation
-  * If one point in issue space correlates with (encourages) strategic voting, does this influence election results?
-  * Does it reduce manipulation to rescale approval scores?
-* Compare range voting with plurality, approval, and IRV/RCV.
-  * Debate exists about ranked choice versus Bayesian regret
-  * Approval voting avoids degrees of favor, but conveys less information than range & IRV.
-    How does it stack up against IRV in particular? Are there alternative evaluation systems to
-    regret?
 
 ## Thoughts
 
@@ -72,12 +55,14 @@ First thought: A voting method attempts to capture the collective will of the pe
 It is not the role of a voting method to address the difference between perceived utility
 and actual utility that a canditate may provide to a voter.
 
-Second thought: It is possible for some collective activities (for instance, voting)
-to result in collective intelligence. Other activities can produce collective stupidity.
-A better voting method ought to result in better intelligence than a poorer one.
-It may be possible for a voting method to help maximize *actual utility* even while
+Second thought: It has been observed that some collective activities
+result in "collective intelligence." But other activities can produce collective stupidity.
+A good voting method ought to result in collective intelligence.
+So it may be possible for a voting method to help maximize *actual utility* even while
 individual ballots can only be based on percieved utility. This should only be possible
 if perceived utility, on average, has a positive correlation with actual utility.
+This can be modelled in a simulation, provided there is some distinction made
+between (simulated) actual utility and perceived, which would be affected by biases.
 
 ### Ideal virtues of voting methods
 
@@ -183,3 +168,24 @@ worst of us, not the best, regardless of the merits of any voting system.
     * I'm not convinced multiplication makes much sense. But addition vs distance is interesting.
 
 ## To-Do
+
+* Fix strategic ballot scores
+* Allow a fraction of the population to be strategic
+* Allow a political faction to be more strategic than another
+  * Under different methods, how much are strategic voters wrongly rewarded?
+
+### More questions:
+
+* How does dimensionality of issue space affect things?
+* Can we generate candidates in a way that mimics real election results?
+  * Try generating candidates in position-space by doing a multi-seat pre-election. This
+    might help distribute candidates more uniformly in position space.
+* How does candidate generation affect regret?
+* Resistance against manipulation
+  * If one point in issue space correlates with (encourages) strategic voting, does this influence election results?
+  * Does it reduce manipulation to rescale approval scores?
+* Compare range voting with plurality, approval, and IRV/RCV.
+  * Debate exists about ranked choice versus Bayesian regret
+  * Approval voting avoids degrees of favor, but conveys less information than range & IRV.
+    How does it stack up against IRV in particular? Are there alternative evaluation systems to
+    regret?

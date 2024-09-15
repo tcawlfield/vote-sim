@@ -108,8 +108,8 @@ mod tests {
     use float_eq::assert_float_eq;
 
     use super::*;
-    use crate::sim::Sim;
     use crate::methods::ElectResult;
+    use crate::sim::Sim;
 
     #[test]
     fn test_rrv() {

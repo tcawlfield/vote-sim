@@ -34,10 +34,11 @@ pub fn run(
 
     let mut axes: Vec<Box<dyn ConsiderationSim>> = {
         let max_sim = sim_primary.as_ref().unwrap_or(&sim);
-        config.considerations
-        .iter()
-        .map(|c| c.as_sim(max_sim))
-        .collect()
+        config
+            .considerations
+            .iter()
+            .map(|c| c.as_sim(max_sim))
+            .collect()
     };
 
     let mut methods: Vec<MethodTracker> = config

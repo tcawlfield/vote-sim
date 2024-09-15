@@ -1,10 +1,10 @@
+use super::ConsiderationSim;
+use crate::methods::ElectResult;
+use crate::sim::Sim;
+use ndarray::Array2;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use rand_distr::StandardNormal;
-use ndarray::Array2;
-use crate::methods::ElectResult;
-use crate::sim::Sim;
-use super::ConsiderationSim;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Issue {
@@ -42,8 +42,11 @@ impl ConsiderationSim for IssuesSim {
         let npos = self.p.issues.len();
         for i in 0..ncand {
             for ipos in 0..npos {
-                self.cand_position[(i, ipos)] =
-                    gen_bimodal_gauss(self.p.issues[ipos].sigma, self.p.issues[ipos].halfcsep, &mut rng);
+                self.cand_position[(i, ipos)] = gen_bimodal_gauss(
+                    self.p.issues[ipos].sigma,
+                    self.p.issues[ipos].halfcsep,
+                    &mut rng,
+                );
             }
         }
         if verbose {
@@ -52,8 +55,11 @@ impl ConsiderationSim for IssuesSim {
         let mut cit_position = vec![0.0; npos];
         for j in 0..ncit {
             for ipos in 0..npos {
-                cit_position[ipos] =
-                    gen_bimodal_gauss(self.p.issues[ipos].sigma, self.p.issues[ipos].halfvsep, &mut rng);
+                cit_position[ipos] = gen_bimodal_gauss(
+                    self.p.issues[ipos].sigma,
+                    self.p.issues[ipos].halfvsep,
+                    &mut rng,
+                );
             }
             if verbose && ncit < 20 {
                 println!("cit {}: {:?}", j, cit_position);

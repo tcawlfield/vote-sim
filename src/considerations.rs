@@ -1,14 +1,14 @@
-use std::fmt;
-use ndarray::Array2;
-use rand::rngs::ThreadRng;
 use crate::methods::ElectResult;
 use crate::sim::Sim;
+use ndarray::Array2;
+use rand::rngs::ThreadRng;
+use std::fmt;
 
-mod likability;
 mod issues;
+mod likability;
 
-pub use likability::Likability;
 pub use issues::Issues;
+pub use likability::Likability;
 
 pub trait ConsiderationSim: fmt::Debug {
     fn add_to_scores(&mut self, scores: &mut Array2<f64>, rng: &mut ThreadRng, verbose: bool);

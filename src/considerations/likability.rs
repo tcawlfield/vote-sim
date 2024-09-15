@@ -1,9 +1,9 @@
+use crate::methods::ElectResult;
+use crate::sim::Sim;
 use ndarray::Array2;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use rand_distr::StandardNormal;
-use crate::methods::ElectResult;
-use crate::sim::Sim;
 
 use super::ConsiderationSim;
 
@@ -21,7 +21,6 @@ use super::ConsiderationSim;
 pub struct Likability {
     pub mean: f64,
 }
-
 
 #[derive(Debug)]
 pub struct LikabilitySim {
