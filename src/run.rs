@@ -37,7 +37,7 @@ pub fn run(
         config
             .considerations
             .iter()
-            .map(|c| c.as_sim(max_sim))
+            .map(|c| c.new_sim(max_sim))
             .collect()
     };
 
@@ -71,7 +71,7 @@ pub fn run(
     let mut cov_matrix = CovMatrix::new(sim.ncand);
 
     let mut mwms = if let Some(sim_primary) = &sim_primary {
-        Some(config.primary_method.as_sim(&sim_primary))
+        Some(config.primary_method.new_sim(&sim_primary))
     } else {
         None
     };

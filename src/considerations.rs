@@ -28,7 +28,7 @@ pub enum Consideration {
 }
 
 impl Consideration {
-    pub fn as_sim(&self, sim: &Sim) -> Box<dyn ConsiderationSim> {
+    pub fn new_sim(&self, sim: &Sim) -> Box<dyn ConsiderationSim> {
         match self {
             Consideration::Likability(c) => Box::new(c.new_sim(sim)),
             Consideration::Issues(c) => Box::new(c.new_sim(sim)),

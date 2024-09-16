@@ -67,7 +67,7 @@ impl Sim {
     }
 
     // Side-effects: compute self.regrets and self.cand_by_regret
-    fn compute_regrets(&mut self) {
+    pub fn compute_regrets(&mut self) {
         let mut max_util = f64::MIN;
         let mut avg_util = 0.0;
         for j in 0..self.ncand {
@@ -89,7 +89,7 @@ impl Sim {
             .sort_by(|&a, &b| self.regrets[a].partial_cmp(&self.regrets[b]).unwrap());
     }
 
-    fn rank_candidates(&mut self) {
+    pub fn rank_candidates(&mut self) {
         for i in 0..self.ncit {
             self.scratch_ranks.sort_by(|&a, &b| {
                 self.scores[(i, b)]

@@ -22,7 +22,7 @@ pub struct MethodTracker {
 impl MethodTracker {
     pub fn new(method: &Method, sim: &Sim, max_trials: usize) -> MethodTracker {
         MethodTracker {
-            method: method.as_sim(sim),
+            method: method.new_sim(sim),
             ntrials: 0,
             ntrials_subopt: 0,
             mean_regret: MeanSD::default(),

@@ -48,3 +48,7 @@ nranks = 2
 [methods.Range]
 strat = "Strategic"
 nranks = 2
+
+[[methods]]  # IRV honest
+[methods.InstantRunoff]
+strat = "Honest"
