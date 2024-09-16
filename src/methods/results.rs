@@ -18,3 +18,9 @@ pub enum Strategy {
     Honest,
     Strategic,
 }
+
+impl WinnerAndRunnerup {
+    pub fn is_tied(&self) -> bool {
+        self.winner.score == self.runnerup.score
+    }
+}

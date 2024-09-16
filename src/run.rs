@@ -95,7 +95,10 @@ pub fn run(
 
         let mut prev_rslt = None;
         for method in methods.iter_mut() {
-            let rslt = method.elect(&sim, prev_rslt, itrial == 0);
+            let mut rslt = method.elect(&sim, prev_rslt, itrial == 0);
+            if rslt.is_tied() {
+                rslt = sim.break_tie_with_plurality(&rslt);
+            }
             let regret = sim.regrets[rslt.winner.cand];
             if let Strategy::Honest = method.method.strat() {
                 prev_rslt = Some(rslt);

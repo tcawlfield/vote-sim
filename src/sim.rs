@@ -1,5 +1,6 @@
 use crate::considerations::*;
-use crate::methods::ElectResult;
+use crate::methods::{ElectResult, WinnerAndRunnerup};
+use meansd::binned::Width;
 use ndarray::Array2;
 use rand::rngs::ThreadRng;
 
@@ -99,6 +100,19 @@ impl Sim {
             for j in 0..self.ncand {
                 self.ranks[(i, j)] = self.scratch_ranks[j];
             }
+        }
+    }
+
+    pub fn break_tie_with_plurality(&self, result: &WinnerAndRunnerup) -> WinnerAndRunnerup {
+        if !result.is_tied() {
+            result.clone()
+        } else if self.regrets[result.runnerup.cand] < self.regrets[result.winner.cand] {
+            WinnerAndRunnerup {
+                winner: result.runnerup,
+                runnerup: result.winner,
+            }
+        } else {
+            result.clone()
         }
     }
 
