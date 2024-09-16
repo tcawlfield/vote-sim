@@ -54,3 +54,15 @@ nranks = 2
 
 [[methods]]  # Borda honest
 [methods.Borda]
+
+[[methods]]
+[methods.Multivote]
+strat = "Honest"
+votes = 3
+spread_fact = 1.0
+
+# [[methods]]
+# [methods.Multivote]
+# strat = "Strategic"  # Same as honest plurality ATM
+# votes = 3
+# spread_fact = 1.0

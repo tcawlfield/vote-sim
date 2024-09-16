@@ -1,6 +1,5 @@
 use crate::considerations::*;
 use crate::methods::{ElectResult, WinnerAndRunnerup};
-use meansd::binned::Width;
 use ndarray::Array2;
 use rand::rngs::ThreadRng;
 

@@ -1,6 +1,7 @@
 mod borda;
 mod instant_runoff;
 mod method_sim;
+mod multivote;
 mod plurality;
 mod rangevoting;
 mod results;
@@ -10,6 +11,7 @@ mod tallies;
 pub use borda::Borda;
 pub use instant_runoff::InstantRunoff;
 pub use method_sim::{MWMethodSim, MethodSim};
+pub use multivote::Multivote;
 pub use plurality::Plurality;
 pub use rangevoting::RangeVoting;
 pub use results::{ElectResult, Strategy, WinnerAndRunnerup};
@@ -24,6 +26,7 @@ pub enum Method {
     Range(RangeVoting),
     InstantRunoff(InstantRunoff),
     Borda(Borda),
+    Multivote(Multivote),
 }
 
 impl Method {
@@ -33,6 +36,7 @@ impl Method {
             Method::Range(m) => Box::new(m.new_sim(sim)),
             Method::InstantRunoff(m) => Box::new(m.new_sim(sim)),
             Method::Borda(m) => Box::new(m.new_sim(sim)),
+            Method::Multivote(m) => Box::new(m.new_sim(sim)),
         }
     }
 }
