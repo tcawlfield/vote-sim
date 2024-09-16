@@ -1,4 +1,4 @@
-voters = 100
+voters = 101
 candidates = 4
 
 # Candidates can be drawn from a larger population using a multi-winner method
@@ -51,4 +51,6 @@ nranks = 2
 
 [[methods]]  # IRV honest
 [methods.InstantRunoff]
-strat = "Honest"
+
+[[methods]]  # Borda honest
+[methods.Borda]

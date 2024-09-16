@@ -1,3 +1,4 @@
+mod borda;
 mod instant_runoff;
 mod method_sim;
 mod plurality;
@@ -6,6 +7,7 @@ mod results;
 mod reweighted_range;
 mod tallies;
 
+pub use borda::Borda;
 pub use instant_runoff::InstantRunoff;
 pub use method_sim::{MWMethodSim, MethodSim};
 pub use plurality::Plurality;
@@ -21,6 +23,7 @@ pub enum Method {
     Plurality(Plurality),
     Range(RangeVoting),
     InstantRunoff(InstantRunoff),
+    Borda(Borda),
 }
 
 impl Method {
@@ -29,6 +32,7 @@ impl Method {
             Method::Plurality(m) => Box::new(m.new_sim(sim)),
             Method::Range(m) => Box::new(m.new_sim(sim)),
             Method::InstantRunoff(m) => Box::new(m.new_sim(sim)),
+            Method::Borda(m) => Box::new(m.new_sim(sim)),
         }
     }
 }

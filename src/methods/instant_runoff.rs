@@ -108,7 +108,7 @@ impl MethodSim for IRVSim {
     }
 
     fn name(&self) -> String {
-        format!("IRV, {:?}", "Honest")
+        format!("IRV, {}", "Honest")
     }
 
     fn colname(&self) -> String {
