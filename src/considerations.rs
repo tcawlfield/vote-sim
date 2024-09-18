@@ -4,9 +4,11 @@ use ndarray::Array2;
 use rand::rngs::ThreadRng;
 use std::fmt;
 
+mod irrational;
 mod issues;
 mod likability;
 
+pub use irrational::Irrational;
 pub use issues::Issues;
 pub use likability::Likability;
 
@@ -25,6 +27,7 @@ pub trait ConsiderationSim: fmt::Debug {
 pub enum Consideration {
     Likability(Likability),
     Issues(Issues),
+    Irrational(Irrational),
 }
 
 impl Consideration {
@@ -32,6 +35,7 @@ impl Consideration {
         match self {
             Consideration::Likability(c) => Box::new(c.new_sim(sim)),
             Consideration::Issues(c) => Box::new(c.new_sim(sim)),
+            Consideration::Irrational(c) => Box::new(c.new_sim(sim)),
         }
     }
 }

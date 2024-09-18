@@ -135,7 +135,11 @@ pub fn run(
         for (consid, pos_bld) in axes.iter().zip(cand_posn_blds.iter_mut()) {
             consid.push_posn_elements(
                 &mut |x, next_row| {
-                    pos_bld.values().values().append_value(x);
+                    if x.is_nan() {
+                        pos_bld.values().values().append_null();
+                    } else {
+                        pos_bld.values().values().append_value(x);
+                    }
                     if next_row {
                         pos_bld.values().append(true);
                     }
