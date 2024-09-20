@@ -59,7 +59,7 @@ impl MethodTracker {
             Arc::new(Field::new("winner", DataType::Int32, false)),
             Arc::new(Field::new("regret", DataType::Float64, false)),
         ]));
-        Field::new(self.method.colname(), dt, false)
+        Field::new(format!("m:{}", self.method.colname()), dt, false)
     }
 
     pub fn get_column(&mut self) -> arrow_array::ArrayRef {
