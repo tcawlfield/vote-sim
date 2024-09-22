@@ -60,9 +60,9 @@ impl Sim {
         self.scores.fill(0.0);
         for ax in axes.iter_mut() {
             ax.add_to_scores(&mut self.scores, rng, verbose);
-            if self.ncit < 20 && verbose {
-                println!("scores for {:?}:\n{:?}", ax, &mut self.scores);
-            }
+        }
+        if self.ncit < 20 && verbose {
+            println!("Voter utilities:\n{:?}", &mut self.scores);
         }
     }
 

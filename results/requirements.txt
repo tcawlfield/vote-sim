@@ -3,3 +3,5 @@ pyarrow
 awkward
 s3fs
 ipyleaflet
+tomlkit
+pandas

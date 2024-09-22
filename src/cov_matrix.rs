@@ -21,6 +21,7 @@ impl CovMatrix {
 
     pub fn compute(&mut self, scores: &Array2<f64>) {
         let (ncit, ncand) = scores.dim();
+        assert_eq!(self.elements.dim().0, ncand);
         self.mean.fill(0.0);
         self.elements.fill(0.0);
         for icit in 0..ncit {

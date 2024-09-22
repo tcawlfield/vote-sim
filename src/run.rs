@@ -93,6 +93,11 @@ pub fn run(
             None
         };
 
+        cov_matrix.compute(&sim.scores);
+        if itrial == 0 {
+            println!("Cov matrix: {}", cov_matrix.elements);
+        }
+
         let mut prev_rslt = None;
         for method in methods.iter_mut() {
             let mut rslt = method.elect(&sim, prev_rslt, itrial == 0);
@@ -120,7 +125,6 @@ pub fn run(
             cand_regret_bld.values().append_value(*rgrt);
         }
         cand_regret_bld.append(true);
-        cov_matrix.compute(&sim.scores);
         for ix in 0..sim.ncand {
             for iy in 0..(ix + 1) {
                 cov_bld

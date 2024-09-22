@@ -1,0 +1,47 @@
+voters = 8
+candidates = 4
+
+# Candidates can be drawn from a larger population using a multi-winner method
+# primary_candidates = 7
+[primary_method.RRV]
+strat = "Honest"
+ranks = 21
+# 0.5 <= k <= 1.0 -- smaller values downweight appeased ballots more.
+k = 0.5
+
+[[considerations]]
+Likability = { mean = 0.1 }
+
+# [[considerations]]
+# [[considerations.Issues.issues]]
+# sigma = 1.0
+# halfcsep = 1.0
+# halfvsep = 0.5
+# [[considerations.Issues.issues]]
+# sigma = 0.5
+# halfcsep = 0.75
+# halfvsep = 0.75
+
+# [[considerations]]
+# [considerations.Irrational]
+# sigma = 1.0
+# camps = 0
+# individualism_deg = 20.0
+
+[[methods]]
+Plurality = { strat = "Honest" }
+
+[[methods]]
+[methods.Range]
+strat = "Honest"
+nranks = 5
+strategic_stretch_factor = 1.0
+
+[[methods]]  # Approval voting
+[methods.Range]
+strat = "Honest"
+nranks = 2
+strategic_stretch_factor = 1.0
+
+[[methods]]  # IRV honest
+[methods.InstantRunoff]

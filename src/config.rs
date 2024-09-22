@@ -13,7 +13,16 @@ pub struct Config {
     pub primary_candidates: Option<usize>,
     pub considerations: Vec<Consideration>,
     pub methods: Vec<Method>,
+    #[serde(default = "default_primary")]
     pub primary_method: MultiWinMethod,
+}
+
+fn default_primary() -> MultiWinMethod {
+    MultiWinMethod::RRV(crate::methods::RRV {
+        strat: crate::methods::Strategy::Honest,
+        ranks: 25,
+        k: 0.5,
+    })
 }
 
 impl Config {
