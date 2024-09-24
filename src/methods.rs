@@ -6,6 +6,7 @@ mod plurality;
 mod rangevoting;
 mod results;
 mod reweighted_range;
+mod star;
 mod tallies;
 
 pub use borda::Borda;
@@ -16,6 +17,7 @@ pub use plurality::Plurality;
 pub use rangevoting::RangeVoting;
 pub use results::{ElectResult, Strategy, WinnerAndRunnerup};
 pub use reweighted_range::RRV;
+pub use star::STAR;
 
 use crate::sim::Sim;
 use serde::{Deserialize, Serialize};
@@ -27,6 +29,7 @@ pub enum Method {
     InstantRunoff(InstantRunoff),
     Borda(Borda),
     Multivote(Multivote),
+    STAR(STAR),
 }
 
 impl Method {
@@ -37,6 +40,7 @@ impl Method {
             Method::InstantRunoff(m) => Box::new(m.new_sim(sim)),
             Method::Borda(m) => Box::new(m.new_sim(sim)),
             Method::Multivote(m) => Box::new(m.new_sim(sim)),
+            Method::STAR(m) => Box::new(m.new_sim(sim)),
         }
     }
 }

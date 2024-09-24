@@ -61,6 +61,15 @@ strat = "Honest"
 votes = 3
 spread_fact = 1.0
 
+[[methods]]
+[methods.STAR]
+strat = "Honest"
+
+[[methods]]
+[methods.STAR]
+strat = "Strategic"
+strategic_stretch_factor = 2.0
+
 # [[methods]]
 # [methods.Multivote]
 # strat = "Strategic"  # Same as honest plurality ATM
