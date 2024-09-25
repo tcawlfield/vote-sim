@@ -1,6 +1,6 @@
 use crate::considerations::*;
 use crate::methods::{ElectResult, WinnerAndRunnerup};
-use ndarray::Array2;
+use ndarray::{Array2, Axis};
 use rand::rngs::ThreadRng;
 
 pub struct Sim {
@@ -86,7 +86,7 @@ impl Sim {
             *u = (max_util - *u) / (max_util - avg_util);
         }
         self.cand_by_regret
-            .sort_by(|&a, &b| self.regrets[a].partial_cmp(&self.regrets[b]).unwrap());
+            .sort_by(|&a, &b| self.regrets[a].partial_cmp(&self.regrets[b]).unwrap_or(std::cmp::Ordering::Equal));
     }
 
     pub fn rank_candidates(&mut self) {
@@ -105,13 +105,24 @@ impl Sim {
     pub fn break_tie_with_plurality(&self, result: &WinnerAndRunnerup) -> WinnerAndRunnerup {
         if !result.is_tied() {
             result.clone()
-        } else if self.regrets[result.runnerup.cand] < self.regrets[result.winner.cand] {
-            WinnerAndRunnerup {
-                winner: result.runnerup,
-                runnerup: result.winner,
-            }
         } else {
-            result.clone()
+            let mut runup_votes = 0;
+            let mut winner_votes = 0;
+            for utilities in self.scores.axis_iter(Axis(0)) {
+                if utilities[result.winner.cand] >= utilities[result.runnerup.cand] {
+                    winner_votes += 1;
+                } else {
+                    runup_votes += 1;
+                }
+            }
+            if runup_votes > winner_votes {
+                WinnerAndRunnerup {
+                    winner: result.runnerup,
+                    runnerup: result.winner,
+                }
+            } else {
+                result.clone()
+            }
         }
     }
 

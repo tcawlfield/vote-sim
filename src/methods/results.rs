@@ -7,7 +7,7 @@ pub struct ElectResult {
 }
 
 // WinnerAndRunnerup is useful for strategic methods
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WinnerAndRunnerup {
     pub winner: ElectResult,
     pub runnerup: ElectResult,
