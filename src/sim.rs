@@ -85,8 +85,11 @@ impl Sim {
         for u in self.regrets.iter_mut() {
             *u = (max_util - *u) / (max_util - avg_util);
         }
-        self.cand_by_regret
-            .sort_by(|&a, &b| self.regrets[a].partial_cmp(&self.regrets[b]).unwrap_or(std::cmp::Ordering::Equal));
+        self.cand_by_regret.sort_by(|&a, &b| {
+            self.regrets[a]
+                .partial_cmp(&self.regrets[b])
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
     }
 
     pub fn rank_candidates(&mut self) {

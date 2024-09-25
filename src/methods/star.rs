@@ -2,10 +2,10 @@ use ndarray::Array2;
 use serde::{Deserialize, Serialize};
 
 use super::method_sim::MethodSim;
-use super::results::{Strategy, WinnerAndRunnerup};
+use super::rangevoting::{fill_range_ballot, fill_range_ballot_strat};
+use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
 use super::tallies::{tally_votes, Tallies};
 use crate::sim::Sim;
-use super::rangevoting::{fill_range_ballot, fill_range_ballot_strat};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct STAR {
@@ -91,13 +91,28 @@ impl MethodSim for STARSim {
         let runoff = tally_votes(&self.tallies);
         let ca = runoff.winner.cand;
         let cb = runoff.runnerup.cand;
-        if self.preference_matrix[(cb, ca)] > self.preference_matrix[(ca, cb)] {
-            WinnerAndRunnerup{
-                winner: runoff.runnerup,
-                runnerup: runoff.winner,
+        if self.preference_matrix[(ca, cb)] >= self.preference_matrix[(cb, ca)] {
+            WinnerAndRunnerup {
+                winner: ElectResult {
+                    cand: runoff.winner.cand,
+                    score: self.preference_matrix[(ca, cb)] as f64,
+                },
+                runnerup: ElectResult {
+                    cand: runoff.runnerup.cand,
+                    score: self.preference_matrix[(cb, ca)] as f64,
+                },
             }
         } else {
-            runoff
+            WinnerAndRunnerup {
+                winner: ElectResult {
+                    cand: runoff.runnerup.cand,
+                    score: self.preference_matrix[(cb, ca)] as f64,
+                },
+                runnerup: ElectResult {
+                    cand: runoff.winner.cand,
+                    score: self.preference_matrix[(ca, cb)] as f64,
+                },
+            }
         }
     }
 
@@ -121,22 +136,6 @@ impl MethodSim for STARSim {
 mod tests {
     use super::*;
     use crate::sim::Sim;
-
-    #[test]
-    fn test_fill_range() {
-        let scores = ndarray::Array::from_iter((0..100).map(|i| -9.111 + i as f64));
-        let mut ballot = vec![0; 100];
-        fill_range_ballot(&scores.view(), 100, &mut ballot);
-        for (i, &b) in ballot.iter().enumerate() {
-            assert_eq!(i as i32, b);
-        }
-
-        let scores = ndarray::array![10., 10.9, 12.7, 18.1, 19.0];
-        // With a range of 0-9, 10 equal steps are 0.9 each.
-        let mut ballot = vec![999; 5]; // fill value gets overwritten (prove this)
-        fill_range_ballot_strat(&scores.view(), 100, &mut ballot, 11.5, 10.0);
-        assert_eq!(ballot, &[0, 1, 92, 98, 99]);
-    }
 
     #[test]
     fn test_star() {
@@ -163,6 +162,8 @@ mod tests {
         println!("preferences: {:?}", method.preference_matrix);
         assert_eq!(honest_results.winner.cand, 2);
         assert_eq!(honest_results.runnerup.cand, 1);
+        assert_eq!(honest_results.winner.score, 3.);
+        assert_eq!(honest_results.runnerup.score, 2.);
 
         sim.scores = ndarray::array![
             [0., 5., 5.],
@@ -179,5 +180,7 @@ mod tests {
         println!("preferences: {:?}", method.preference_matrix);
         assert_eq!(honest_results.winner.cand, 2);
         assert_eq!(honest_results.runnerup.cand, 1);
+        assert_eq!(honest_results.winner.score, 3.);
+        assert_eq!(honest_results.runnerup.score, 2.);
     }
 }

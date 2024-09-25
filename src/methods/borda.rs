@@ -69,7 +69,7 @@ mod tests {
     use crate::sim::Sim;
 
     #[test]
-    fn test_irv_honest() {
+    fn test_borda_honest() {
         let mut sim = Sim::new(4, 5);
         sim.scores = ndarray::array![
             [4., 3., 2., 1.],

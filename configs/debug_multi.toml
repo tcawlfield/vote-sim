@@ -1,0 +1,17 @@
+voters = 13
+candidates = 5
+
+[[considerations]]
+[considerations.Irrational]
+sigma = 1.0
+camps = 0
+individualism_deg = 20.0
+
+[[methods]]
+Plurality = { strat = "Honest" }
+
+[[methods]]
+[methods.Multivote]
+strat = "Honest"
+votes = 1
+spread_fact = 1.0
