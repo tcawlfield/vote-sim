@@ -86,12 +86,12 @@ impl ConsiderationSim for IrrationalSim {
             }
             for ((icit, icand), cand_score) in scores.indexed_iter_mut() {
                 let icamp = icit % ncamps;
-                *cand_score = self.camp_scores[(icamp, icand)]
+                *cand_score += self.camp_scores[(icamp, icand)]
                     + rng.sample(unit_uniform) * self.individual_scale;
             }
         } else {
             for cand_score in scores.iter_mut() {
-                *cand_score = rng.sample(unit_uniform) * self.individual_scale;
+                *cand_score += rng.sample(unit_uniform) * self.individual_scale;
             }
         }
     }
