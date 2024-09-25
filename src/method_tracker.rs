@@ -38,7 +38,11 @@ impl MethodTracker {
         honest_rslt: Option<WinnerAndRunnerup>,
         verbose: bool,
     ) -> WinnerAndRunnerup {
-        let result = self.method.elect(sim, honest_rslt, verbose);
+        let mut result = self.method.elect(sim, honest_rslt, verbose);
+
+        if result.is_tied() {
+            result = sim.break_tie_with_plurality(&result);
+        }
 
         self.ntrials += 1;
         let regret = sim.regrets[result.winner.cand];
@@ -50,7 +54,6 @@ impl MethodTracker {
 
         self.result_bldr.append_value(regret);
         self.winner_bldr.append_value(result.winner.cand as i32);
-
         result
     }
 
