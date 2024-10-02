@@ -8,6 +8,7 @@ pub struct Sim {
     pub ncit: usize,
     pub scores: Array2<f64>,
     pub ranks: Array2<usize>,
+    pub i_beats_j_by: Array2<i32>,
     pub regrets: Vec<f64>,
     pub cand_by_regret: Vec<usize>,
     scratch_ranks: Vec<usize>,
@@ -15,13 +16,12 @@ pub struct Sim {
 
 impl Sim {
     pub fn new(ncand: usize, ncit: usize) -> Sim {
-        let scores: Array2<f64> = Array2::zeros((ncit, ncand));
-        let ranks: Array2<usize> = Array2::zeros((ncit, ncand));
         Sim {
             ncand,
             ncit,
-            scores,
-            ranks,
+            scores: Array2::zeros((ncit, ncand)),
+            i_beats_j_by: Array2::zeros((ncand, ncand)),
+            ranks: Array2::zeros((ncit, ncand)),
             regrets: vec![0.0; ncand],
             cand_by_regret: (0..ncand).collect(),
             scratch_ranks: (0..ncand).collect(),
@@ -93,14 +93,25 @@ impl Sim {
     }
 
     pub fn rank_candidates(&mut self) {
-        for i in 0..self.ncit {
-            self.scratch_ranks.sort_by(|&a, &b| {
-                self.scores[(i, b)]
-                    .partial_cmp(&self.scores[(i, a)])
-                    .unwrap()
-            });
-            for j in 0..self.ncand {
-                self.ranks[(i, j)] = self.scratch_ranks[j];
+        // for i in 0..self.ncit {
+        self.i_beats_j_by.fill(0);
+        for (icit, cit_scores) in self.scores.axis_iter(Axis(0)).enumerate() {
+            self.scratch_ranks
+                .sort_by(|&a, &b| cit_scores[b].partial_cmp(&cit_scores[a]).unwrap());
+            for icand in 0..self.ncand {
+                self.ranks[(icit, icand)] = self.scratch_ranks[icand];
+                for jcand in (icand + 1)..self.ncand {
+                    if cit_scores[icand] > cit_scores[jcand] {
+                        self.i_beats_j_by[(icand, jcand)] += 1;
+                    }
+                }
+            }
+        }
+
+        for ((i, j), beat_by) in self.i_beats_j_by.indexed_iter_mut() {
+            if j > i {
+                // Only upper-triangular elements are used -- or lower-triangular?
+                *beat_by = 2 * *beat_by - self.ncit as i32; // total ordering, so defeats = ncit - n_i_beats_j.
             }
         }
     }
