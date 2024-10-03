@@ -1,4 +1,4 @@
-use super::method_sim::MethodSim;
+use super::MethodSim;
 use super::results::{Strategy, WinnerAndRunnerup};
 use super::tallies::{tally_votes, Tallies};
 use crate::sim::Sim;

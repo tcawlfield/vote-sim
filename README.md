@@ -173,6 +173,11 @@ worst of us, not the best, regardless of the merits of any voting system.
 * Allow a fraction of the population to be strategic
 * Allow a political faction to be more strategic than another
   * Under different methods, how much are strategic voters wrongly rewarded?
+* Each voting method needs a new method, strategic_prereq to return Option<Method>.
+  * We can use this to ensure that each strategic method is preceded by its honest
+    "pre-election poll" method. If not, they can be inserted.
+  * At the same time, this suggests another property of MethodSim: is_visible.
+    is_visible() returns false if the method was inserted as a pre-poll.
 
 ### More questions:
 

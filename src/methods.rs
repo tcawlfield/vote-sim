@@ -1,9 +1,10 @@
 mod borda;
 mod instant_runoff;
-mod method_sim;
 mod multivote;
+mod condorcet_util;
 mod plurality;
 mod rangevoting;
+mod ranked_pairs;
 mod results;
 mod reweighted_range;
 mod star;
@@ -11,10 +12,10 @@ mod tallies;
 
 pub use borda::Borda;
 pub use instant_runoff::InstantRunoff;
-pub use method_sim::{MWMethodSim, MethodSim};
 pub use multivote::Multivote;
 pub use plurality::Plurality;
 pub use rangevoting::RangeVoting;
+pub use ranked_pairs::RP;
 pub use results::{ElectResult, Strategy, WinnerAndRunnerup};
 pub use reweighted_range::RRV;
 pub use star::STAR;
@@ -30,6 +31,7 @@ pub enum Method {
     Borda(Borda),
     Multivote(Multivote),
     STAR(STAR),
+    RP(RP),
 }
 
 impl Method {
@@ -41,8 +43,20 @@ impl Method {
             Method::Borda(m) => Box::new(m.new_sim(sim)),
             Method::Multivote(m) => Box::new(m.new_sim(sim)),
             Method::STAR(m) => Box::new(m.new_sim(sim)),
-        }
+            Method::RP(m) => Box::new(m.new_sim(sim)),        }
     }
+}
+
+pub trait MethodSim {
+    fn elect(
+        &mut self,
+        sim: &Sim,
+        honest_rslt: Option<WinnerAndRunnerup>,
+        verbose: bool,
+    ) -> WinnerAndRunnerup;
+    fn name(&self) -> String;
+    fn colname(&self) -> String;
+    fn strat(&self) -> Strategy;
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -56,4 +70,14 @@ impl MultiWinMethod {
             MultiWinMethod::RRV(m) => Box::new(m.new_sim(sim)),
         }
     }
+}
+
+pub trait MWMethodSim {
+    fn multi_elect(
+        &mut self,
+        sim: &Sim,
+        honest_rslt: Option<WinnerAndRunnerup>,
+        nwinners: usize,
+        verbose: bool,
+    ) -> &Vec<ElectResult>;
 }
