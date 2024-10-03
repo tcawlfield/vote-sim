@@ -35,21 +35,21 @@ pub fn find_candidate_pairoffs(pairs: &mut Vec<CandPair>, sim: &Sim) {
 
 pub fn lock_in(locked_in: &mut Array2<bool>, pair: &CandPair, set: bool) {
     if pair.winner > pair.loser {
-        locked_in[(pair.winner, pair.loser)] = set;
+        locked_in[(pair.loser, pair.winner)] = set; // (i, j) where j > i
     } else {
-        locked_in[(pair.loser, pair.winner)] = set;
+        locked_in[(pair.winner, pair.loser)] = set;
     }
 }
 
 pub fn find_locked_in_winner(locked_in: &mut Array2<bool>, sim: &Sim) -> Option<usize> {
     'candidate: for iwin in 0..sim.ncand {
         let mut really_wins = false;
-        let pi1 = (0..iwin).map(|i| (i, iwin));
-        let pi2 = (iwin+1..sim.ncand).map(|j| (iwin, j));
+        let pi1 = (0..iwin).map(|i| (i, iwin, -1));
+        let pi2 = (iwin+1..sim.ncand).map(|j| (iwin, j, 1));
         let pair_iter = pi1.chain(pi2);
-        for (i, j) in pair_iter {
+        for (i, j, i_is_iwin) in pair_iter {
             if locked_in[(i, j)] {
-                if sim.i_beats_j_by[(i, j)] > 0 {
+                if sim.i_beats_j_by[(i, j)] * i_is_iwin > 0 {
                     really_wins = true; // But keep looking -- must beat all other locked-in pairs
                 } else {
                     continue 'candidate // Not a winner
