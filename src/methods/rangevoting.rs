@@ -1,9 +1,9 @@
 use ndarray::{ArrayView, Ix1};
 use serde::{Deserialize, Serialize};
 
-use super::MethodSim;
 use super::results::{Strategy, WinnerAndRunnerup};
 use super::tallies::{tally_votes, Tallies};
+use super::MethodSim;
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -1,7 +1,7 @@
 mod borda;
+pub mod condorcet_util;
 mod instant_runoff;
 mod multivote;
-mod condorcet_util;
 mod plurality;
 mod rangevoting;
 mod ranked_pairs;
@@ -43,7 +43,8 @@ impl Method {
             Method::Borda(m) => Box::new(m.new_sim(sim)),
             Method::Multivote(m) => Box::new(m.new_sim(sim)),
             Method::STAR(m) => Box::new(m.new_sim(sim)),
-            Method::RP(m) => Box::new(m.new_sim(sim)),        }
+            Method::RP(m) => Box::new(m.new_sim(sim)),
+        }
     }
 }
 

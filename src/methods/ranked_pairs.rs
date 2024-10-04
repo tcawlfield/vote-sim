@@ -1,10 +1,10 @@
 use ndarray::Array2;
 use serde::{Deserialize, Serialize};
 
-use super::MethodSim;
+use super::condorcet_util::{find_candidate_pairoffs, find_locked_in_winner, lock_in, CandPair};
 use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
+use super::MethodSim;
 use crate::sim::Sim;
-use super::condorcet_util::{CandPair, find_candidate_pairoffs, lock_in, find_locked_in_winner};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RP {
@@ -40,7 +40,8 @@ impl MethodSim for RPSim {
         self.pairs.sort_by_key(|p| -p.margin);
 
         let winner = self.find_winner(sim, verbose);
-        self.pairs.retain(|p| {p.winner != winner && p.loser != winner});
+        self.pairs
+            .retain(|p| p.winner != winner && p.loser != winner);
         let runner_up = self.find_winner(sim, false);
         WinnerAndRunnerup {
             winner: ElectResult {
@@ -72,7 +73,6 @@ impl MethodSim for RPSim {
 
 impl RPSim {
     fn find_winner(&mut self, sim: &Sim, verbose: bool) -> usize {
-
         let mut pair_iter = self.pairs.iter();
         self.locked_in.fill(false);
 
@@ -99,7 +99,7 @@ impl RPSim {
                     if verbose {
                         println!("Locked in {:?} -- current winner is {}", p, w);
                     }
-                },
+                }
                 None => {
                     lock_in(&mut self.locked_in, p, false);
                     if verbose {
@@ -140,11 +140,14 @@ mod tests {
         }
         .new_sim(&sim);
         sim.rank_candidates(); // Creates the i_beats_j matrix in sim
-        assert_eq!(sim.i_beats_j_by, ndarray::array![
-            [0, 6, -4], // i goes down, j goes across. j > i.
-            [0, 0, 2],
-            [0, 0, 0],
-        ]);
+        assert_eq!(
+            sim.i_beats_j_by,
+            ndarray::array![
+                [0, 6, -4], // i goes down, j goes across. j > i.
+                [0, 0, 2],
+                [0, 0, 0],
+            ]
+        );
 
         let honest_results = method.elect(&sim, None, true);
         assert_eq!(honest_results.winner.cand, 2);

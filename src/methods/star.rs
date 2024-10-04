@@ -1,10 +1,10 @@
 use ndarray::Array2;
 use serde::{Deserialize, Serialize};
 
-use super::MethodSim;
 use super::rangevoting::{fill_range_ballot, fill_range_ballot_strat};
 use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
 use super::tallies::{tally_votes, Tallies};
+use super::MethodSim;
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

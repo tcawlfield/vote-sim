@@ -1,9 +1,9 @@
 use ndarray::{Array2, Axis};
 use serde::{Deserialize, Serialize};
 
-use super::MWMethodSim;
 use super::rangevoting::fill_range_ballot;
 use super::results::{Strategy, WinnerAndRunnerup};
+use super::MWMethodSim;
 use crate::methods::ElectResult;
 use crate::sim::Sim;
 

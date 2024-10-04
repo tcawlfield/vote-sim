@@ -70,6 +70,10 @@ strat = "Honest"
 strat = "Strategic"
 strategic_stretch_factor = 2.0
 
+[[methods]]
+[methods.RP]
+strat = "Honest"
+
 # [[methods]]
 # [methods.Multivote]
 # strat = "Strategic"  # Same as honest plurality ATM

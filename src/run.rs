@@ -1,4 +1,6 @@
-use arrow_array::builder::{FixedSizeListBuilder, Float64Builder, Int32Builder, ListBuilder};
+use arrow_array::builder::{
+    BooleanBuilder, FixedSizeListBuilder, Float64Builder, Int32Builder, ListBuilder,
+};
 use arrow_array::RecordBatch;
 use parquet::file::metadata::KeyValue;
 use parquet::{arrow::ArrowWriter, basic::Compression, file::properties::WriterProperties};
@@ -64,6 +66,11 @@ pub fn run(
             sim.ncand as i32,
         ));
     }
+    let mut smith_candidates_bld = Int32Builder::with_capacity(trials);
+    let mut in_smith_set_bld = FixedSizeListBuilder::new(
+        BooleanBuilder::with_capacity(trials * sim.ncand),
+        sim.ncand as i32,
+    );
 
     // TODO: Use position arrays to demonstrate that RRV primaries spread out the candidates
     //   in position space and improve likeability.
@@ -147,6 +154,11 @@ pub fn run(
             );
             pos_bld.append(true);
         }
+        smith_candidates_bld.append_value(sim.smith_set_size() as i32);
+        for is_smith in sim.in_smith_set.iter() {
+            in_smith_set_bld.values().append_value(*is_smith);
+        }
+        in_smith_set_bld.append(true);
     }
 
     let mut columns: Vec<arrow_array::ArrayRef> = Vec::new();
@@ -156,9 +168,12 @@ pub fn run(
         columns.push(Arc::new(cpb.finish()) as arrow_array::ArrayRef);
     }
     columns.push(Arc::new(cov_bld.finish()) as arrow_array::ArrayRef);
+    columns.push(Arc::new(smith_candidates_bld.finish()) as arrow_array::ArrayRef);
+    columns.push(Arc::new(in_smith_set_bld.finish()) as arrow_array::ArrayRef);
     for method in methods.iter_mut() {
         columns.push(method.get_column());
     }
+
     let mut schema = SchemaBuilder::new();
     schema.push(Field::new("ideal_cand", DataType::Int32, true));
     schema.push(Field::new(
@@ -193,6 +208,15 @@ pub fn run(
             DataType::List(Arc::new(Field::new("item", DataType::Float64, true))),
             true,
         ))),
+        true,
+    ));
+    schema.push(Field::new("num_smith", DataType::Int32, true));
+    schema.push(Field::new(
+        "in_smith",
+        DataType::FixedSizeList(
+            Arc::new(Field::new("item", DataType::Boolean, true)),
+            sim.ncand as i32,
+        ),
         true,
     ));
 
