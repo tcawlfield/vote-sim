@@ -41,12 +41,14 @@ pub fn lock_in(locked_in: &mut Array2<bool>, pair: &CandPair, set: bool) {
 }
 
 pub fn find_locked_in_winner(locked_in: &mut Array2<bool>, sim: &Sim) -> Option<usize> {
+    // println!("locked_in = {:?}", locked_in);
     'candidate: for iwin in 0..sim.ncand {
         let mut really_wins = false;
         let pi1 = (0..iwin).map(|i| (i, iwin, -1));
         let pi2 = (iwin + 1..sim.ncand).map(|j| (iwin, j, 1));
         let pair_iter = pi1.chain(pi2);
         for (i, j, i_is_iwin) in pair_iter {
+            // println!("iwin={}, i={}, j={}, locked_in? {}, i_beats_j_by={}", iwin, i, j, locked_in[(i,j)], sim.i_beats_j_by[(i,j)]);
             if locked_in[(i, j)] {
                 if sim.i_beats_j_by[(i, j)] * i_is_iwin > 0 {
                     really_wins = true; // But keep looking -- must beat all other locked-in pairs

@@ -40,9 +40,13 @@ impl MethodSim for RPSim {
         self.pairs.sort_by_key(|p| -p.margin);
 
         let winner = self.find_winner(sim, verbose);
-        self.pairs
-            .retain(|p| p.winner != winner && p.loser != winner);
-        let runner_up = self.find_winner(sim, false);
+        let runner_up = if sim.ncand > 2 {
+            self.pairs
+                .retain(|p| p.winner != winner && p.loser != winner);
+            self.find_winner(sim, false)
+        } else {
+            (winner + 1) % 2
+        };
         WinnerAndRunnerup {
             winner: ElectResult {
                 cand: winner,

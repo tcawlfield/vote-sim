@@ -57,13 +57,20 @@ impl MethodTracker {
         result
     }
 
-    pub fn get_field(&self) -> Field {
-        let dt = DataType::Struct(Fields::from(vec![
+    pub fn colname(&self) -> String {
+        self.method.colname()
+    }
+
+    pub fn data_type() -> DataType {
+        DataType::Struct(Fields::from(vec![
             Arc::new(Field::new("winner", DataType::Int32, false)),
             Arc::new(Field::new("regret", DataType::Float64, false)),
-        ]));
-        Field::new(format!("m:{}", self.method.colname()), dt, false)
+        ]))
     }
+
+    // pub fn get_field(&self) -> Field {
+    //     Field::new(self.method.colname(), Self::data_type(), false)
+    // }
 
     pub fn get_column(&mut self) -> arrow_array::ArrayRef {
         // Arc::new(self.result_bldr.finish())

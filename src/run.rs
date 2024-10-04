@@ -1,7 +1,7 @@
 use arrow_array::builder::{
     BooleanBuilder, FixedSizeListBuilder, Float64Builder, Int32Builder, ListBuilder,
 };
-use arrow_array::RecordBatch;
+use arrow_array::{RecordBatch, StructArray};
 use parquet::file::metadata::KeyValue;
 use parquet::{arrow::ArrowWriter, basic::Compression, file::properties::WriterProperties};
 
@@ -170,9 +170,18 @@ pub fn run(
     columns.push(Arc::new(cov_bld.finish()) as arrow_array::ArrayRef);
     columns.push(Arc::new(smith_candidates_bld.finish()) as arrow_array::ArrayRef);
     columns.push(Arc::new(in_smith_set_bld.finish()) as arrow_array::ArrayRef);
+    let mut method_cols = Vec::new();
     for method in methods.iter_mut() {
-        columns.push(method.get_column());
+        method_cols.push((
+            Arc::new(Field::new(
+                method.colname(),
+                MethodTracker::data_type(),
+                false,
+            )),
+            method.get_column(),
+        ));
     }
+    columns.push(Arc::new(StructArray::from(method_cols)));
 
     let mut schema = SchemaBuilder::new();
     schema.push(Field::new("ideal_cand", DataType::Int32, true));
@@ -220,9 +229,22 @@ pub fn run(
         true,
     ));
 
+    //for method in methods.iter() {
+    //    schema.push(method.get_field());
+    //}
+    let mut meth_schema_bld = SchemaBuilder::new();
     for method in methods.iter() {
-        schema.push(method.get_field());
+        meth_schema_bld.push(Field::new(
+            method.colname(),
+            MethodTracker::data_type(),
+            false,
+        ));
     }
+    schema.push(Field::new(
+        "methods",
+        DataType::Struct(meth_schema_bld.finish().fields),
+        false,
+    ));
     let batch = RecordBatch::try_new(Arc::new(schema.finish()), columns).unwrap();
 
     let config_str = serde_json::to_string(config).unwrap();
