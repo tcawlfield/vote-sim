@@ -65,8 +65,8 @@ impl MethodSim for RPSim {
 
     fn colname(&self) -> String {
         match self.params.strat {
-            Strategy::Honest => "RP_h".to_string(),
-            Strategy::Strategic => "RP_s".to_string(),
+            Strategy::Honest => "rp_h".to_string(),
+            Strategy::Strategic => "rp_s".to_string(),
         }
     }
 

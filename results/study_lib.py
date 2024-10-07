@@ -5,6 +5,7 @@ import shutil
 import copy
 from collections import defaultdict
 
+import numpy as np
 import tomlkit
 import awkward as ak
 import pandas as pd
@@ -36,10 +37,6 @@ def do_run(config, trials) -> ak.Array:
     return results
 
 
-def get_fields(results):
-    return list(filter(lambda fn: fn.startswith('m:'), results.fields))    
-
-
 def config_series(base_config, parameter, pvalues):
     """
     Generates a sequence of configs based on the base config, with a dotted parameter
@@ -59,7 +56,39 @@ def config_series(base_config, parameter, pvalues):
         yield (param_name, val, config)
 
 
-def run_experiment(config_seq, trials=2000):
+def run_experiment(config_seq, trials=2000, pi=False, sm=False):
+    """
+    pi: show percent elections that are non-ideal
+    sm: Show smith set stats: avg_nsmith is average number of candidates in the Smith set (1 if no cycle)
+    {method}_insm: *percent* of time this method's winner is in the Smith set
+    """
+    iexp = 0
+    table_data = defaultdict(list)
+    for config_tuple in config_seq:
+        if isinstance(config_tuple, tuple):
+            (pname, pval, config) = config_tuple
+        else:
+            (pname, pval, config) = ('config_num', iexp, config_tuple)
+        iexp += 1  # Only for the case that config_seq is a list of configs.
+
+        results = do_run(config, trials)
+        table_data[pname].append(pval)
+        if sm:
+            table_data['avg_nsmith'].append(ak.mean(results.num_smith))
+        for f in results.methods.fields:
+            mean_regret = ak.mean(results.methods[f].regret)
+            table_data[f'{f}_mR'].append(mean_regret)
+            if pi:
+                percent_ideal = ak.count(results.methods[f].regret[results.methods[f].regret == 0]) / trials * 100.
+                table_data[f'{f}_pi'].append(percent_ideal)
+            if sm:
+                in_smith = results.in_smith[np.arange(len(results)), results.methods[f].winner]
+                table_data[f'{f}_insm'].append(np.count_nonzero(in_smith) / len(in_smith) * 100)
+    # print(repr(table_data))
+    return pd.DataFrame(table_data)
+
+
+def run_experiment_smith(config_seq, trials=2000):
     iexp = 0
     table_data = defaultdict(list)
     for config_tuple in config_seq:
@@ -72,10 +101,14 @@ def run_experiment(config_seq, trials=2000):
         results = do_run(config, trials)
         fields = get_fields(results)
         table_data[pname].append(pval)
+        table_data['avg_nsmith'].append(ak.mean(results.num_smith))
         for f in fields:
             mean_regret = ak.mean(results[f]['regret'])
-            percent_ideal = ak.count(results[f]['regret'][results[f]['regret'] == 0]) / trials * 100.
             table_data[f'{f[2:]}_mR'].append(mean_regret)
-            table_data[f'{f[2:]}_pi'].append(percent_ideal)
+            num_in_smith = 0
+            for (ins, winner) in zip(results.in_smith, results[f].winner):
+                if ins[winner]: num_in_smith += 1
+            table_data[f'{f[2:]}_in_smth'].append(num_in_smith / len(results))
+            
     # print(repr(table_data))
     return pd.DataFrame(table_data)
