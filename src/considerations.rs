@@ -9,7 +9,7 @@ mod issues;
 mod likability;
 
 pub use irrational::Irrational;
-pub use issues::Issues;
+pub use issues::{Issue, new_issues_sim};
 pub use likability::Likability;
 
 pub trait ConsiderationSim: fmt::Debug {
@@ -26,7 +26,7 @@ pub trait ConsiderationSim: fmt::Debug {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum Consideration {
     Likability(Likability),
-    Issues(Issues),
+    Issues(Vec<Issue>),
     Irrational(Irrational),
 }
 
@@ -34,7 +34,7 @@ impl Consideration {
     pub fn new_sim(&self, sim: &Sim) -> Box<dyn ConsiderationSim> {
         match self {
             Consideration::Likability(c) => Box::new(c.new_sim(sim)),
-            Consideration::Issues(c) => Box::new(c.new_sim(sim)),
+            Consideration::Issues(issues) => Box::new(new_issues_sim(issues.clone(), sim)),
             Consideration::Irrational(c) => Box::new(c.new_sim(sim)),
         }
     }

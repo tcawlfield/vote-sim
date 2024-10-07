@@ -13,23 +13,17 @@ pub struct Issue {
     pub halfvsep: f64,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Issues {
-    pub issues: Vec<Issue>,
-}
-
 #[derive(Debug)]
 pub struct IssuesSim {
-    p: Issues,
+    issues: Vec<Issue>,
     cand_position: Array2<f64>,
 }
 
-impl Issues {
-    pub fn new_sim(&self, sim: &Sim) -> IssuesSim {
-        IssuesSim {
-            p: self.clone(),
-            cand_position: Array2::zeros((sim.ncand, self.issues.len())),
-        }
+pub fn new_issues_sim(issues: Vec<Issue>, sim: &Sim) -> IssuesSim {
+    let num_issues = issues.len();
+    IssuesSim {
+        issues,
+        cand_position: Array2::zeros((sim.ncand, num_issues)),
     }
 }
 
@@ -39,12 +33,12 @@ impl ConsiderationSim for IssuesSim {
         // All citizens are the same in this regard.
         // Or at least we assume there are enough citizens that every representative
         // group in position-space spans all degrees of likability alignment.
-        let npos = self.p.issues.len();
+        let npos = self.issues.len();
         for i in 0..ncand {
             for ipos in 0..npos {
                 self.cand_position[(i, ipos)] = gen_bimodal_gauss(
-                    self.p.issues[ipos].sigma,
-                    self.p.issues[ipos].halfcsep,
+                    self.issues[ipos].sigma,
+                    self.issues[ipos].halfcsep,
                     &mut rng,
                 );
             }
@@ -56,8 +50,8 @@ impl ConsiderationSim for IssuesSim {
         for j in 0..ncit {
             for ipos in 0..npos {
                 cit_position[ipos] = gen_bimodal_gauss(
-                    self.p.issues[ipos].sigma,
-                    self.p.issues[ipos].halfvsep,
+                    self.issues[ipos].sigma,
+                    self.issues[ipos].halfvsep,
                     &mut rng,
                 );
             }
@@ -75,7 +69,7 @@ impl ConsiderationSim for IssuesSim {
     }
 
     fn get_dim(&self) -> usize {
-        self.p.issues.len()
+        self.issues.len()
     }
 
     fn get_name(&self) -> String {
