@@ -9,7 +9,7 @@ mod issues;
 mod likability;
 
 pub use irrational::Irrational;
-pub use issues::{Issue, new_issues_sim};
+pub use issues::{new_issues_sim, Issue};
 pub use likability::Likability;
 
 pub trait ConsiderationSim: fmt::Debug {

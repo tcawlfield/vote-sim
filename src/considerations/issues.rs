@@ -6,11 +6,19 @@ use rand::rngs::ThreadRng;
 use rand::Rng;
 use rand_distr::StandardNormal;
 
+const SQRT_3: f64 = 1.732050807568877293527446341505872367_f64; // borrowed from nightly
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Issue {
     pub sigma: f64,
     pub halfcsep: f64,
-    pub halfvsep: f64,
+    pub halfvsep: Option<f64>,
+    #[serde(default = "default_false")]
+    pub uniform: bool,
+}
+
+fn default_false() -> bool {
+    false
 }
 
 #[derive(Debug)]
@@ -35,12 +43,8 @@ impl ConsiderationSim for IssuesSim {
         // group in position-space spans all degrees of likability alignment.
         let npos = self.issues.len();
         for i in 0..ncand {
-            for ipos in 0..npos {
-                self.cand_position[(i, ipos)] = gen_bimodal_gauss(
-                    self.issues[ipos].sigma,
-                    self.issues[ipos].halfcsep,
-                    &mut rng,
-                );
+            for (ipos, issue) in self.issues.iter().enumerate() {
+                self.cand_position[(i, ipos)] = issue.gen_value(&mut rng, false);
             }
         }
         if verbose {
@@ -48,12 +52,8 @@ impl ConsiderationSim for IssuesSim {
         }
         let mut cit_position = vec![0.0; npos];
         for j in 0..ncit {
-            for ipos in 0..npos {
-                cit_position[ipos] = gen_bimodal_gauss(
-                    self.issues[ipos].sigma,
-                    self.issues[ipos].halfvsep,
-                    &mut rng,
-                );
+            for (ipos, issue) in self.issues.iter().enumerate() {
+                cit_position[ipos] = issue.gen_value(&mut rng, true);
             }
             if verbose && ncit < 20 {
                 println!("cit {}: {:?}", j, cit_position);
@@ -98,12 +98,25 @@ impl ConsiderationSim for IssuesSim {
     }
 }
 
-fn gen_bimodal_gauss<R: Rng>(sigma: f64, halfsep: f64, rng: &mut R) -> f64 {
-    let x: f64 = rng.sample(StandardNormal);
-    let x = x * sigma;
-    if rng.gen::<bool>() {
-        x + halfsep
-    } else {
-        x - halfsep
+impl Issue {
+    fn gen_value<R: Rng>(&self, rng: &mut R, is_voter: bool) -> f64 {
+        let mut sep = if is_voter {
+            match self.halfvsep {
+                Some(s) => s,
+                None => self.halfcsep,
+            }
+        } else {
+            self.halfcsep
+        };
+        if rng.gen::<bool>() {
+            sep = -sep;
+        }
+        if self.uniform {
+            let uniform = rand_distr::Uniform::from(-SQRT_3..SQRT_3);
+            rng.sample(uniform) * self.sigma + sep
+        } else {
+            let x: f64 = rng.sample(StandardNormal);
+            x * self.sigma + sep
+        }
     }
 }
