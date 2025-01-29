@@ -11,7 +11,8 @@ pub struct Sim {
     pub ranks: Array2<usize>,
     pub i_beats_j_by: Array2<i32>,
     pub regrets: Vec<f64>,
-    pub cand_by_regret: Vec<usize>,
+    pub cand_by_regret: Vec<usize>, // map from regret rank to icand
+    pub regret_rank: Vec<usize>, // map icand to regret-ranked pos'n
     pub in_smith_set: Vec<bool>,
     scratch_ranks: Vec<usize>,
 }
@@ -26,6 +27,7 @@ impl Sim {
             ranks: Array2::zeros((ncit, ncand)),
             regrets: vec![0.0; ncand],
             cand_by_regret: (0..ncand).collect(),
+            regret_rank: (0..ncand).collect(),
             in_smith_set: vec![false; ncand],
             scratch_ranks: (0..ncand).collect(),
         }
@@ -94,6 +96,9 @@ impl Sim {
                 .partial_cmp(&self.regrets[b])
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
+        for (irr, &icand) in self.cand_by_regret.iter().enumerate() {
+            self.regret_rank[icand] = irr;
+        }
     }
 
     /// rank_candidates uses the score table to fix the table of

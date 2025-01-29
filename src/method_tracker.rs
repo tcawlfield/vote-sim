@@ -53,7 +53,7 @@ impl MethodTracker {
         }
 
         self.result_bldr.append_value(regret);
-        self.winner_bldr.append_value(result.winner.cand as i32);
+        self.winner_bldr.append_value(sim.regret_rank[result.winner.cand] as i32);
         result
     }
 

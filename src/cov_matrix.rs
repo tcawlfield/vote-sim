@@ -38,6 +38,9 @@ impl CovMatrix {
             for iy in 0..(ix + 1) {
                 self.elements[(ix, iy)] /= (ncit - 1) as f64;
             }
+            for iy in 0..ix {
+                self.elements[(iy, ix)] = self.elements[(ix, iy)];
+            }
         }
     }
 }

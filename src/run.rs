@@ -122,9 +122,10 @@ pub fn run(
             }
         }
 
-        ideal_cnd_bld.append_value(sim.cand_by_regret[0] as i32);
-        for rgrt in sim.regrets.iter() {
-            cand_regret_bld.values().append_value(*rgrt);
+        ideal_cnd_bld.append_value(0);
+        let cbr = &sim.cand_by_regret;
+        for &icand in cbr.iter() {
+            cand_regret_bld.values().append_value(sim.regrets[icand]);
         }
         cand_regret_bld.append(true);
         for ix in 0..sim.ncand {
@@ -132,12 +133,13 @@ pub fn run(
                 cov_bld
                     .values()
                     .values()
-                    .append_value(cov_matrix.elements[(ix, iy)]);
+                    .append_value(cov_matrix.elements[(cbr[ix], cbr[iy])]);
             }
             cov_bld.values().append(true); // End of row
         }
         cov_bld.append(true); // End of matrix
 
+        // TODO: order candidates by regret for considerations
         for (consid, pos_bld) in axes.iter().zip(cand_posn_blds.iter_mut()) {
             consid.push_posn_elements(
                 &mut |x, next_row| {
@@ -155,8 +157,8 @@ pub fn run(
             pos_bld.append(true);
         }
         smith_candidates_bld.append_value(sim.smith_set_size() as i32);
-        for is_smith in sim.in_smith_set.iter() {
-            in_smith_set_bld.values().append_value(*is_smith);
+        for &icand in cbr.iter() {
+            in_smith_set_bld.values().append_value(sim.in_smith_set[icand]);
         }
         in_smith_set_bld.append(true);
     }
