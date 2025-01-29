@@ -1,4 +1,3 @@
-use crate::methods::ElectResult;
 use crate::sim::Sim;
 use ndarray::Array2;
 use rand::distributions::Uniform;
@@ -104,20 +103,9 @@ impl ConsiderationSim for IrrationalSim {
         "Irrational".to_string()
     }
 
-    fn push_posn_elements(
-        &self,
-        report: &mut dyn FnMut(f64, bool),
-        final_candidates: Option<&Vec<ElectResult>>,
-    ) {
-        if let Some(final_candidates) = final_candidates {
-            for _fc in final_candidates.iter() {
-                report(f64::NAN, true);
-            }
-        } else {
-            let (_ncamps, ncand) = self.camp_scores.dim();
-            for _ in 0..ncand {
-                report(f64::NAN, true);
-            }
+    fn push_posn_elements(&self, report: &mut dyn FnMut(f64, bool), final_candidates: &Vec<usize>) {
+        for _fc in final_candidates.iter() {
+            report(f64::NAN, true);
         }
     }
 }

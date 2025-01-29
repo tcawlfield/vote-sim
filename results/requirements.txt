@@ -1,7 +1,9 @@
 seaborn
-pyarrow
+pyarrow!=19.0.0
 awkward
 s3fs
 ipyleaflet
 tomlkit
 pandas
+ipykernel
+pyyaml

@@ -1,4 +1,3 @@
-use crate::methods::ElectResult;
 use crate::sim::Sim;
 use ndarray::Array2;
 use rand::rngs::ThreadRng;
@@ -16,11 +15,7 @@ pub trait ConsiderationSim: fmt::Debug {
     fn add_to_scores(&mut self, scores: &mut Array2<f64>, rng: &mut ThreadRng, verbose: bool);
     fn get_dim(&self) -> usize;
     fn get_name(&self) -> String;
-    fn push_posn_elements(
-        &self,
-        report: &mut dyn FnMut(f64, bool),
-        final_candidates: Option<&Vec<ElectResult>>,
-    );
+    fn push_posn_elements(&self, report: &mut dyn FnMut(f64, bool), final_candidates: &Vec<usize>);
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]

@@ -1,5 +1,4 @@
 use super::ConsiderationSim;
-use crate::methods::ElectResult;
 use crate::sim::Sim;
 use ndarray::Array2;
 use rand::rngs::ThreadRng;
@@ -76,23 +75,11 @@ impl ConsiderationSim for IssuesSim {
         "issues".to_string()
     }
 
-    fn push_posn_elements(
-        &self,
-        report: &mut dyn FnMut(f64, bool),
-        final_candidates: Option<&Vec<ElectResult>>,
-    ) {
-        let (ncand, npos) = self.cand_position.dim();
-        if let Some(final_candidates) = final_candidates {
-            for fc in final_candidates.iter() {
-                for ipos in 0..npos {
-                    report(self.cand_position[(fc.cand, ipos)], ipos == npos - 1);
-                }
-            }
-        } else {
-            for icand in 0..ncand {
-                for ipos in 0..npos {
-                    report(self.cand_position[(icand, ipos)], ipos == npos - 1);
-                }
+    fn push_posn_elements(&self, report: &mut dyn FnMut(f64, bool), final_candidates: &Vec<usize>) {
+        let (_ncand, npos) = self.cand_position.dim();
+        for &fc in final_candidates.iter() {
+            for ipos in 0..npos {
+                report(self.cand_position[(fc, ipos)], ipos == npos - 1);
             }
         }
     }

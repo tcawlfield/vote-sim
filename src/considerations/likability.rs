@@ -1,4 +1,3 @@
-use crate::methods::ElectResult;
 use crate::sim::Sim;
 use ndarray::Array2;
 use rand::rngs::ThreadRng;
@@ -61,19 +60,9 @@ impl ConsiderationSim for LikabilitySim {
         "likability".to_string()
     }
 
-    fn push_posn_elements(
-        &self,
-        report: &mut dyn FnMut(f64, bool),
-        final_candidates: Option<&Vec<ElectResult>>,
-    ) {
-        if let Some(final_candidates) = final_candidates {
-            for fc in final_candidates.iter() {
-                report(self.scores[fc.cand], true);
-            }
-        } else {
-            for &score in self.scores.iter() {
-                report(score, true);
-            }
+    fn push_posn_elements(&self, report: &mut dyn FnMut(f64, bool), final_candidates: &Vec<usize>) {
+        for &fc in final_candidates.iter() {
+            report(self.scores[fc], true);
         }
     }
 }

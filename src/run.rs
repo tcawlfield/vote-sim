@@ -83,10 +83,15 @@ pub fn run(
         None
     };
 
+    // ordered_final_cands is a list of candidates in order of increasing regret.
+    // With no primary, ordered_final_cands is identical to sim.cand_by_regret.
+    // With a primary, it's a list containing only winning primary candidates.
+    let mut ordered_final_cands = vec![0; sim.ncand];
+
     for itrial in 0..trials {
         // println!("Sim election {}", itrial + 1);
 
-        let final_candidates = if let Some(rrv) = &mut mwms {
+        if let Some(rrv) = &mut mwms {
             let sim_primary: &mut Sim = sim_primary.as_mut().unwrap();
             sim_primary.election(&mut axes, &mut rng, itrial == 0);
             let final_candidates = rrv.multi_elect(&sim_primary, None, sim.ncand, itrial == 0);
@@ -94,10 +99,16 @@ pub fn run(
                 println!("primary election winners: {:?}", final_candidates);
             }
             sim.take_from_primary(sim_primary, &final_candidates);
-            Some(final_candidates)
+
+            ordered_final_cands.clear();
+            for &fc in sim_primary.cand_by_regret.iter() {
+                if final_candidates.iter().any(|c| c.cand == fc) {
+                    ordered_final_cands.push(fc);
+                }
+            }
         } else {
             sim.election(&mut axes, &mut rng, itrial == 0);
-            None
+            sim.cand_by_regret.clone_into(&mut ordered_final_cands);
         };
 
         cov_matrix.compute(&sim.scores);
@@ -139,7 +150,6 @@ pub fn run(
         }
         cov_bld.append(true); // End of matrix
 
-        // TODO: order candidates by regret for considerations
         for (consid, pos_bld) in axes.iter().zip(cand_posn_blds.iter_mut()) {
             consid.push_posn_elements(
                 &mut |x, next_row| {
@@ -152,13 +162,15 @@ pub fn run(
                         pos_bld.values().append(true);
                     }
                 },
-                final_candidates,
+                &ordered_final_cands,
             );
             pos_bld.append(true);
         }
         smith_candidates_bld.append_value(sim.smith_set_size() as i32);
         for &icand in cbr.iter() {
-            in_smith_set_bld.values().append_value(sim.in_smith_set[icand]);
+            in_smith_set_bld
+                .values()
+                .append_value(sim.in_smith_set[icand]);
         }
         in_smith_set_bld.append(true);
     }
