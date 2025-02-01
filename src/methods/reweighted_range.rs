@@ -75,10 +75,7 @@ impl MWMethodSim for RRVSim {
                     self.wtd_scores[*j] += wt * (self.ballots[(i, *j)] as f64);
                 }
             }
-            //println!("self.wtd_scores = {:?}", self.wtd_scores);
-            // let winner = remaining.iter()
-            //                       .max_by_key(|&j| self.wtd_scores[*j]).unwrap();
-            // let winner_idx = remaining.iter().find(|&j| j == winner).unwrap();
+            // println!("self.wtd_scores = {:?}", self.wtd_scores);
             let (winner_idx, winner_score) = {
                 let mut rem_iter = self.remaining.iter();
                 let mut winner_idx = 0;
@@ -98,6 +95,7 @@ impl MWMethodSim for RRVSim {
                 cand: winner,
                 score: winner_score,
             });
+            // println!("  Winner is {} with score {}", winner, winner_score);
         }
         &self.winners
     }
