@@ -9,6 +9,7 @@ mod results;
 mod reweighted_range;
 mod star;
 mod tallies;
+mod plurality_top_n;
 
 pub use borda::Borda;
 pub use instant_runoff::InstantRunoff;
@@ -19,6 +20,7 @@ pub use ranked_pairs::RP;
 pub use results::{ElectResult, Strategy, WinnerAndRunnerup};
 pub use reweighted_range::RRV;
 pub use star::STAR;
+pub use plurality_top_n::PluralityTopN;
 
 use crate::sim::Sim;
 use serde::{Deserialize, Serialize};
@@ -63,12 +65,14 @@ pub trait MethodSim {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum MultiWinMethod {
     RRV(RRV),
+    PluralityTopN(PluralityTopN),
 }
 
 impl MultiWinMethod {
     pub fn new_sim(&self, sim: &Sim) -> Box<dyn MWMethodSim> {
         match self {
             MultiWinMethod::RRV(m) => Box::new(m.new_sim(sim)),
+            MultiWinMethod::PluralityTopN(m) => Box::new(m.new_sim(sim)),
         }
     }
 }

@@ -1,0 +1,24 @@
+voters = 50
+candidates = 3
+primary_candidates = 8
+
+# primary_candidates = 8
+[primary_method.PluralityTopN]
+
+[[considerations]]
+[[considerations.Issues]]
+# Analagous to left <-> right
+sigma = 1.0
+halfcsep = 2.0
+halfvsep = 2.0
+[[considerations.Issues]]
+# Analagous to libertarian <-> authoritarian
+sigma = 0.5
+halfcsep = 0.0
+halfvsep = 0.0
+
+[[methods]]
+Plurality = { strat = "Honest" }
+
+[[methods]]
+Plurality = { strat = "Strategic" }
