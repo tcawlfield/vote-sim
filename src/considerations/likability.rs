@@ -6,18 +6,26 @@ use rand_distr::StandardNormal;
 
 use super::ConsiderationSim;
 
-// Likability is an attribute of each candidate that gives them universal appeal.
-// (All citizens are the same in this regard.)
-// Or at least we assume there are enough citizens that every representative
-// group in position-space spans all degrees of likability alignment.
-// If there is a bias in likability (Republicans see Trump as highly charismatic)
-// then that becomes an issue, not a likability.
-//
-// Likability is positive and has a mean value of mean.
-// Candidate likabilities are <mean> * <standard normal variate>^2
+/// Likability is an attribute of each candidate that gives them universal appeal.
+/// (All citizens are the same in this regard.)
+/// Or at least we assume there are enough citizens that every representative
+/// group in position-space spans all degrees of likability alignment.
+/// If there is a bias in likability (Republicans see Trump as highly charismatic)
+/// then that becomes an issue, not a likability.
+///
+/// Likability is positive and has a mean value of `mean`. Likabilities have
+/// a Chi-square distribution with one degree of freedom. Their standard deviation
+/// is sqrt(2) * `mean`.
+///
+/// If Likability is the only consideration for a simulated election, all voters
+/// will produce identical ballots. Most (all?) voting methods will select
+/// the ideal winner every time. And so to the extent that a Likability factor has
+/// a `mean` value that is large compared to the scale of the other considerations,
+/// all methods will tend to produce ideal results.
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Likability {
+    /// The scale of the Likability scores
     pub mean: f64,
 }
 

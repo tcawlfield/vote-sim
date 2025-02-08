@@ -4,8 +4,36 @@ use super::MethodSim;
 use crate::sim::Sim;
 use serde::{Deserialize, Serialize};
 
+/// In Plurality voting, a.k.a First Past the Post, voters mark exactly one candidate on
+/// their ballots to indicate that candidate as their top preference. The candidate
+/// with the must number of "votes" wins the election.
+///
+/// Although this method is very simple and intuitive, and by far the most widely used,
+/// it performs much worse than all other methods in almost every way, regardless of
+/// the details of the candidates-voter consideration model.
+///
+/// The poor performance of Plurality voting is counterintuitive, but there are at least
+/// three major problems identified with it, which can help to understand it more
+/// intuitively.
+///
+/// 1. Very little information is expressed on the ballot. A voter is unable to communicate
+///    anything beyond their preference for one candidate.
+/// 2. There is a strong spoiler effect. If a candidate enters an election who is
+///    relatively unpopular, they "steal" a small number of votes from the popular candidates.
+///    Most of these votes are from voters that would otherwise prefer the popular
+///    candidate nearest the "spoiler" candidate, and thus lower the chance of that
+///    popular candidate winning. This tends to drive a political system into a
+///    two-party equilibrium, as decribed by Duverger's law.
+/// 3. Related to (2), Plurality has a "center-squeeze" effect, that supresses the
+///    ability for centrist candidates to win an election. This effect increases
+///    with the number of candidates, which makes open primary elections likely to
+///    favor outlying candidates, or extremists.
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Plurality {
+    /// Honest voters will vote for the candidate with the highest score, or
+    /// perceived utility. Strategic voters will instead limit their choice to
+    /// one of the two front-runners in a pre-election poll.
     pub strat: Strategy,
 }
 
