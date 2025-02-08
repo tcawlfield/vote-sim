@@ -19,6 +19,10 @@ pub enum Strategy {
     Strategic,
 }
 
+pub fn default_honest() -> Strategy {
+    Strategy::Honest
+}
+
 impl WinnerAndRunnerup {
     pub fn is_tied(&self) -> bool {
         self.winner.score == self.runnerup.score
