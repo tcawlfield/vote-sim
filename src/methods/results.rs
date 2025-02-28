@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+// use std::string::ToString;
+use strum_macros::Display;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ElectResult {
@@ -13,7 +15,7 @@ pub struct WinnerAndRunnerup {
     pub runnerup: ElectResult,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Display)]
 pub enum Strategy {
     Honest,
     Strategic,
@@ -26,5 +28,14 @@ pub fn default_honest() -> Strategy {
 impl WinnerAndRunnerup {
     pub fn is_tied(&self) -> bool {
         self.winner.score == self.runnerup.score
+    }
+}
+
+impl Strategy {
+    pub fn as_letter(&self) -> &str {
+        match self {
+            Strategy::Honest => "h",
+            Strategy::Strategic => "s",
+        }
     }
 }

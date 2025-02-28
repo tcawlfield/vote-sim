@@ -1,5 +1,6 @@
 voters = 101
 candidates = 4
+primary_candidates = 8
 
 # Candidates can be drawn from a larger population using a multi-winner method
 # primary_candidates = 7
@@ -20,8 +21,8 @@ halfvsep = 2.0
 [[considerations.Issues]]
 # Analagous to libertarian <-> authoritarian
 sigma = 0.5
-halfcsep = 0.75
-halfvsep = 0.75
+halfcsep = 0.0
+halfvsep = 0.0
 
 [[methods]]
 Plurality = { strat = "Honest" }

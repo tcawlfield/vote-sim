@@ -111,15 +111,17 @@ impl MethodSim for BordaSim {
     }
 
     fn name(&self) -> String {
-        format!("Borda, {}", "Honest")
+        match self.p.rank_top_n {
+            Some(n) => format!("Borda, {} {}", self.p.strat, n),
+            None => format!("Borda, {}", self.p.strat),
+        }
     }
 
     fn colname(&self) -> String {
-        "Borda_h".to_string()
-        // match self.p.strat {
-        //     Strategy::Honest => "IRV_h".to_string(),
-        //     Strategy::Strategic => "IRV_s".to_string(),
-        // }
+        match self.p.rank_top_n {
+            Some(n) => format!("Borda_{}_{}", self.p.strat.as_letter(), n),
+            None => format!("Borda_{}", self.p.strat.as_letter()),
+        }
     }
 
     fn strat(&self) -> Strategy {
