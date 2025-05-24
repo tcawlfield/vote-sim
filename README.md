@@ -9,38 +9,36 @@ Here is (yet another) voting simulation.
 It's helpful to have a fast simulation even when there are many voters, candidates,
 and methods. Also, it's helpful for me to practice and better understand Rust.
 
-## Original question: Does strategic voting do better or worse for plurality?
+## Analysis
 
-A very early voting simulation (TODO: Reference?) apparently had the result that strategic voters,
-as a population, always performed worse for themselves (collectively) than
-honest voters. But for the *plurality* voting method, that seems like an irrational
-result, and [other voting simulations](https://electionscience.github.io/vse-sim/)
-gave opposite results. I wanted to weigh in on this, and my simulation here produces
-the result that in *plurality* voting, a population of strategic voters do better for themselves.
+The simulation is controlled by a configuration file, and writes output to a Parquet file.
+You can study the results of these simulations using Python. I generally do this with
+Jupyter notebooks and a variety of libraries including the excellent Awkward Array
+project.
 
-For all other methods considered here, strategic voters tend to get worse results for the
-whole population.
+## Blog
 
-Consider STAR voting. STAR uses a score-based ballot. The suggested scale is 0-5, or six
-possible scores for each candidate. Step one: Add up the scores for each candidate. Find the
-*two* highest-scoring candidates. Step two: do an (instant) runoff between these, using
-every ballot where these two finalists were given different scores. This runoff is
-a plurality vote, counting the numbers of ballots that favor each one candidate over the other.
-* Using plurality to pick the final winner helps minimize strategic effects in two ways:
-  * Degree of score-separation no longer is considered
-  * Voters are encouraged to differentiate between candidates, especially any who are
-    "hopefuls" (expected potential winners). This may discourage ballots with all zeros
-    and fives.
-* **This is somewhat similar to strategic voting with plurality!** It's still better than
-  plurality because the top-two are chosen with a method that is more expressive, and
-  has neither spoiler nor center-squeeze effects. But it ends with plurality, which
-  for 3+ candidates is a terrible method by all measures, but for exactly two
-  candidates is probably the very best method available.
+Here are some results from this simulation:
 
-So by reason of that, plurality voting with strategic voters is much less horrible than it
-is with honest voters.
+[How we all Chose](https://tcawlfield.github.io/vote-sim-studies/)
 
-## Thoughts
+## Code
+
+Note: I would like to get Rust documentation up on Github Pages. Not done yet though.
+
+* Useful terms:
+  * Consideration / axis
+    * Issue / Persuasion / Position
+    * Likability
+  * Score / utility
+* How are scores combined?
+  * At the top level we have a list of Considerations
+    * Combine with Addition / Multiplication / Quadrature/distance
+  * Considerations themselves can be simple or multi-dimensional
+    * N-dimensional considerations could evaluate with distance or multiplication
+    * I'm not convinced multiplication makes much sense. But addition vs distance is interesting.
+
+## Concepts
 
 This simulation uses *voter satisfaction efficiency* as a metric of success. The details
 of that are not particularly important, but it assumes an abstract metric akin to
@@ -120,64 +118,28 @@ to the core utility scores.
 
 This method should be more likely to create Condorcet cycles -- no Condorcet winner.
 
-### Sortition
-
-This project is all about voting, a topic that goes beyond politics. But it interfaces
-with politics. So I allow myself a small space to opine about sortition here. Sortition is
-the idea of electing people at random, by lottery.
-
-It is clear that voters have more accurate and incisive opinions of candidates that they
-know well personally than people they do not know. In anything other than small-town, local
-elections, voters have very little first-hand knowledge of the candidates. It follows that
-the huge majority of voters do not contribute any real or authentic information about
-the candidates by way of their ballots. They only contribute information about their
-perceived values or needs. This information is filtered through the lens of what voters
-believe that the candidates themselves stand for or support, and how their campaigns
-have shaped the minds of the electorate and have manufactured (usually) dislike and even
-outrage over the supposed policies and personalities of other candidates. One way or
-another it's a battle of perception, not reality.
-
-It seems that this leads to a lot of problems that are manifest in politics today.
-Political parties consolidate power, and thus silence individual voices and
-weaken the ability for any legislative
-assemblies to make decisions that favor the common good. Effective leadership requires
-finding solutions that meet the needs of the represented as completely as possible.
-"I win, you win" kinds of solutions. But partisan politics encourage adversarial
-decision-making, resulting in policies designed to favor certain groups at the
-expense of others.
-
-If we wish to have both accurate representation as well as representatives who are encouraged
-to promote general welfare, then we may want to select citizens for public service
-who would not be inclined to serve if it required a popularity contest or sacrificing
-principles for campaign funds and the support of one political party or another.
-The very nature of elections is competition. Perhaps large public elections find the
-worst of us, not the best, regardless of the merits of any voting system.
-
-## Code
-
-* Useful terms:
-  * Consideration / axis
-    * Issue / Persuasion / Position
-    * Likability
-  * Score / utility
-* How are scores combined?
-  * At the top level we have a list of Considerations
-    * Combine with Addition / Multiplication / Quadrature/distance
-  * Considerations themselves can be simple or multi-dimensional
-    * N-dimensional considerations could evaluate with distance or multiplication
-    * I'm not convinced multiplication makes much sense. But addition vs distance is interesting.
-
 ## To-Do
 
-* Fix strategic ballot scores
-* Allow a fraction of the population to be strategic
-* Allow a political faction to be more strategic than another
-  * Under different methods, how much are strategic voters wrongly rewarded?
-* Each voting method needs a new method, strategic_prereq to return Option<Method>.
-  * We can use this to ensure that each strategic method is preceded by its honest
-    "pre-election poll" method. If not, they can be inserted.
-  * At the same time, this suggests another property of MethodSim: is_visible.
-    is_visible() returns false if the method was inserted as a pre-poll.
+* Strategic voting improvements
+  * Allow a fraction of the population to be strategic
+  * Allow a political faction to be more strategic than another
+    * Under different methods, how much are strategic voters wrongly rewarded?
+  * Each voting method needs a new method, strategic_prereq to return Option<Method>.
+    * We can use this to ensure that each strategic method is preceded by its
+      honest "pre-election poll" method. If not, they can be inserted.
+    * At the same time, this suggests another property of MethodSim: is_visible.
+      is_visible() returns false if the method was inserted as a pre-poll.
+* Add a Virtues (described above) consideration
+* Multi-winner methods
+  * Iterative rewreighted range voting ---- loop through winners, removing them
+    and adding another in their place. Keep cycling through winners until either
+    the winner list becomes stable (needs better definition) or a maximum cycle
+    count is reached. Research prior art here, and consider repeating stability
+    patterns.
+  * How should we best characterize the effectiveness of the winning set?
+    * For each candidate, score utility by winners in preference order. Most
+      preferred gets 100%, next-most gets ... 50% maybe? Etc. What is natural
+      here?
 
 ### More questions:
 
