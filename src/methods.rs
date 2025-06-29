@@ -1,26 +1,28 @@
 mod borda;
+mod btr_irv;
 pub mod condorcet_util;
 mod instant_runoff;
 mod multivote;
 mod plurality;
+mod plurality_top_n;
 mod rangevoting;
 mod ranked_pairs;
 mod results;
 mod reweighted_range;
 mod star;
 mod tallies;
-mod plurality_top_n;
+mod test_utils;
 
 pub use borda::Borda;
 pub use instant_runoff::InstantRunoff;
 pub use multivote::Multivote;
 pub use plurality::Plurality;
+pub use plurality_top_n::PluralityTopN;
 pub use rangevoting::RangeVoting;
 pub use ranked_pairs::RP;
 pub use results::{ElectResult, Strategy, WinnerAndRunnerup};
 pub use reweighted_range::RRV;
 pub use star::STAR;
-pub use plurality_top_n::PluralityTopN;
 
 use crate::sim::Sim;
 use serde::{Deserialize, Serialize};
@@ -34,6 +36,7 @@ pub enum Method {
     Multivote(Multivote),
     STAR(STAR),
     RP(RP),
+    BtrIrv(btr_irv::BtrIrv),
 }
 
 impl Method {
@@ -46,6 +49,7 @@ impl Method {
             Method::Multivote(m) => Box::new(m.new_sim(sim)),
             Method::STAR(m) => Box::new(m.new_sim(sim)),
             Method::RP(m) => Box::new(m.new_sim(sim)),
+            Method::BtrIrv(m) => Box::new(m.new_sim(sim)),
         }
     }
 }
