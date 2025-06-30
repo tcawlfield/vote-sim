@@ -62,5 +62,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         config.primary_candidates = Some(pcand);
     }
 
+    pretty_env_logger::init();
+
     run::run(&config, args.trials, &args.outfile)
 }

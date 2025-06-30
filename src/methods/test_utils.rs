@@ -1,6 +1,7 @@
 use crate::sim::Sim;
 use ndarray::{s, ArrayView};
 
+#[allow(dead_code)]
 pub fn sim_from_scores(scores: &[(&[f64], usize)]) -> Sim {
     let ncand = scores[0].0.len();
     let mut ncit = 0;
