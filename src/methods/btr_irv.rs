@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 
 use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
 use super::tallies::Tallies;
-use super::test_utils::sim_from_scores;
 use super::MethodSim;
 use crate::sim::Sim;
 
@@ -66,7 +65,7 @@ impl MethodSim for BtrIrvSim {
                     .map(|(icand, _)| icand),
             );
             // Sort from low to high tallies
-            self.candidates.sort_by_key(|&icand| -self.tallies[icand]);
+            self.candidates.sort_by_key(|&icand| self.tallies[icand]);
             let top_cand = self.candidates[self.candidates.len() - 1];
             let top_votes = self.tallies[top_cand];
             if self.candidates.len() <= 2 || top_votes >= (sim.ncit as i32 + 1) / 2 {
@@ -101,7 +100,7 @@ impl MethodSim for BtrIrvSim {
     }
 
     fn name(&self) -> String {
-        format!("IRV, {}", "Honest")
+        format!("BRT-IRV, {}", "Honest")
     }
 
     fn colname(&self) -> String {
@@ -121,7 +120,7 @@ impl MethodSim for BtrIrvSim {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sim::Sim;
+    use crate::methods::test_utils::sim_from_scores;
 
     #[test]
     fn test_btr_irv_honest() {
@@ -138,9 +137,9 @@ mod tests {
         let mut method = BtrIrv {}.new_sim(&sim);
         sim.rank_candidates();
         let honest_results = method.elect(&sim, None, true);
-        assert_eq!(honest_results.winner.cand, 0);
-        assert_eq!(honest_results.winner.score, 3.);
-        assert_eq!(honest_results.runnerup.cand, 1);
-        assert_eq!(honest_results.runnerup.score, 2.);
+        assert_eq!(honest_results.winner.cand, 1);
+        assert_eq!(honest_results.winner.score, 58.);
+        assert_eq!(honest_results.runnerup.cand, 0);
+        assert_eq!(honest_results.runnerup.score, 42.);
     }
 }

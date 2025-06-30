@@ -75,7 +75,7 @@ pub fn find_any_condorcet_winner(sim: &Sim) -> usize {
     for icand in 0..sim.ncand {
         let mut cand_victories = 0;
         for i in 0..icand {
-            if sim.i_beats_j_by[(i, icand)] < 0 {
+            if sim.i_beats_j_by[(i, icand)] <= 0 {
                 cand_victories += 1; // icand beats i
             }
         }
