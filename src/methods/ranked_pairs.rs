@@ -148,8 +148,8 @@ mod tests {
             sim.i_beats_j_by,
             ndarray::array![
                 [0, 6, -4], // i goes down, j goes across. j > i.
-                [0, 0, 2],
-                [0, 0, 0],
+                [-6, 0, 2],
+                [4, -2, 0],
             ]
         );
 

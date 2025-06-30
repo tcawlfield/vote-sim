@@ -12,7 +12,7 @@ pub struct Sim {
     pub i_beats_j_by: Array2<i32>,
     pub regrets: Vec<f64>,
     pub cand_by_regret: Vec<usize>, // map from regret rank to icand
-    pub regret_rank: Vec<usize>, // map icand to regret-ranked pos'n
+    pub regret_rank: Vec<usize>,    // map icand to regret-ranked pos'n
     pub in_smith_set: Vec<bool>,
     scratch_ranks: Vec<usize>,
 }
@@ -111,24 +111,29 @@ impl Sim {
                 .sort_by(|&a, &b| cit_scores[b].partial_cmp(&cit_scores[a]).unwrap());
             for icand in 0..self.ncand {
                 self.ranks[(icit, icand)] = self.scratch_ranks[icand];
-                for jcand in (icand + 1)..self.ncand {
+                for jcand in 0..icand {
                     if cit_scores[icand] > cit_scores[jcand] {
                         self.i_beats_j_by[(icand, jcand)] += 1;
+                    } else if cit_scores[icand] < cit_scores[jcand] {
+                        // This is a slowdown, but handles equal-score cases (which should be nearly nonexistent)
+                        self.i_beats_j_by[(jcand, icand)] += 1;
                     }
                 }
             }
         }
 
-        for ((i, j), beat_by) in self.i_beats_j_by.indexed_iter_mut() {
-            if j > i {
-                // Only upper-triangular elements are used -- or lower-triangular?
-                *beat_by = 2 * *beat_by - self.ncit as i32; // total ordering, so defeats = ncit - n_i_beats_j.
+        // i_beats_j_by is misnamed until we convert to a margin of victory
+        for i in 1..self.ncand {
+            for j in 0..i {
+                let ibj = self.i_beats_j_by[(i, j)];
+                self.i_beats_j_by[(i, j)] -= self.i_beats_j_by[(j, i)];
+                self.i_beats_j_by[(j, i)] -= ibj;
             }
         }
     }
 
     /// find_smith_set fills in in_smith_set array.
-    /// Requires rand_candidates to have been called.
+    /// Requires rank_candidates to have been called.
     pub fn find_smith_set(&mut self) {
         mark_smith_candidates(self);
     }
@@ -164,5 +169,47 @@ impl Sim {
                 result.clone()
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ndarray::array;
+
+    #[test]
+    fn test_ranks_beats_and_smith() {
+        // Example from https://electowiki.org/wiki/Ranked_Pairs#Notes
+        let mut sim = Sim::new(6, 5);
+        sim.scores = array![
+            [-1., -2., -3., -4., -5., -6.],
+            [-1., -2., -3., -4., -5., -6.],
+            [-2., -3., -1., -5., -6., -4.],
+            [-3., -1., -2., -6., -4., -5.],
+            [-1., -2., -1., -4., -5., -4.],
+        ];
+        sim.rank_candidates(); // Creates the i_beats_j matrix in sim
+        #[rustfmt::skip]
+        assert_eq!(sim.ranks, array![
+            [0, 1, 2, 3, 4, 5],
+            [0, 1, 2, 3, 4, 5],
+            [2, 0, 1, 5, 3, 4], // cand 2 is ranked 1st, etc.
+            [1, 2, 0, 4, 5, 3],
+            [2, 0, 1, 5, 3, 4], // stable sort of 0, 1, 3, 4 from row above
+        ]);
+        #[rustfmt::skip]
+        assert_eq!(sim.i_beats_j_by, array![
+            [ 0,  3,  0,  5,  5,  5], // i goes down, j goes across. j > i.
+            [-3,  0,  1,  5,  5,  5],
+            [ 0, -1,  0,  5,  5,  5],
+            [-5, -5, -5,  0,  3,  0],
+            [-5, -5, -5, -3,  0,  1],
+            [-5, -5, -5,  0, -1,  0],
+        ]);
+        sim.find_smith_set();
+        assert_eq!(
+            sim.in_smith_set,
+            vec![true, true, true, false, false, false]
+        );
     }
 }

@@ -15,7 +15,7 @@ pub fn find_candidate_pairoffs(pairs: &mut Vec<CandPair>, sim: &Sim) {
     pairs.clear();
     for icand in 0..sim.ncand {
         for jcand in (icand + 1)..sim.ncand {
-            if sim.i_beats_j_by[(icand, jcand)] > 0 {
+            if sim.i_beats_j_by[(icand, jcand)] >= 0 {
                 pairs.push(CandPair {
                     winner: icand,
                     loser: jcand,
@@ -74,17 +74,15 @@ pub fn find_any_condorcet_winner(sim: &Sim) -> usize {
     let mut max_victories = 0;
     for icand in 0..sim.ncand {
         let mut cand_victories = 0;
-        for i in 0..icand {
-            if sim.i_beats_j_by[(i, icand)] <= 0 {
-                cand_victories += 1; // icand beats i
+        for j in 0..sim.ncand {
+            if j == icand {
+                continue;
+            }
+            if sim.i_beats_j_by[(icand, j)] >= 0 {
+                cand_victories += 1; // icand beats or ties with i
             }
         }
-        for j in icand + 1..sim.ncand {
-            if sim.i_beats_j_by[(icand, j)] > 0 {
-                cand_victories += 1; // icand beats j
-            }
-        }
-        if cand_victories > max_victories {
+        if cand_victories >= max_victories {
             winner = icand;
             max_victories = cand_victories;
         }
@@ -100,24 +98,20 @@ pub fn mark_smith_candidates(sim: &mut Sim) {
     sim.in_smith_set[seed] = true;
     // Now include in the set all candidates which defeat one of the Smith candidates
     let mut icand = 0;
-    while icand < sim.ncand {
+    'icand_loop: while icand < sim.ncand {
         if sim.in_smith_set[icand] {
             icand += 1;
             continue;
         }
         // icand is not yet in the Smith set. They become a member by defeating one who is.
-        for i in 0..icand {
-            if sim.in_smith_set[i] && sim.i_beats_j_by[(i, icand)] < 0 {
-                sim.in_smith_set[icand] = true; // icand beats i
-                icand = 0; // Must start from the top because there may be cycles.
+        for j in 0..sim.ncand {
+            if j == icand {
                 continue;
             }
-        }
-        for j in icand + 1..sim.ncand {
-            if sim.in_smith_set[j] && sim.i_beats_j_by[(icand, j)] > 0 {
-                sim.in_smith_set[icand] = true; // icand beats j
-                icand = 0;
-                continue;
+            if sim.in_smith_set[j] && sim.i_beats_j_by[(icand, j)] >= 0 {
+                sim.in_smith_set[icand] = true; // icand beats or ties i
+                icand = 0; // Must start from the top because there may be cycles.
+                continue 'icand_loop;
             }
         }
         icand += 1;
@@ -128,42 +122,26 @@ pub fn mark_smith_candidates(sim: &mut Sim) {
 mod tests {
     use ndarray::array;
     // use super::*;
+    use crate::methods::test_utils::sim_from_scores;
     use crate::sim::Sim;
-
-    // TODO: consider moving setup_scores into sim::tests module. Can I reference it from there?
-    pub fn setup_scores(ballot_scores: &[(&[f64], usize)]) -> Sim {
-        let ncand = ballot_scores[0].0.len();
-        let ncit = ballot_scores.iter().map(|p| p.1).sum();
-        let mut sim = Sim::new(ncand, ncit);
-        let mut score_iter = sim.scores.axis_iter_mut(ndarray::Axis(0));
-        for (scores, multiple) in ballot_scores.iter() {
-            for _ in 0..*multiple {
-                for (ssc, sc) in score_iter.next().unwrap().iter_mut().zip(scores.iter()) {
-                    *ssc = *sc;
-                }
-            }
-        }
-        sim
-    }
 
     #[test]
     fn test_smith_set() {
-        let mut sim = setup_scores(&[
+        let mut sim = sim_from_scores(&[
             (&[-2., -3., -4., -1.], 40), // D>A>B>C
             (&[-3., -1., -2., -4.], 35), // B>C>A>D
             (&[-2., -3., -1., -4.], 25), // C>A>B>D
         ]);
         sim.rank_candidates(); // Gives us i_beats_j_by
-        assert_eq!(
-            sim.i_beats_j_by,
-            array![
-                [0, 40 - 35 + 25, 40 - 35 - 25, -40 + 35 + 25],
-                [0, 0, 40 + 35 - 25, -40 + 35 + 25],
-                [0, 0, 0, -40 + 35 + 25],
-                [0, 0, 0, 0],
-            ]
-        );
+        let expect_beats = array![
+            [0, 40 - 35 + 25, 40 - 35 - 25, -40 + 35 + 25],
+            [-30, 0, 40 + 35 - 25, -40 + 35 + 25],
+            [20, -50, 0, -40 + 35 + 25],
+            [-20, -20, -20, 0],
+        ];
+        assert_eq!(sim.i_beats_j_by, expect_beats);
         sim.find_smith_set();
+        // (A>B, B>C, C>A), A>D, B>D, C>D
         assert_eq!(sim.in_smith_set, [true, true, true, false]);
         assert_eq!(sim.smith_set_size(), 3);
 
@@ -176,9 +154,15 @@ mod tests {
             [-2.1, -6.0, -0.8, -2.5]
         ];
         sim.rank_candidates();
+        #[rustfmt::skip]
         assert_eq!(
             sim.i_beats_j_by,
-            array![[0, 1, -5, 5], [0, 0, -3, -1], [0, 0, 0, 5], [0, 0, 0, 0],]
+            array![
+                [ 0, 1, -5,  5],
+                [-1, 0, -3, -1],
+                [ 5, 3,  0,  5],
+                [-5, 1, -5,  0],
+            ]
         );
         sim.find_smith_set();
         assert_eq!(sim.smith_set_size(), 1);

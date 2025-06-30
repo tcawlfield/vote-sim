@@ -2,6 +2,7 @@ mod borda;
 mod btr_irv;
 pub mod condorcet_util;
 mod instant_runoff;
+mod minimax;
 mod multivote;
 mod plurality;
 mod plurality_top_n;
@@ -37,6 +38,7 @@ pub enum Method {
     STAR(STAR),
     RP(RP),
     BtrIrv(btr_irv::BtrIrv),
+    MM(minimax::Minimax),
 }
 
 impl Method {
@@ -50,6 +52,7 @@ impl Method {
             Method::STAR(m) => Box::new(m.new_sim(sim)),
             Method::RP(m) => Box::new(m.new_sim(sim)),
             Method::BtrIrv(m) => Box::new(m.new_sim(sim)),
+            Method::MM(m) => Box::new(m.new_sim(sim)),
         }
     }
 }
