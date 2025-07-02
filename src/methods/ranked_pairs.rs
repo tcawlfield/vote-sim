@@ -1,3 +1,4 @@
+use log::*;
 use ndarray::Array2;
 use serde::{Deserialize, Serialize};
 
@@ -77,6 +78,7 @@ impl MethodSim for RPSim {
 
 impl RPSim {
     fn find_winner(&mut self, sim: &Sim, verbose: bool) -> usize {
+        debug!("Pairs: {:?}", self.pairs);
         let mut pair_iter = self.pairs.iter();
         self.locked_in.fill(false);
 
@@ -100,15 +102,11 @@ impl RPSim {
             match find_locked_in_winner(&mut self.locked_in, sim) {
                 Some(w) => {
                     winner = w;
-                    if verbose {
-                        println!("Locked in {:?} -- current winner is {}", p, w);
-                    }
+                    debug!("Locked in {:?} -- current winner is {}", p, w);
                 }
                 None => {
                     lock_in(&mut self.locked_in, p, false);
-                    if verbose {
-                        println!("Won't lock in {:?} -- creates Condorcet cycle", p);
-                    }
+                    debug!("Won't lock in {:?} -- creates Condorcet cycle", p);
                 }
             }
         }
