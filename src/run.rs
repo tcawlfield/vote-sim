@@ -2,12 +2,13 @@ use arrow_array::builder::{
     BooleanBuilder, FixedSizeListBuilder, Float64Builder, Int32Builder, ListBuilder,
 };
 use arrow_array::{RecordBatch, StructArray};
+use arrow_schema::{DataType, Field, SchemaBuilder};
 use parquet::file::metadata::KeyValue;
 use parquet::{arrow::ArrowWriter, basic::Compression, file::properties::WriterProperties};
-
-use arrow_schema::{DataType, Field, SchemaBuilder};
 use std::fs;
+use std::sync::mpsc;
 use std::{error::Error, sync::Arc};
+use work_queue::{LocalQueue, Queue};
 
 use crate::config::Config;
 use crate::considerations::ConsiderationSim;
@@ -16,7 +17,65 @@ use crate::method_tracker::MethodTracker;
 use crate::methods::Strategy;
 use crate::sim::Sim;
 
+static MAX_TRIALS_PER_JOB: usize = 10000;
+
+struct Task {
+    config: Config,
+    trials: usize,
+    result_chan: mpsc::Sender<TaskResult>,
+}
+
+struct TaskResult {
+    method_stats: Vec<MethodTracker>,
+    batch: RecordBatch,
+}
+
 pub fn run(
+    config: &Config,
+    trials: usize,
+    outfile: &Option<std::ffi::OsString>,
+) -> Result<(), Box<dyn Error>> {
+    let num_workers = std::thread::available_parallelism().unwrap().get();
+    let min_chunks = num_workers.max((trials + MAX_TRIALS_PER_JOB - 1) / MAX_TRIALS_PER_JOB);
+    let chunks_per_worker = (min_chunks + num_workers - 1) / num_workers;
+    let chunks = chunks_per_worker * num_workers;
+    let trials_per_chunk = (trials + 1) / chunks;
+
+    let (task_result_tx, task_result_rx) = mpsc::channel();
+
+    let queue: Queue<Task> = Queue::new(num_workers, 4);
+    let mut trials_left = trials;
+    for chunks_to_do in (1..chunks + 1).rev() {
+        let task = Task {
+            config: config.clone(),
+            trials: (trials_left + chunks_to_do - 1) / chunks_to_do,
+            result_chan: task_result_tx.clone(),
+        };
+        queue.push(task);
+    }
+
+    let handles: Vec<_> = queue
+        .local_queues()
+        .map(|mut local_queue| {
+            std::thread::spawn(move || {
+                while let Some(task) = local_queue.pop() {
+                    task.0(&mut local_queue);
+                }
+            })
+        })
+        .collect();
+    drop(task_result_tx);
+
+    // Loop over task_result_rx
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    Ok(())
+}
+
+fn run_batch(
     config: &Config,
     trials: usize,
     outfile: &Option<std::ffi::OsString>,
@@ -71,9 +130,6 @@ pub fn run(
         BooleanBuilder::with_capacity(trials * sim.ncand),
         sim.ncand as i32,
     );
-
-    // TODO: Use position arrays to demonstrate that RRV primaries spread out the candidates
-    //   in position space and improve likeability.
 
     let mut cov_matrix = CovMatrix::new(sim.ncand);
 
@@ -253,7 +309,7 @@ pub fn run(
         DataType::Struct(meth_schema_bld.finish().fields),
         false,
     ));
-    let batch = RecordBatch::try_new(Arc::new(schema.finish()), columns).unwrap();
+    let batch: RecordBatch = RecordBatch::try_new(Arc::new(schema.finish()), columns).unwrap();
 
     let config_str = serde_json::to_string(config).unwrap();
     if let Some(filename) = outfile {

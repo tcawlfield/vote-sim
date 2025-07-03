@@ -28,7 +28,7 @@ pub use star::STAR;
 use crate::sim::Sim;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Method {
     Plurality(Plurality),
     Range(RangeVoting),
@@ -64,7 +64,7 @@ pub trait MethodSim {
     fn strat(&self) -> Strategy;
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum MultiWinMethod {
     RRV(RRV),
     PluralityTopN(PluralityTopN),

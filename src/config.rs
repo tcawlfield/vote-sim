@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use crate::considerations::Consideration;
 use crate::methods::{Method, MultiWinMethod};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     pub voters: usize,
     pub candidates: usize,

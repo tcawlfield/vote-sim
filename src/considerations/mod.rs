@@ -18,7 +18,8 @@ pub trait ConsiderationSim: fmt::Debug {
     fn push_posn_elements(&self, report: &mut dyn FnMut(f64, bool), final_candidates: &Vec<usize>);
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub enum Consideration {
     Likability(Likability),
     Issues(Vec<Issue>),
