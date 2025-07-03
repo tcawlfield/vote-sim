@@ -58,12 +58,7 @@ impl Method {
 }
 
 pub trait MethodSim {
-    fn elect(
-        &mut self,
-        sim: &Sim,
-        honest_rslt: Option<WinnerAndRunnerup>,
-        verbose: bool,
-    ) -> WinnerAndRunnerup;
+    fn elect(&mut self, sim: &Sim, honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup;
     fn name(&self) -> String;
     fn colname(&self) -> String;
     fn strat(&self) -> Strategy;
@@ -90,6 +85,5 @@ pub trait MWMethodSim {
         sim: &Sim,
         honest_rslt: Option<WinnerAndRunnerup>,
         nwinners: usize,
-        verbose: bool,
     ) -> &Vec<ElectResult>;
 }

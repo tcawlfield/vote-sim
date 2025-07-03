@@ -45,7 +45,6 @@ impl MWMethodSim for RRVSim {
         sim: &Sim,
         _honest_rslt: Option<WinnerAndRunnerup>,
         nwinners: usize,
-        _verbose: bool,
     ) -> &Vec<ElectResult> {
         self.ballots.fill(0);
         for icit in 0..sim.ncit {
@@ -75,17 +74,14 @@ impl MWMethodSim for RRVSim {
                     self.wtd_scores[*j] += wt * (self.ballots[(i, *j)] as f64);
                 }
             }
-            // println!("self.wtd_scores = {:?}", self.wtd_scores);
             let (winner_idx, winner_score) = {
                 let mut rem_iter = self.remaining.iter();
                 let mut winner_idx = 0;
                 let mut winner_score = self.wtd_scores[*rem_iter.next().unwrap()];
-                //println!("     winner = {}, score = {}", remaining[winner_idx], winner_score);
                 for (idx, j) in rem_iter.enumerate() {
                     if self.wtd_scores[*j] > winner_score {
                         winner_idx = idx + 1;
                         winner_score = self.wtd_scores[*j];
-                        //println!("     New winner={}, score={}", remaining[winner_idx], winner_score);
                     }
                 }
                 (winner_idx, winner_score)
@@ -95,7 +91,6 @@ impl MWMethodSim for RRVSim {
                 cand: winner,
                 score: winner_score,
             });
-            // println!("  Winner is {} with score {}", winner, winner_score);
         }
         &self.winners
     }
@@ -136,7 +131,7 @@ mod tests {
             sim.scores[(icit, 4)] = 10.; // B2
         }
 
-        let results = rrv.multi_elect(&sim, None, 3, true);
+        let results = rrv.multi_elect(&sim, None, 3);
         assert_eq!(results.len(), 3);
 
         // First round, full weights, cand A1 wins with 600 pts (60 * 10 + 40 * 0)

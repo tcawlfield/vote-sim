@@ -27,12 +27,7 @@ impl Minimax {
 }
 
 impl MethodSim for MinimaxSim {
-    fn elect(
-        &mut self,
-        sim: &Sim,
-        _honest_rslt: Option<WinnerAndRunnerup>,
-        _verbose: bool,
-    ) -> WinnerAndRunnerup {
+    fn elect(&mut self, sim: &Sim, _honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup {
         // self.min_victory_margin will hold the lowest margin of victory (negative when
         // the candidate loses against another) that the indexing candidate has over others
         // in pair-wise matchups.
@@ -100,7 +95,7 @@ mod tests {
             ]
         );
         let mut method = Minimax {}.new_sim(&sim);
-        let honest_results = method.elect(&sim, None, true);
+        let honest_results = method.elect(&sim, None);
         assert_eq!(method.min_victory_margin, vec![-16, 16, -36, -66]);
         assert_eq!(honest_results.winner.cand, 1);
         assert_eq!(honest_results.winner.score, 16.);

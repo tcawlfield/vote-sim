@@ -59,12 +59,7 @@ impl Borda {
 }
 
 impl MethodSim for BordaSim {
-    fn elect(
-        &mut self,
-        sim: &Sim,
-        honest_rslt: Option<WinnerAndRunnerup>,
-        verbose: bool,
-    ) -> WinnerAndRunnerup {
+    fn elect(&mut self, sim: &Sim, honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup {
         self.tallies.fill(0);
         let top_ncand = if let Some(n) = self.p.rank_top_n {
             n
@@ -104,9 +99,7 @@ impl MethodSim for BordaSim {
                 }
             }
         }
-        if verbose {
-            println!("Borda tallies are: {:?}", self.tallies);
-        }
+        log::info!("Borda tallies are: {:?}", self.tallies);
         tally_votes(&self.tallies)
     }
 
@@ -152,7 +145,7 @@ mod tests {
         }
         .new_sim(&sim);
         sim.rank_candidates();
-        let honest_results = method.elect(&sim, None, true);
+        let honest_results = method.elect(&sim, None);
         assert_eq!(honest_results.winner.cand, 1);
         assert_eq!(honest_results.winner.score, 15.);
         assert_eq!(honest_results.runnerup.cand, 0);
@@ -163,7 +156,7 @@ mod tests {
             rank_top_n: None,
         }
         .new_sim(&sim);
-        let strat_results = method.elect(&sim, Some(honest_results), true);
+        let strat_results = method.elect(&sim, Some(honest_results));
         // scores: Note strategic scoring is reduced by 1 so that enemy == 0 always
         // 3 0 2 1
         // 0 3 1 2
@@ -191,7 +184,7 @@ mod tests {
         }
         .new_sim(&sim);
         sim.rank_candidates();
-        let honest_results = method.elect(&sim, None, true);
+        let honest_results = method.elect(&sim, None);
         assert_eq!(method.tallies, vec![4, 6, 2, 3]);
         assert_eq!(honest_results.winner.cand, 1);
         assert_eq!(honest_results.runnerup.cand, 0);
@@ -201,7 +194,7 @@ mod tests {
             rank_top_n: Some(3),
         }
         .new_sim(&sim);
-        let strat_results = method.elect(&sim, Some(honest_results), true);
+        let strat_results = method.elect(&sim, Some(honest_results));
         // scores: Note strategic scoring is reduced by 1 so that enemy == 0 always
         // 2 0 1 0
         // 0 2 0 1

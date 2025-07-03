@@ -89,15 +89,13 @@ pub fn run(
     let mut ordered_final_cands = vec![0; sim.ncand];
 
     for itrial in 0..trials {
-        // println!("Sim election {}", itrial + 1);
+        log::info!("Sim election {}", itrial + 1);
 
         if let Some(rrv) = &mut mwms {
             let sim_primary: &mut Sim = sim_primary.as_mut().unwrap();
-            sim_primary.election(&mut axes, &mut rng, itrial == 0);
-            let final_candidates = rrv.multi_elect(&sim_primary, None, sim.ncand, itrial == 0);
-            if itrial == 0 {
-                println!("primary election winners: {:?}", final_candidates);
-            }
+            sim_primary.election(&mut axes, &mut rng);
+            let final_candidates = rrv.multi_elect(&sim_primary, None, sim.ncand);
+            log::info!("primary election winners: {:?}", final_candidates);
             sim.take_from_primary(sim_primary, &final_candidates);
 
             ordered_final_cands.clear();
@@ -107,30 +105,26 @@ pub fn run(
                 }
             }
         } else {
-            sim.election(&mut axes, &mut rng, itrial == 0);
+            sim.election(&mut axes, &mut rng);
             sim.cand_by_regret.clone_into(&mut ordered_final_cands);
         };
 
         cov_matrix.compute(&sim.scores);
-        if itrial == 0 {
-            println!("Cov matrix: {}", cov_matrix.elements);
-        }
+        log::info!("Cov matrix: {}", cov_matrix.elements);
 
         let mut prev_rslt = None;
         for method in methods.iter_mut() {
-            let rslt = method.elect(&sim, prev_rslt, itrial == 0);
+            let rslt = method.elect(&sim, prev_rslt);
             let regret = sim.regrets[rslt.winner.cand];
             if let Strategy::Honest = method.method.strat() {
                 prev_rslt = Some(rslt);
             }
-            if itrial == 0 {
-                println!(
-                    "Method {:?} found winner {} -- regret {}",
-                    method.method.name(),
-                    rslt.winner.cand,
-                    regret
-                );
-            }
+            log::info!(
+                "Method {:?} found winner {} -- regret {}",
+                method.method.name(),
+                rslt.winner.cand,
+                regret
+            );
         }
 
         ideal_cnd_bld.append_value(0);

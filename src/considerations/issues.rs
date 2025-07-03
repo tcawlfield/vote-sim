@@ -11,7 +11,7 @@ const SQRT_3: f64 = 1.732050807568877293527446341505872367_f64; // borrowed from
 /// Examples may include: conservative versus liberal, authoritarian
 /// versus libertarian, ranch dressing versus blue cheese, or hard sci-fi versus
 /// soft sci-fi.
-/// 
+///
 /// Scores, or voters' perceived utilities for each candidate, are penalized
 /// by the distance between the voter and candidate in (Euclidean) issue space.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -64,7 +64,7 @@ pub fn new_issues_sim(issues: Vec<Issue>, sim: &Sim) -> IssuesSim {
 }
 
 impl ConsiderationSim for IssuesSim {
-    fn add_to_scores(&mut self, scores: &mut Array2<f64>, mut rng: &mut ThreadRng, verbose: bool) {
+    fn add_to_scores(&mut self, scores: &mut Array2<f64>, mut rng: &mut ThreadRng) {
         let (ncit, ncand) = scores.dim();
         // All citizens are the same in this regard.
         // Or at least we assume there are enough citizens that every representative
@@ -75,17 +75,13 @@ impl ConsiderationSim for IssuesSim {
                 self.cand_position[(i, ipos)] = issue.gen_value(&mut rng, false);
             }
         }
-        if verbose {
-            println!("Candidate positions: {:?}", self.cand_position);
-        }
+        log::info!("Candidate positions: {:?}", self.cand_position);
         let mut cit_position = vec![0.0; npos];
         for j in 0..ncit {
             for (ipos, issue) in self.issues.iter().enumerate() {
                 cit_position[ipos] = issue.gen_value(&mut rng, true);
             }
-            if verbose && ncit < 20 {
-                println!("cit {}: {:?}", j, cit_position);
-            }
+            log::info!("cit {}: {:?}", j, cit_position);
             for i in 0..ncand {
                 let mut distsq = 0.0;
                 for p in 0..npos {

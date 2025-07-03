@@ -33,13 +33,8 @@ impl Sim {
         }
     }
 
-    pub fn election(
-        &mut self,
-        axes: &mut [Box<dyn ConsiderationSim>],
-        rng: &mut ThreadRng,
-        verbose: bool,
-    ) {
-        self.get_scores(axes, rng, verbose);
+    pub fn election(&mut self, axes: &mut [Box<dyn ConsiderationSim>], rng: &mut ThreadRng) {
+        self.get_scores(axes, rng);
         self.compute_regrets();
         self.rank_candidates();
         self.find_smith_set();
@@ -57,19 +52,12 @@ impl Sim {
         self.rank_candidates();
     }
 
-    fn get_scores(
-        &mut self,
-        axes: &mut [Box<dyn ConsiderationSim>],
-        rng: &mut ThreadRng,
-        verbose: bool,
-    ) {
+    fn get_scores(&mut self, axes: &mut [Box<dyn ConsiderationSim>], rng: &mut ThreadRng) {
         self.scores.fill(0.0);
         for ax in axes.iter_mut() {
-            ax.add_to_scores(&mut self.scores, rng, verbose);
+            ax.add_to_scores(&mut self.scores, rng);
         }
-        if self.ncit < 20 && verbose {
-            println!("Voter utilities:\n{:?}", &mut self.scores);
-        }
+        log::info!("Voter utilities:\n{:?}", &mut self.scores);
     }
 
     // Side-effects: compute self.regrets and self.cand_by_regret

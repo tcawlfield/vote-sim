@@ -12,7 +12,7 @@ pub use issues::{new_issues_sim, Issue};
 pub use likability::Likability;
 
 pub trait ConsiderationSim: fmt::Debug {
-    fn add_to_scores(&mut self, scores: &mut Array2<f64>, rng: &mut ThreadRng, verbose: bool);
+    fn add_to_scores(&mut self, scores: &mut Array2<f64>, rng: &mut ThreadRng);
     fn get_dim(&self) -> usize;
     fn get_name(&self) -> String;
     fn push_posn_elements(&self, report: &mut dyn FnMut(f64, bool), final_candidates: &Vec<usize>);

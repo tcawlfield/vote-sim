@@ -31,12 +31,7 @@ impl Multivote {
 }
 
 impl MethodSim for MultivoteSim {
-    fn elect(
-        &mut self,
-        sim: &Sim,
-        _honest_rslt: Option<WinnerAndRunnerup>,
-        verbose: bool,
-    ) -> WinnerAndRunnerup {
+    fn elect(&mut self, sim: &Sim, _honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup {
         self.tallies.fill(0);
         if let Strategy::Strategic = self.p.strat {
             for ranks in sim.ranks.axis_iter(Axis(0)) {
@@ -45,7 +40,7 @@ impl MethodSim for MultivoteSim {
             return tally_votes(&self.tallies);
         }
 
-        for utilities in sim.scores.axis_iter(Axis(0)) {
+        for (icit, utilities) in sim.scores.axis_iter(Axis(0)).enumerate() {
             let min_score = utilities.iter().map(|x| *x).reduce(f64::min).unwrap();
             let ttl_score: f64 = utilities.iter().map(|x| *x).sum();
             self.cand_scores
@@ -53,9 +48,7 @@ impl MethodSim for MultivoteSim {
 
             let reduction = self.p.spread_fact * (ttl_score - min_score * sim.ncand as f64)
                 / (self.p.votes as f64);
-            // if verbose {
-            //     println!("  voter {} has reduction {}", icit, reduction);
-            // }
+            log::debug!("  voter {} has reduction {}", icit, reduction);
             for _ in 0..self.p.votes {
                 let mut max_score = self.cand_scores[0];
                 let mut best_cand = 0;
@@ -67,18 +60,16 @@ impl MethodSim for MultivoteSim {
                 }
                 self.tallies[best_cand] += 1;
                 self.cand_scores[best_cand] -= reduction;
-                // if verbose {
-                //     println!(
-                //         "Voter {} votes for {}, scores are now {:?}",
-                //         icit, best_cand, cand_scores
-                //     );
-                // }
+                log::debug!(
+                    "Voter {} votes for {}, scores are now {:?}",
+                    icit,
+                    best_cand,
+                    self.cand_scores
+                );
             }
         }
 
-        if verbose {
-            println!("Multivote tallies are: {:?}", self.tallies);
-        }
+        log::debug!("Multivote tallies are: {:?}", self.tallies);
         tally_votes(&self.tallies)
     }
 
@@ -127,7 +118,7 @@ mod tests {
         // Next scores:          1., 2., 1.25, 1.5  -- cand 1 gets the vote
         // Tallies:
         sim.rank_candidates();
-        let honest_results = method.elect(&sim, None, true);
+        let honest_results = method.elect(&sim, None);
         assert_eq!(honest_results.winner.cand, 3);
         assert_eq!(honest_results.winner.score, 7.);
         assert_eq!(honest_results.runnerup.cand, 2);
@@ -140,7 +131,7 @@ mod tests {
         }
         .new_sim(&sim);
         // tallies: 4, 4, 4, 8
-        let strat_results = smethod.elect(&sim, Some(honest_results), true);
+        let strat_results = smethod.elect(&sim, Some(honest_results));
         assert_eq!(strat_results.winner.cand, 3);
         assert_eq!(strat_results.winner.score, 8.);
     }

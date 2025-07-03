@@ -53,12 +53,7 @@ impl Plurality {
 }
 
 impl MethodSim for PluralitySim {
-    fn elect(
-        &mut self,
-        sim: &Sim,
-        honest_rslt: Option<WinnerAndRunnerup>,
-        verbose: bool,
-    ) -> WinnerAndRunnerup {
+    fn elect(&mut self, sim: &Sim, honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup {
         match self.params.strat {
             Strategy::Honest => {
                 self.tallies.fill(0);
@@ -71,7 +66,7 @@ impl MethodSim for PluralitySim {
                     prev
                 } else {
                     self.params.strat = Strategy::Honest;
-                    let prev = self.elect(&sim, None, false);
+                    let prev = self.elect(&sim, None);
                     self.params.strat = Strategy::Strategic;
                     prev
                 };
@@ -87,12 +82,11 @@ impl MethodSim for PluralitySim {
                 }
             }
         }
-        if verbose {
-            println!(
-                "Plurality votes ({:?}): {:?}",
-                self.params.strat, self.tallies
-            );
-        }
+        log::debug!(
+            "Plurality votes ({:?}): {:?}",
+            self.params.strat,
+            self.tallies
+        );
         tally_votes(&self.tallies)
     }
 
@@ -111,97 +105,3 @@ impl MethodSim for PluralitySim {
         self.params.strat
     }
 }
-
-/*
-fn tally_votes_with_plurality_for_ties(
-    votes: &Vec<u32>,
-    net_scores: &Array2<f64>,
-    verbose: bool,
-) -> (ElectResult, ElectResult) {
-    let (ncit, ncand) = net_scores.dim();
-    let mut ntop: usize = 1;
-    let mut top_cands: Vec<usize> = vec![0; ncand];
-    let mut most_votes = votes[0];
-
-    let mut nsecond: usize = 0;
-    let mut second_cands: Vec<usize> = vec![0; ncand];
-    let mut runup_votes: u32 = 0;
-
-    for icand in 1..ncand {
-        if votes[icand] > most_votes {
-            // New best
-            nsecond = ntop; // Previous best becomes runner-up
-            for i in 0..ntop {
-                second_cands[i] = top_cands[i];
-            }
-            runup_votes = most_votes;
-
-            ntop = 1;
-            top_cands[0] = icand;
-            most_votes = votes[icand];
-        } else if votes[icand] == most_votes {
-            // new tie for top
-            top_cands[ntop] = icand;
-            ntop += 1;
-        } else if votes[icand] > runup_votes {
-            // new runner-up candidate
-            nsecond = 1;
-            second_cands[0] = icand;
-            runup_votes = votes[icand];
-        } else if votes[icand] == runup_votes {
-            // new tie for runner-up
-            second_cands[nsecond] = icand;
-            nsecond += 1;
-        }
-    }
-    if ntop > 1 {
-        // Do a runoff
-        let mut some_scores = Array2::zeros((ncit, ntop));
-        for icit in 0..ncit {
-            for icand in 0..ntop {
-                some_scores[(icit, icand)] = net_scores[(icit, top_cands[icand])];
-            }
-        }
-        let mut runoff_results = elect_plurality_honest(&some_scores, verbose);
-        runoff_results.0.cand = top_cands[runoff_results.0.cand];
-        runoff_results.1.cand = top_cands[runoff_results.1.cand];
-        runoff_results
-    } else if nsecond > 1 {
-        // Don't bother to do a runoff.
-        let mut rng = rand::thread_rng();
-        let chosen_second = rng.gen_range(0..nsecond);
-        (
-            ElectResult {
-                cand: top_cands[0],
-                score: most_votes as f64,
-            },
-            ElectResult {
-                cand: second_cands[chosen_second],
-                score: runup_votes as f64,
-            },
-        )
-    } else if nsecond == 0 {
-        (
-            ElectResult {
-                cand: top_cands[0],
-                score: most_votes as f64,
-            },
-            ElectResult {
-                cand: 0,
-                score: -1.0,
-            },
-        )
-    } else {
-        (
-            ElectResult {
-                cand: top_cands[0],
-                score: most_votes as f64,
-            },
-            ElectResult {
-                cand: second_cands[0],
-                score: runup_votes as f64,
-            },
-        )
-    }
-}
-*/

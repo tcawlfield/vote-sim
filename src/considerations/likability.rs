@@ -46,7 +46,7 @@ impl Likability {
 
 impl ConsiderationSim for LikabilitySim {
     #[allow(unused_variables)]
-    fn add_to_scores(&mut self, scores: &mut Array2<f64>, rng: &mut ThreadRng, verbose: bool) {
+    fn add_to_scores(&mut self, scores: &mut Array2<f64>, rng: &mut ThreadRng) {
         let (ncit, ncand) = scores.dim();
 
         self.scores.clear();

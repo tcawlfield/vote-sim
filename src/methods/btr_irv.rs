@@ -31,17 +31,10 @@ impl BtrIrv {
 }
 
 impl MethodSim for BtrIrvSim {
-    fn elect(
-        &mut self,
-        sim: &Sim,
-        _honest_rslt: Option<WinnerAndRunnerup>,
-        verbose: bool,
-    ) -> WinnerAndRunnerup {
+    fn elect(&mut self, sim: &Sim, _honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup {
         self.eliminated.fill(false);
         loop {
-            if verbose {
-                println!("IRV round: eliminated = {:?}", self.eliminated);
-            }
+            log::debug!("IRV round: eliminated = {:?}", self.eliminated);
             // Tally up the votes -- each voter's favorite non-eliminated candidate gets a tally.
             self.tallies.fill(0);
             for cand_fav_iter in sim.ranks.lanes(Axis(1)) {
@@ -52,9 +45,7 @@ impl MethodSim for BtrIrvSim {
                     }
                 }
             }
-            if verbose {
-                println!("  tallies are: {:?}", self.tallies);
-            }
+            log::debug!("  tallies are: {:?}", self.tallies);
 
             self.candidates.clear();
             self.candidates.extend(
@@ -92,9 +83,7 @@ impl MethodSim for BtrIrvSim {
                 // (possibly?) the Smith criterion (eliminating candidates not in Smith set first).
                 bot_cand = bot_cand2;
             }
-            if verbose {
-                println!("top_cand = {}, bot_cand = {}", top_cand, bot_cand);
-            }
+            log::debug!("top_cand = {}, bot_cand = {}", top_cand, bot_cand);
             self.eliminated[bot_cand] = true;
         }
     }
@@ -136,7 +125,7 @@ mod tests {
          */
         let mut method = BtrIrv {}.new_sim(&sim);
         sim.rank_candidates();
-        let honest_results = method.elect(&sim, None, true);
+        let honest_results = method.elect(&sim, None);
         assert_eq!(honest_results.winner.cand, 1);
         assert_eq!(honest_results.winner.score, 58.);
         assert_eq!(honest_results.runnerup.cand, 0);

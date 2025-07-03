@@ -74,7 +74,7 @@ impl Irrational {
 
 impl ConsiderationSim for IrrationalSim {
     #[allow(unused_variables)]
-    fn add_to_scores(&mut self, scores: &mut Array2<f64>, rng: &mut ThreadRng, verbose: bool) {
+    fn add_to_scores(&mut self, scores: &mut Array2<f64>, rng: &mut ThreadRng) {
         let (ncit, ncand) = scores.dim();
         let unit_uniform = Uniform::from(0.0_f64..1.0_f64);
         if self.p.uses_camps() {

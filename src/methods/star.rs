@@ -44,12 +44,7 @@ impl STAR {
 }
 
 impl MethodSim for STARSim {
-    fn elect(
-        &mut self,
-        sim: &Sim,
-        honest_rslt: Option<WinnerAndRunnerup>,
-        verbose: bool,
-    ) -> WinnerAndRunnerup {
+    fn elect(&mut self, sim: &Sim, honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup {
         self.tallies.fill(0);
         self.preference_matrix.fill(0);
         // for icit in 0..sim.ncit {
@@ -85,9 +80,7 @@ impl MethodSim for STARSim {
                 }
             }
         }
-        if verbose {
-            println!("{} tallies: {:?}", self.name(), self.tallies);
-        }
+        log::debug!("{} tallies: {:?}", self.name(), self.tallies);
         let runoff = tally_votes(&self.tallies);
         let ca = runoff.winner.cand;
         let cb = runoff.runnerup.cand;
@@ -157,7 +150,7 @@ mod tests {
         }
         .new_sim(&sim);
         // cand's 1 and 2 go to runoff.
-        let honest_results = method.elect(&sim, None, false);
+        let honest_results = method.elect(&sim, None);
         println!("tallies: {:?}", method.tallies);
         println!("preferences: {:?}", method.preference_matrix);
         assert_eq!(honest_results.winner.cand, 2);
@@ -175,7 +168,7 @@ mod tests {
             // ttls: 15, 17, 16: again 1 and 2 go to runoff but this time we swap.
             // cand 1 prefered to 2: 2 -- 2vs1: 3. cand 2 wins the runoff.
         ];
-        let honest_results = method.elect(&sim, None, false);
+        let honest_results = method.elect(&sim, None);
         println!("tallies: {:?}", method.tallies);
         println!("preferences: {:?}", method.preference_matrix);
         assert_eq!(honest_results.winner.cand, 2);

@@ -1,3 +1,4 @@
+use log::debug;
 use ndarray::Axis;
 use serde::{Deserialize, Serialize};
 
@@ -29,17 +30,10 @@ impl InstantRunoff {
 }
 
 impl MethodSim for IRVSim {
-    fn elect(
-        &mut self,
-        sim: &Sim,
-        _honest_rslt: Option<WinnerAndRunnerup>,
-        verbose: bool,
-    ) -> WinnerAndRunnerup {
+    fn elect(&mut self, sim: &Sim, _honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup {
         self.eliminated.fill(false);
         loop {
-            if verbose {
-                println!("IRV round: eliminated = {:?}", self.eliminated);
-            }
+            debug!("IRV round: eliminated = {:?}", self.eliminated);
             // Tally up the votes -- each voter's favorite non-eliminated candidate gets a tally.
             self.tallies.fill(0);
             for cand_fav_iter in sim.ranks.lanes(Axis(1)) {
@@ -50,9 +44,7 @@ impl MethodSim for IRVSim {
                     }
                 }
             }
-            if verbose {
-                println!("  tallies are: {:?}", self.tallies);
-            }
+            debug!("  tallies are: {:?}", self.tallies);
 
             // Find top and bottom candidates
             let mut top_cand = sim.ncand; // invalid index
@@ -70,25 +62,20 @@ impl MethodSim for IRVSim {
                     runup_votes = top_votes;
                     top_cand = icand;
                     top_votes = votes;
-                    // println!(" - top={}, runup={}", top_cand, runner_up);
                 } else if votes > runup_votes {
                     runner_up = icand;
                     runup_votes = votes;
-                    // println!(" - runup={}", runner_up);
                 }
                 if votes < bot_votes {
                     bot_cand = icand;
                     bot_votes = votes;
-                    // println!(" - bot_cand={}", bot_cand);
                 }
             }
 
-            if verbose {
-                println!(
-                    "top_cand = {}, runner_up = {}, bot_cand = {}",
-                    top_cand, runner_up, bot_cand
-                );
-            }
+            debug!(
+                "top_cand = {}, runner_up = {}, bot_cand = {}",
+                top_cand, runner_up, bot_cand
+            );
             // Do we have an election, or not?
             if top_votes >= (sim.ncit as i32 + 1) / 2 || runner_up == bot_cand {
                 return WinnerAndRunnerup {
@@ -146,7 +133,7 @@ mod tests {
          */
         let mut method = InstantRunoff {}.new_sim(&sim);
         sim.rank_candidates();
-        let honest_results = method.elect(&sim, None, true);
+        let honest_results = method.elect(&sim, None);
         assert_eq!(honest_results.winner.cand, 0);
         assert_eq!(honest_results.winner.score, 3.);
         assert_eq!(honest_results.runnerup.cand, 1);

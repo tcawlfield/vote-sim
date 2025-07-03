@@ -36,12 +36,7 @@ impl RangeVoting {
 }
 
 impl MethodSim for RangeVotingSim {
-    fn elect(
-        &mut self,
-        sim: &Sim,
-        honest_rslt: Option<WinnerAndRunnerup>,
-        verbose: bool,
-    ) -> WinnerAndRunnerup {
+    fn elect(&mut self, sim: &Sim, honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup {
         self.tallies.fill(0);
         // for icit in 0..sim.ncit {
         for vscores in sim.scores.outer_iter() {
@@ -67,9 +62,7 @@ impl MethodSim for RangeVotingSim {
                 self.tallies[icand] += self.ballot[icand];
             }
         }
-        if verbose {
-            println!("{} tallies: {:?}", self.name(), self.tallies);
-        }
+        log::debug!("{} tallies: {:?}", self.name(), self.tallies);
         tally_votes(&self.tallies)
     }
 
@@ -175,7 +168,7 @@ mod tests {
             strategic_stretch_factor: 2.0,
         }
         .new_sim(&sim);
-        let honest_results = method.elect(&sim, None, false);
+        let honest_results = method.elect(&sim, None);
         assert_eq!(honest_results.winner.cand, 2);
         assert_eq!(honest_results.runnerup.cand, 0);
 
@@ -185,7 +178,7 @@ mod tests {
             strategic_stretch_factor: 1000., // votes become 0's and 10's
         }
         .new_sim(&sim);
-        let strat_results = method2.elect(&sim, Some(honest_results), false);
+        let strat_results = method2.elect(&sim, Some(honest_results));
         assert_eq!(strat_results.winner.cand, 1);
     }
 }

@@ -30,21 +30,16 @@ impl RP {
 }
 
 impl MethodSim for RPSim {
-    fn elect(
-        &mut self,
-        sim: &Sim,
-        _honest_rslt: Option<WinnerAndRunnerup>,
-        verbose: bool,
-    ) -> WinnerAndRunnerup {
+    fn elect(&mut self, sim: &Sim, _honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup {
         find_candidate_pairoffs(&mut self.pairs, sim);
         // Sort by decreasing margin of victory -- first element is the highest-ranked pair.
         self.pairs.sort_by_key(|p| -p.margin);
 
-        let winner = self.find_winner(sim, verbose);
+        let winner = self.find_winner(sim);
         let runner_up = if sim.ncand > 2 {
             self.pairs
                 .retain(|p| p.winner != winner && p.loser != winner);
-            self.find_winner(sim, false)
+            self.find_winner(sim)
         } else {
             (winner + 1) % 2
         };
@@ -77,7 +72,7 @@ impl MethodSim for RPSim {
 }
 
 impl RPSim {
-    fn find_winner(&mut self, sim: &Sim, verbose: bool) -> usize {
+    fn find_winner(&mut self, sim: &Sim) -> usize {
         debug!("Pairs: {:?}", self.pairs);
         let mut pair_iter = self.pairs.iter();
         self.locked_in.fill(false);
@@ -85,14 +80,10 @@ impl RPSim {
         // Lock in the first two pairs
         if let Some(p) = pair_iter.next() {
             lock_in(&mut self.locked_in, p, true);
-            if verbose {
-                println!("Locked in {:?}", p);
-            }
+            log::debug!("Locked in {:?}", p);
             if let Some(p) = pair_iter.next() {
                 lock_in(&mut self.locked_in, p, true);
-                if verbose {
-                    println!("Locked in {:?}", p);
-                }
+                log::debug!("Locked in {:?}", p);
             }
         }
         // Lock in remaining pairs provided they do not create a cycle.
@@ -151,7 +142,7 @@ mod tests {
             ]
         );
 
-        let honest_results = method.elect(&sim, None, true);
+        let honest_results = method.elect(&sim, None);
         assert_eq!(honest_results.winner.cand, 2);
     }
 }
