@@ -126,12 +126,11 @@ impl Issue {
         } else {
             self.halfcsep
         };
-        if rng.gen::<bool>() {
+        if rng.random::<bool>() {
             sep = -sep;
         }
         if self.uniform {
-            let uniform = rand_distr::Uniform::from(-SQRT_3..SQRT_3);
-            rng.sample(uniform) * self.sigma + sep
+            rng.random_range(-SQRT_3..=SQRT_3) * self.sigma + sep
         } else {
             let x: f64 = rng.sample(StandardNormal);
             x * self.sigma + sep

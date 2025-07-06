@@ -5,16 +5,16 @@ authors = ["Topher Cawlfield <ccawlfield@gogoair.com>"]
 edition = '2021'
 
 [dependencies]
-rand = "0.8"
+rand = "0.9"
 lazy_static = "1.4"
-ndarray = "0.15"
+ndarray = "0.16"
 csv = "1.0"
-rand_distr = "0.4"
+rand_distr = "0.5"
 clap = { version = "4", features = ["derive", "string"] }
-parquet = "53"
-arrow-array = "53"
-arrow-schema = "53"
-meansd = "2"
+parquet = "55"
+arrow-array = "55.2.0"
+arrow-schema = "55.2.0"
+meansd = { git = "https://gitlab.com/lephto/meansd.git", branch = "main" }
 float_eq = "1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

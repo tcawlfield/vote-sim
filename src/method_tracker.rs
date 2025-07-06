@@ -87,8 +87,7 @@ impl MethodTracker {
         Arc::new(struct_array)
     }
 
-    // fn fields(&self)
-
+    #[allow(dead_code)]
     pub fn report(&self) {
         let frac_suboptimal = self.ntrials_subopt as f64 / self.ntrials as f64;
         println!(
@@ -99,5 +98,46 @@ impl MethodTracker {
             frac_suboptimal,
             self.mean_subopt_regret.mean(),
         )
+    }
+
+    pub fn sendable_report(&self) -> SendableMethodReport {
+        SendableMethodReport {
+            name: self.method.name(),
+            ntrials: self.ntrials,
+            ntrials_subopt: self.ntrials_subopt,
+            mean_regret: self.mean_regret.clone(),
+            mean_subopt_regret: self.mean_subopt_regret.clone(),
+        }
+    }
+}
+
+pub struct SendableMethodReport {
+    name: String,
+    ntrials: usize,
+    ntrials_subopt: usize,
+    mean_regret: MeanSD,
+    mean_subopt_regret: MeanSD,
+}
+
+impl SendableMethodReport {
+    pub fn combine(&mut self, other: &Self) {
+        assert!(self.name == other.name);
+        self.ntrials += other.ntrials;
+        self.ntrials_subopt += other.ntrials_subopt;
+        self.mean_regret += other.mean_regret;
+        self.mean_subopt_regret += other.mean_subopt_regret;
+    }
+
+    pub fn report(&self) {
+        let frac_suboptimal = self.ntrials_subopt as f64 / self.ntrials as f64;
+        println!(
+            "Method {}: Avg Regret: {}, σ: {}, Frac suboptimal winner: {}, avg subopt regret: {}, {} elections",
+            self.name,
+            self.mean_regret.mean(),
+            self.mean_regret.sstdev(),
+            frac_suboptimal,
+            self.mean_subopt_regret.mean(),
+            self.ntrials,
+        );
     }
 }

@@ -1,6 +1,6 @@
 use crate::sim::Sim;
 use ndarray::Array2;
-use rand::distributions::Uniform;
+use rand::distr::StandardUniform;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 
@@ -76,21 +76,23 @@ impl ConsiderationSim for IrrationalSim {
     #[allow(unused_variables)]
     fn add_to_scores(&mut self, scores: &mut Array2<f64>, rng: &mut ThreadRng) {
         let (ncit, ncand) = scores.dim();
-        let unit_uniform = Uniform::from(0.0_f64..1.0_f64);
         if self.p.uses_camps() {
             let (ncamps, ncand_from_self) = self.camp_scores.dim();
             assert_eq!(ncand_from_self, ncand);
             for u in self.camp_scores.iter_mut() {
-                *u = rng.sample(unit_uniform) * self.camp_scale;
+                let uniform_sample: f64 = rng.sample(StandardUniform);
+                *u = uniform_sample * self.camp_scale;
             }
             for ((icit, icand), cand_score) in scores.indexed_iter_mut() {
                 let icamp = icit % ncamps;
-                *cand_score += self.camp_scores[(icamp, icand)]
-                    + rng.sample(unit_uniform) * self.individual_scale;
+                let uniform_sample: f64 = rng.sample(StandardUniform);
+                *cand_score +=
+                    self.camp_scores[(icamp, icand)] + uniform_sample * self.individual_scale;
             }
         } else {
             for cand_score in scores.iter_mut() {
-                *cand_score += rng.sample(unit_uniform) * self.individual_scale;
+                let uniform_sample: f64 = rng.sample(StandardUniform);
+                *cand_score += uniform_sample * self.individual_scale;
             }
         }
     }

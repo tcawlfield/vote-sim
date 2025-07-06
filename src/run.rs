@@ -8,12 +8,12 @@ use parquet::{arrow::ArrowWriter, basic::Compression, file::properties::WriterPr
 use std::fs;
 use std::sync::mpsc;
 use std::{error::Error, sync::Arc};
-use work_queue::{LocalQueue, Queue};
+use work_queue::Queue;
 
 use crate::config::Config;
 use crate::considerations::ConsiderationSim;
 use crate::cov_matrix::CovMatrix;
-use crate::method_tracker::MethodTracker;
+use crate::method_tracker::{MethodTracker, SendableMethodReport};
 use crate::methods::Strategy;
 use crate::sim::Sim;
 
@@ -26,7 +26,7 @@ struct Task {
 }
 
 struct TaskResult {
-    method_stats: Vec<MethodTracker>,
+    method_stats: Vec<SendableMethodReport>,
     batch: RecordBatch,
 }
 
@@ -40,26 +40,34 @@ pub fn run(
     let chunks_per_worker = (min_chunks + num_workers - 1) / num_workers;
     let chunks = chunks_per_worker * num_workers;
     let trials_per_chunk = (trials + 1) / chunks;
+    log::warn!(
+        "{} worker threads, {} batches of about {} events",
+        num_workers,
+        chunks,
+        trials_per_chunk
+    );
 
     let (task_result_tx, task_result_rx) = mpsc::channel();
 
     let queue: Queue<Task> = Queue::new(num_workers, 4);
     let mut trials_left = trials;
     for chunks_to_do in (1..chunks + 1).rev() {
+        let task_trials = (trials_left + chunks_to_do - 1) / chunks_to_do;
         let task = Task {
             config: config.clone(),
-            trials: (trials_left + chunks_to_do - 1) / chunks_to_do,
+            trials: task_trials,
             result_chan: task_result_tx.clone(),
         };
         queue.push(task);
+        trials_left -= task_trials;
     }
 
-    let handles: Vec<_> = queue
+    let _handles: Vec<_> = queue
         .local_queues()
         .map(|mut local_queue| {
             std::thread::spawn(move || {
                 while let Some(task) = local_queue.pop() {
-                    task.0(&mut local_queue);
+                    run_batch(&task.config, task.trials, &task.result_chan).unwrap();
                 }
             })
         })
@@ -68,8 +76,45 @@ pub fn run(
 
     // Loop over task_result_rx
 
-    for handle in handles {
-        handle.join().unwrap();
+    let mut writer = None;
+    let mut summaries: Option<Vec<SendableMethodReport>> = None;
+    while let Ok(mut task_result) = task_result_rx.recv() {
+        if writer.is_none() {
+            if let Some(filename) = outfile {
+                writer = Some(get_writer(&config, &filename, &task_result.batch));
+            }
+        }
+        if let Some(writer) = writer.as_mut() {
+            writer.write(&task_result.batch)?;
+        }
+        if let Some(summaries) = summaries.as_mut() {
+            for (whole_summary, task_summary) in
+                summaries.iter_mut().zip(task_result.method_stats.iter())
+            {
+                whole_summary.combine(task_summary);
+            }
+        } else {
+            summaries = Some(std::mem::take(&mut task_result.method_stats));
+        }
+    }
+
+    // for method in methods.iter() {
+    //     method.report();
+    // }
+    if let Some(writer) = writer {
+        // writer must be closed to write footer
+        writer.close().unwrap();
+        println!("Wrote {}", outfile.as_ref().unwrap().to_str().unwrap());
+    }
+
+    // for handle in handles {
+    //     handle.join().unwrap();
+    // }
+
+    if let Some(summaries) = summaries {
+        for method_report in summaries {
+            method_report.report();
+        }
     }
 
     Ok(())
@@ -78,9 +123,9 @@ pub fn run(
 fn run_batch(
     config: &Config,
     trials: usize,
-    outfile: &Option<std::ffi::OsString>,
+    task_result_tx: &mpsc::Sender<TaskResult>,
 ) -> Result<(), Box<dyn Error>> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     let ncand = config.candidates;
     let ncit = config.voters;
@@ -310,29 +355,32 @@ fn run_batch(
         false,
     ));
     let batch: RecordBatch = RecordBatch::try_new(Arc::new(schema.finish()), columns).unwrap();
-
-    let config_str = serde_json::to_string(config).unwrap();
-    if let Some(filename) = outfile {
-        let props = WriterProperties::builder()
-            .set_compression(Compression::SNAPPY)
-            .set_key_value_metadata(Some(vec![KeyValue::new(
-                "voting_config".to_owned(),
-                config_str,
-            )]))
-            .build();
-        let file = fs::File::create(&filename)?;
-        let mut writer = ArrowWriter::try_new(file, batch.schema(), Some(props)).unwrap();
-
-        writer.write(&batch).expect("Writing batch");
-
-        // writer must be closed to write footer
-        writer.close().unwrap();
-        println!("Wrote {}", filename.to_str().unwrap());
-    }
-
-    for method in methods.iter() {
-        method.report();
-    }
+    let sendable_reports: Vec<SendableMethodReport> =
+        methods.iter().map(|m| m.sendable_report()).collect();
+    task_result_tx
+        .send(TaskResult {
+            method_stats: sendable_reports,
+            batch,
+        })
+        .expect("Could not send batch summry");
 
     Ok(())
+}
+
+fn get_writer(
+    config: &Config,
+    filename: &std::ffi::OsStr,
+    sample_batch: &RecordBatch,
+) -> ArrowWriter<fs::File> {
+    let config_str = serde_json::to_string(config).unwrap();
+    let props = WriterProperties::builder()
+        .set_compression(Compression::SNAPPY)
+        .set_key_value_metadata(Some(vec![KeyValue::new(
+            "voting_config".to_owned(),
+            config_str,
+        )]))
+        .build();
+    let file = fs::File::create(&filename).unwrap();
+    let writer = ArrowWriter::try_new(file, sample_batch.schema(), Some(props)).unwrap();
+    writer
 }
