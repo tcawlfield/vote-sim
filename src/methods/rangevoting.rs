@@ -1,3 +1,6 @@
+// © Copyright 2025 Topher Cawlfield
+// SPDX-License-Identifier: Apache-2.0
+
 use ndarray::{ArrayView, Ix1};
 use serde::{Deserialize, Serialize};
 

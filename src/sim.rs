@@ -1,3 +1,6 @@
+// © Copyright 2025 Topher Cawlfield
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::considerations::*;
 use crate::methods::condorcet_util::mark_smith_candidates;
 use crate::methods::{ElectResult, WinnerAndRunnerup};

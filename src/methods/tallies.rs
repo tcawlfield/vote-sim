@@ -1,3 +1,6 @@
+// © Copyright 2025 Topher Cawlfield
+// SPDX-License-Identifier: Apache-2.0
+
 use super::results::{ElectResult, WinnerAndRunnerup};
 
 pub type Tallies = Vec<i32>;

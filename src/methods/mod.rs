@@ -1,3 +1,6 @@
+// © Copyright 2025 Topher Cawlfield
+// SPDX-License-Identifier: Apache-2.0
+
 mod borda;
 mod btr_irv;
 pub mod condorcet_util;

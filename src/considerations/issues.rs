@@ -1,3 +1,6 @@
+// © Copyright 2025 Topher Cawlfield
+// SPDX-License-Identifier: Apache-2.0
+
 use super::ConsiderationSim;
 use crate::sim::Sim;
 use ndarray::Array2;
