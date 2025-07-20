@@ -60,7 +60,7 @@ impl Sim {
         for ax in axes.iter_mut() {
             ax.add_to_scores(&mut self.scores, rng);
         }
-        log::info!("Voter utilities:\n{:?}", &mut self.scores);
+        log::debug!("Voter utilities:\n{:?}", &mut self.scores);
     }
 
     // Side-effects: compute self.regrets and self.cand_by_regret

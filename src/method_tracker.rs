@@ -115,11 +115,11 @@ impl MethodTracker {
 }
 
 pub struct SendableMethodReport {
-    name: String,
-    ntrials: usize,
-    ntrials_subopt: usize,
-    mean_regret: MeanSD,
-    mean_subopt_regret: MeanSD,
+    pub name: String,
+    pub ntrials: usize,
+    pub ntrials_subopt: usize,
+    pub mean_regret: MeanSD,
+    pub mean_subopt_regret: MeanSD,
 }
 
 impl SendableMethodReport {

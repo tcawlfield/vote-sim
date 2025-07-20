@@ -78,13 +78,13 @@ impl ConsiderationSim for IssuesSim {
                 self.cand_position[(i, ipos)] = issue.gen_value(&mut rng, false);
             }
         }
-        log::info!("Candidate positions: {:?}", self.cand_position);
+        log::debug!("Candidate positions: {:?}", self.cand_position);
         let mut cit_position = vec![0.0; npos];
         for j in 0..ncit {
             for (ipos, issue) in self.issues.iter().enumerate() {
                 cit_position[ipos] = issue.gen_value(&mut rng, true);
             }
-            log::info!("cit {}: {:?}", j, cit_position);
+            log::debug!("cit {}: {:?}", j, cit_position);
             for i in 0..ncand {
                 let mut distsq = 0.0;
                 for p in 0..npos {

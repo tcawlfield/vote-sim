@@ -8,6 +8,7 @@ use arrow_array::{RecordBatch, StructArray};
 use arrow_schema::{DataType, Field, SchemaBuilder};
 use parquet::file::metadata::KeyValue;
 use parquet::{arrow::ArrowWriter, basic::Compression, file::properties::WriterProperties};
+use core::task;
 use std::fs;
 use std::sync::mpsc;
 use std::{error::Error, sync::Arc};
@@ -43,7 +44,7 @@ pub fn run(
     let chunks_per_worker = (min_chunks + num_workers - 1) / num_workers;
     let chunks = chunks_per_worker * num_workers;
     let trials_per_chunk = (trials + 1) / chunks;
-    log::warn!(
+    log::info!(
         "{} worker threads, {} batches of about {} events",
         num_workers,
         chunks,
@@ -82,6 +83,7 @@ pub fn run(
     let mut writer = None;
     let mut summaries: Option<Vec<SendableMethodReport>> = None;
     while let Ok(mut task_result) = task_result_rx.recv() {
+        log::info!("Completed a batch of {} elections", task_result.method_stats[0].ntrials);
         if writer.is_none() {
             if let Some(filename) = outfile {
                 writer = Some(get_writer(&config, &filename, &task_result.batch));
@@ -193,13 +195,13 @@ fn run_batch(
     let mut ordered_final_cands = vec![0; sim.ncand];
 
     for itrial in 0..trials {
-        log::info!("Sim election {}", itrial + 1);
+        log::debug!("Sim election {}", itrial + 1);
 
         if let Some(rrv) = &mut mwms {
             let sim_primary: &mut Sim = sim_primary.as_mut().unwrap();
             sim_primary.election(&mut axes, &mut rng);
             let final_candidates = rrv.multi_elect(&sim_primary, None, sim.ncand);
-            log::info!("primary election winners: {:?}", final_candidates);
+            log::debug!("primary election winners: {:?}", final_candidates);
             sim.take_from_primary(sim_primary, &final_candidates);
 
             ordered_final_cands.clear();
@@ -214,7 +216,7 @@ fn run_batch(
         };
 
         cov_matrix.compute(&sim.scores);
-        log::info!("Cov matrix: {}", cov_matrix.elements);
+        log::debug!("Cov matrix: {}", cov_matrix.elements);
 
         let mut prev_rslt = None;
         for method in methods.iter_mut() {
@@ -223,7 +225,7 @@ fn run_batch(
             if let Strategy::Honest = method.method.strat() {
                 prev_rslt = Some(rslt);
             }
-            log::info!(
+            log::debug!(
                 "Method {:?} found winner {} -- regret {}",
                 method.method.name(),
                 rslt.winner.cand,
