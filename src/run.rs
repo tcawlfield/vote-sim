@@ -8,7 +8,6 @@ use arrow_array::{RecordBatch, StructArray};
 use arrow_schema::{DataType, Field, SchemaBuilder};
 use parquet::file::metadata::KeyValue;
 use parquet::{arrow::ArrowWriter, basic::Compression, file::properties::WriterProperties};
-use core::task;
 use std::fs;
 use std::sync::mpsc;
 use std::{error::Error, sync::Arc};

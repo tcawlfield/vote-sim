@@ -55,7 +55,7 @@ impl MethodSim for BtrIrvSim {
                 self.eliminated
                     .iter()
                     .enumerate()
-                    .filter(|(_, &elim)| !elim)
+                    .filter(|&(_, &elim)| !elim)
                     .map(|(icand, _)| icand),
             );
             // Sort from low to high tallies

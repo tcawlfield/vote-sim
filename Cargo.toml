@@ -1,8 +1,8 @@
 [package]
 name = "voting"
 version = "0.1.0"
-authors = ["Topher Cawlfield <ccawlfield@gogoair.com>"]
-edition = '2021'
+authors = ["Topher Cawlfield <tcawlfield@gmail.com>"]
+edition = '2024'
 
 [dependencies]
 rand = "0.9"

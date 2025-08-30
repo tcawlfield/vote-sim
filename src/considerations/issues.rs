@@ -21,6 +21,8 @@ const SQRT_3: f64 = 1.732050807568877293527446341505872367_f64; // borrowed from
 pub struct Issue {
     /// The scale of the issue
     pub sigma: f64,
+    /// A separate sigma for voters if provided
+    pub sigma_vtr: Option<f64>,
     /// Adds a polarization gap to the candidates. Half are shifted
     /// by -halfcsep, and half by +halfcsep.
     pub halfcsep: f64,
@@ -129,14 +131,19 @@ impl Issue {
         } else {
             self.halfcsep
         };
+        let sigma = if let Some(vsig) = self.sigma_vtr && is_voter {
+            vsig
+        } else {
+            self.sigma
+        };
         if rng.random::<bool>() {
             sep = -sep;
         }
         if self.uniform {
-            rng.random_range(-SQRT_3..=SQRT_3) * self.sigma + sep
+            rng.random_range(-SQRT_3..=SQRT_3) * sigma + sep
         } else {
             let x: f64 = rng.sample(StandardNormal);
-            x * self.sigma + sep
+            x * sigma + sep
         }
     }
 }
