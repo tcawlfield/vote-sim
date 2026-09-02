@@ -3,9 +3,9 @@
 
 use crate::sim::Sim;
 use ndarray::Array2;
+use rand::RngExt as _;
 use rand::distr::StandardUniform;
 use rand::rngs::ThreadRng;
-use rand::Rng;
 
 use super::ConsiderationSim;
 

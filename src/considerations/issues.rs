@@ -5,7 +5,7 @@ use super::ConsiderationSim;
 use crate::sim::Sim;
 use ndarray::Array2;
 use rand::rngs::ThreadRng;
-use rand::Rng;
+use rand::{Rng, RngExt as _};
 use rand_distr::StandardNormal;
 
 const SQRT_3: f64 = 1.732050807568877293527446341505872367_f64; // borrowed from nightly
@@ -131,7 +131,9 @@ impl Issue {
         } else {
             self.halfcsep
         };
-        let sigma = if let Some(vsig) = self.sigma_vtr && is_voter {
+        let sigma = if let Some(vsig) = self.sigma_vtr
+            && is_voter
+        {
             vsig
         } else {
             self.sigma

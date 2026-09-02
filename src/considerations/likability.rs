@@ -3,8 +3,8 @@
 
 use crate::sim::Sim;
 use ndarray::Array2;
+use rand::RngExt as _;
 use rand::rngs::ThreadRng;
-use rand::Rng;
 use rand_distr::StandardNormal;
 
 use super::ConsiderationSim;
