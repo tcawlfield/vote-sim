@@ -33,7 +33,7 @@ struct TaskResult {
     batch: RecordBatch,
 }
 
-pub fn run(
+pub fn run_sims(
     config: &Config,
     trials: usize,
     outfile: &Option<std::ffi::OsString>,
@@ -82,7 +82,10 @@ pub fn run(
     let mut writer = None;
     let mut summaries: Option<Vec<SendableMethodReport>> = None;
     while let Ok(mut task_result) = task_result_rx.recv() {
-        log::info!("Completed a batch of {} elections", task_result.method_stats[0].ntrials);
+        log::info!(
+            "Completed a batch of {} elections",
+            task_result.method_stats[0].ntrials
+        );
         if writer.is_none() {
             if let Some(filename) = outfile {
                 writer = Some(get_writer(&config, &filename, &task_result.batch));

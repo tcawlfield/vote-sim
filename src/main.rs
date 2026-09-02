@@ -7,14 +7,8 @@ use std::ffi::OsString;
 use clap::Parser;
 use std::process;
 
-// Local libraries
-mod config;
-mod considerations;
-mod cov_matrix;
-mod method_tracker;
-mod methods;
-mod run;
-mod sim;
+// This crate
+use mcelect::{Config, run_sims};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -54,7 +48,7 @@ fn main() {
 fn run() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
 
-    let mut config = config::Config::from_file(args.config)?;
+    let mut config = Config::from_file(args.config)?;
     if let Some(ncand) = args.candidates {
         config.candidates = ncand;
     }
@@ -67,5 +61,5 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     pretty_env_logger::init();
 
-    run::run(&config, args.trials, &args.outfile)
+    run_sims(&config, args.trials, &args.outfile)
 }

@@ -13,11 +13,11 @@ k = 0.5
 Likability = { mean = 0.1 }
 
 # [[considerations]]
-# [[considerations.Issues.issues]]
+# [[considerations.Issues]]
 # sigma = 1.0
 # halfcsep = 1.0
 # halfvsep = 0.5
-# [[considerations.Issues.issues]]
+# [[considerations.Issues]]
 # sigma = 0.5
 # halfcsep = 0.75
 # halfvsep = 0.75
@@ -37,11 +37,11 @@ strat = "Honest"
 nranks = 5
 strategic_stretch_factor = 1.0
 
-[[methods]]  # Approval voting
+[[methods]] # Approval voting
 [methods.Range]
 strat = "Honest"
 nranks = 2
 strategic_stretch_factor = 1.0
 
-[[methods]]  # IRV honest
+[[methods]] # IRV honest
 [methods.InstantRunoff]
