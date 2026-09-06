@@ -1,10 +1,10 @@
-mod config;
-mod considerations;
+pub mod config;
+pub mod considerations;
 mod cov_matrix;
 mod method_tracker;
-mod methods;
+pub mod methods;
 mod run;
-mod sim;
+pub mod sim;
 
 pub use config::Config;
 pub use run::run_sims;

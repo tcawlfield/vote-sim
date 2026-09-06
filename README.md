@@ -98,26 +98,3 @@ cluster membership is i % N. Each voter gets a relatively-small random deviation
 to the core utility scores.
 
 This method should be more likely to create Condorcet cycles -- no Condorcet winner.
-
-## To-Do
-
-* Strategic voting improvements
-  * Allow a fraction of the population to be strategic
-  * Allow a political faction to be more strategic than another
-    * Under different methods, how much are strategic voters wrongly rewarded?
-  * Each voting method needs a new method, strategic_prereq to return Option<Method>.
-    * We can use this to ensure that each strategic method is preceded by its
-      honest "pre-election poll" method. If not, they can be inserted.
-    * At the same time, this suggests another property of MethodSim: is_visible.
-      is_visible() returns false if the method was inserted as a pre-poll.
-* Add a Virtues (described above) consideration
-* Multi-winner methods
-  * Iterative rewreighted range voting ---- loop through winners, removing them
-    and adding another in their place. Keep cycling through winners until either
-    the winner list becomes stable (needs better definition) or a maximum cycle
-    count is reached. Research prior art here, and consider repeating stability
-    patterns.
-  * How should we best characterize the effectiveness of the winning set?
-    * For each candidate, score utility by winners in preference order. Most
-      preferred gets 100%, next-most gets ... 50% maybe? Etc. What is natural
-      here?

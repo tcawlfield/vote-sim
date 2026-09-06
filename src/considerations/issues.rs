@@ -3,7 +3,7 @@
 
 use super::ConsiderationSim;
 use crate::sim::Sim;
-use ndarray::Array2;
+use ndarray::{Array2, azip};
 use rand::rngs::ThreadRng;
 use rand::{Rng, RngExt as _};
 use rand_distr::StandardNormal;
@@ -70,36 +70,28 @@ pub fn new_issues_sim(issues: Vec<Issue>, sim: &Sim) -> IssuesSim {
 
 impl ConsiderationSim for IssuesSim {
     fn add_to_scores(&mut self, scores: &mut Array2<f64>, mut rng: &mut ThreadRng) {
-        let (ncit, ncand) = scores.dim();
         // All citizens are the same in this regard.
         // Or at least we assume there are enough citizens that every representative
         // group in position-space spans all degrees of likability alignment.
         let npos = self.issues.len();
-        for i in 0..ncand {
-            for (ipos, issue) in self.issues.iter().enumerate() {
-                self.cand_position[(i, ipos)] = issue.gen_value(&mut rng, false);
-            }
+        for mut cand_row in self.cand_position.rows_mut() {
+            azip!((cand_pos in &mut cand_row, issue in &self.issues) *cand_pos = issue.gen_value(&mut rng, false));
         }
         log::debug!("Candidate positions: {:?}", self.cand_position);
-        let mut cit_position = vec![0.0; npos];
-        for j in 0..ncit {
-            for (ipos, issue) in self.issues.iter().enumerate() {
-                cit_position[ipos] = issue.gen_value(&mut rng, true);
-            }
-            log::debug!("cit {}: {:?}", j, cit_position);
-            for i in 0..ncand {
-                let mut distsq = 0.0;
-                for p in 0..npos {
-                    let diff = self.cand_position[(i, p)] - cit_position[p];
-                    let diffsq = diff * diff;
-                    if diffsq < self.horizon_sq[p] {
-                        distsq += diffsq;
+        let mut cit_positions = vec![0.0; npos];
+        for mut cit_scores in scores.rows_mut() {
+            azip!((cit_pos in &mut cit_positions, issue in &self.issues) *cit_pos = issue.gen_value(&mut rng, true));
+            azip!((cand_posns in self.cand_position.outer_iter(), ci_ca_score in &mut cit_scores) {
+                azip!((cand_pos in cand_posns, cit_pos in &cit_positions, hsq in &self.horizon_sq) {
+                    let diffsq = (cand_pos - cit_pos) * (cand_pos - cit_pos);
+                    if diffsq < *hsq {
+                        *ci_ca_score += diffsq;
                     } else {
-                        distsq += self.horizon_sq[p];
+                        *ci_ca_score += *hsq;
                     }
-                }
-                *scores.get_mut((j, i)).unwrap() += -distsq.sqrt();
-            }
+                });
+                *ci_ca_score = -ci_ca_score.sqrt();
+            });
         }
     }
 
