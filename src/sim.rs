@@ -47,9 +47,9 @@ impl Sim {
         assert!(primary.nvtr == self.nvtr);
         assert!(winners.len() == self.ncand);
         for (icand, winner) in winners.iter().enumerate() {
-            for icit in 0..self.nvtr {
-                self.scores[(icit, icand)] = primary.scores[(icit, winner.cand)];
-            }
+            self.scores
+                .column_mut(icand)
+                .assign(&primary.scores.column(winner.cand));
         }
         self.compute_regrets();
         self.rank_candidates();
@@ -65,19 +65,16 @@ impl Sim {
 
     // Side-effects: compute self.regrets and self.cand_by_regret
     pub fn compute_regrets(&mut self) {
-        let mut max_util = f64::MIN;
-        let mut avg_util = 0.0;
-        for j in 0..self.ncand {
-            let mut ttl = 0.0;
-            for i in 0..self.nvtr {
-                ttl += self.scores[(i, j)];
+        // Total each candidate's utility across all voters, accumulating into the
+        // reused self.regrets buffer (contiguous traversal, no allocation).
+        self.regrets.fill(0.0);
+        for voter_scores in self.scores.rows() {
+            for (regret, s) in self.regrets.iter_mut().zip(voter_scores) {
+                *regret += s;
             }
-            self.regrets[j] = ttl;
-            if ttl > max_util {
-                max_util = ttl;
-            }
-            avg_util += (ttl - avg_util) / ((j + 1) as f64);
         }
+        let max_util = self.regrets.iter().copied().fold(f64::MIN, f64::max);
+        let avg_util = self.regrets.iter().sum::<f64>() / self.ncand as f64;
         // Turn into regrets
         for u in self.regrets.iter_mut() {
             *u = (max_util - *u) / (max_util - avg_util);

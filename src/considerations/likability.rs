@@ -48,18 +48,13 @@ impl Likability {
 }
 
 impl ConsiderationSim for LikabilitySim {
-    #[allow(unused_variables)]
     fn add_to_scores(&mut self, scores: &mut Array2<f64>, rng: &mut ThreadRng) {
-        let (ncit, ncand) = scores.dim();
-
         self.scores.clear();
-        for i in 0..ncand {
+        for mut cand_scores in scores.columns_mut() {
             let variant: f64 = rng.sample(StandardNormal);
             let cand_like = variant.powi(2) * self.p.mean;
             self.scores.push(cand_like);
-            for j in 0..ncit {
-                *scores.get_mut((j, i)).unwrap() += cand_like;
-            }
+            cand_scores += cand_like;
         }
     }
 

@@ -61,8 +61,8 @@ impl MethodSim for RangeVotingSim {
                     );
                 }
             }
-            for icand in 0..vscores.len() {
-                self.tallies[icand] += self.ballot[icand];
+            for (tally, ballot) in self.tallies.iter_mut().zip(&self.ballot) {
+                *tally += ballot;
             }
         }
         log::debug!("{} tallies: {:?}", self.name(), self.tallies);

@@ -60,8 +60,8 @@ impl MethodSim for PluralitySim {
         match self.params.strat {
             Strategy::Honest => {
                 self.tallies.fill(0);
-                for icit in 0..sim.nvtr {
-                    self.tallies[sim.ranks[(icit, 0)]] += 1;
+                for &ivtr in sim.ranks.column(0) {
+                    self.tallies[ivtr] += 1;
                 }
             }
             Strategy::Strategic => {
@@ -74,9 +74,8 @@ impl MethodSim for PluralitySim {
                     prev
                 };
                 self.tallies.fill(0);
-                for icit in 0..sim.nvtr {
-                    for rank in 0..sim.ncand {
-                        let icand = sim.ranks[(icit, rank)];
+                for cit_ranks in sim.ranks.rows() {
+                    for &icand in cit_ranks {
                         if icand == pre_poll.winner.cand || icand == pre_poll.runnerup.cand {
                             self.tallies[icand] += 1;
                             break;
