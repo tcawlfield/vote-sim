@@ -35,7 +35,7 @@ impl RRV {
         RRVSim {
             p: self.clone(),
             wtd_scores: vec![0.; sim.ncand],
-            ballots: Array2::zeros((sim.ncit, sim.ncand)),
+            ballots: Array2::zeros((sim.nvtr, sim.ncand)),
             winners: Vec::with_capacity(sim.ncand),
             remaining: Vec::with_capacity(sim.ncand),
         }
@@ -50,7 +50,7 @@ impl MWMethodSim for RRVSim {
         nwinners: usize,
     ) -> &Vec<ElectResult> {
         self.ballots.fill(0);
-        for icit in 0..sim.ncit {
+        for icit in 0..sim.nvtr {
             fill_range_ballot(
                 &sim.scores.index_axis(Axis(0), icit),
                 self.p.ranks,
@@ -66,7 +66,7 @@ impl MWMethodSim for RRVSim {
         self.winners.clear();
         while self.winners.len() < nwinners {
             self.wtd_scores.fill(0.0);
-            for i in 0..sim.ncit {
+            for i in 0..sim.nvtr {
                 // Weight is K / (K + SUM/MAX)
                 let sum = self
                     .winners

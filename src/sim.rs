@@ -9,7 +9,7 @@ use rand::rngs::ThreadRng;
 
 pub struct Sim {
     pub ncand: usize,
-    pub ncit: usize,
+    pub nvtr: usize,
     pub scores: Array2<f64>,
     pub ranks: Array2<usize>,
     pub i_beats_j_by: Array2<i32>,
@@ -21,13 +21,13 @@ pub struct Sim {
 }
 
 impl Sim {
-    pub fn new(ncand: usize, ncit: usize) -> Sim {
+    pub fn new(ncand: usize, nvtr: usize) -> Sim {
         Sim {
             ncand,
-            ncit,
-            scores: Array2::zeros((ncit, ncand)),
+            nvtr,
+            scores: Array2::zeros((nvtr, ncand)),
             i_beats_j_by: Array2::zeros((ncand, ncand)),
-            ranks: Array2::zeros((ncit, ncand)),
+            ranks: Array2::zeros((nvtr, ncand)),
             regrets: vec![0.0; ncand],
             cand_by_regret: (0..ncand).collect(),
             regret_rank: (0..ncand).collect(),
@@ -44,10 +44,10 @@ impl Sim {
     }
 
     pub fn take_from_primary(&mut self, primary: &Sim, winners: &[ElectResult]) {
-        assert!(primary.ncit == self.ncit);
+        assert!(primary.nvtr == self.nvtr);
         assert!(winners.len() == self.ncand);
         for (icand, winner) in winners.iter().enumerate() {
-            for icit in 0..self.ncit {
+            for icit in 0..self.nvtr {
                 self.scores[(icit, icand)] = primary.scores[(icit, winner.cand)];
             }
         }
@@ -69,7 +69,7 @@ impl Sim {
         let mut avg_util = 0.0;
         for j in 0..self.ncand {
             let mut ttl = 0.0;
-            for i in 0..self.ncit {
+            for i in 0..self.nvtr {
                 ttl += self.scores[(i, j)];
             }
             self.regrets[j] = ttl;

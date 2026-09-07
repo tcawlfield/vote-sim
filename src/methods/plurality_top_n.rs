@@ -3,9 +3,9 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::MWMethodSim;
 use super::results::WinnerAndRunnerup;
 use super::tallies::Tallies;
-use super::MWMethodSim;
 use crate::methods::ElectResult;
 use crate::sim::Sim;
 
@@ -40,7 +40,7 @@ impl MWMethodSim for PluralityTopNSim {
         nwinners: usize,
     ) -> &Vec<ElectResult> {
         self.tallies.fill(0);
-        for icit in 0..sim.ncit {
+        for icit in 0..sim.nvtr {
             self.tallies[sim.ranks[(icit, 0)]] += 1;
         }
         log::debug!("Plurality (top {}) votes: {:?}", nwinners, self.tallies);

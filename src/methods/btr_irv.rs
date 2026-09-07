@@ -62,7 +62,7 @@ impl MethodSim for BtrIrvSim {
             self.candidates.sort_by_key(|&icand| self.tallies[icand]);
             let top_cand = self.candidates[self.candidates.len() - 1];
             let top_votes = self.tallies[top_cand];
-            if self.candidates.len() <= 2 || top_votes >= (sim.ncit as i32 + 1) / 2 {
+            if self.candidates.len() <= 2 || top_votes >= (sim.nvtr as i32 + 1) / 2 {
                 let runner_up = self.candidates[self.candidates.len() - 2];
                 return WinnerAndRunnerup {
                     winner: ElectResult {
