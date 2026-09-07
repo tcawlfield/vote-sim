@@ -4,7 +4,6 @@
 use super::ConsiderationSim;
 use crate::sim::Sim;
 use ndarray::{Array2, azip};
-use rand::rngs::ThreadRng;
 use rand::{Rng, RngExt as _};
 use rand_distr::StandardNormal;
 
@@ -69,7 +68,11 @@ pub fn new_issues_sim(issues: Vec<Issue>, sim: &Sim) -> IssuesSim {
 }
 
 impl ConsiderationSim for IssuesSim {
-    fn add_to_scores(&mut self, scores: &mut Array2<f64>, mut rng: &mut ThreadRng) {
+    // Called once per election, not in a hot loop. Keeping it out of line stops
+    // the generic instantiation from being inlined into the enum dispatch, which
+    // otherwise perturbs codegen of the RNG loop below (~12% on the bench).
+    #[inline(never)]
+    fn add_to_scores<R: Rng + ?Sized>(&mut self, scores: &mut Array2<f64>, mut rng: &mut R) {
         // All voters are the same in this regard.
         // Or at least we assume there are enough voters that every representative
         // group in position-space spans all degrees of likability alignment.

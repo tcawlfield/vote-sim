@@ -5,7 +5,7 @@ use crate::considerations::*;
 use crate::methods::condorcet_util::mark_smith_candidates;
 use crate::methods::{ElectResult, WinnerAndRunnerup};
 use ndarray::{Array2, Axis};
-use rand::rngs::ThreadRng;
+use rand::Rng;
 
 pub struct Sim {
     pub ncand: usize,
@@ -36,7 +36,7 @@ impl Sim {
         }
     }
 
-    pub fn election(&mut self, axes: &mut [Box<dyn ConsiderationSim>], rng: &mut ThreadRng) {
+    pub fn election<R: Rng + ?Sized>(&mut self, axes: &mut [ConsiderationSimKind], rng: &mut R) {
         self.get_scores(axes, rng);
         self.compute_regrets();
         self.rank_candidates();
@@ -55,7 +55,7 @@ impl Sim {
         self.rank_candidates();
     }
 
-    fn get_scores(&mut self, axes: &mut [Box<dyn ConsiderationSim>], rng: &mut ThreadRng) {
+    fn get_scores<R: Rng + ?Sized>(&mut self, axes: &mut [ConsiderationSimKind], rng: &mut R) {
         self.scores.fill(0.0);
         for ax in axes.iter_mut() {
             ax.add_to_scores(&mut self.scores, rng);

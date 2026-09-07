@@ -3,8 +3,7 @@
 
 use crate::sim::Sim;
 use ndarray::Array2;
-use rand::RngExt as _;
-use rand::rngs::ThreadRng;
+use rand::{Rng, RngExt as _};
 use rand_distr::StandardNormal;
 
 use super::ConsiderationSim;
@@ -48,7 +47,9 @@ impl Likability {
 }
 
 impl ConsiderationSim for LikabilitySim {
-    fn add_to_scores(&mut self, scores: &mut Array2<f64>, rng: &mut ThreadRng) {
+    // See the note on IssuesSim::add_to_scores: out of line on purpose.
+    #[inline(never)]
+    fn add_to_scores<R: Rng + ?Sized>(&mut self, scores: &mut Array2<f64>, rng: &mut R) {
         self.scores.clear();
         for mut cand_scores in scores.columns_mut() {
             let variant: f64 = rng.sample(StandardNormal);

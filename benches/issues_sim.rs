@@ -1,5 +1,5 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use mcelect::considerations::Consideration;
+use mcelect::considerations::{Consideration, ConsiderationSim};
 use mcelect::sim::Sim;
 
 fn bench_issues_sim(c: &mut Criterion) {

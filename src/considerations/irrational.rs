@@ -3,9 +3,8 @@
 
 use crate::sim::Sim;
 use ndarray::Array2;
-use rand::RngExt as _;
 use rand::distr::StandardUniform;
-use rand::rngs::ThreadRng;
+use rand::{Rng, RngExt as _};
 
 use super::ConsiderationSim;
 
@@ -76,9 +75,10 @@ impl Irrational {
 }
 
 impl ConsiderationSim for IrrationalSim {
-    #[allow(unused_variables)]
-    fn add_to_scores(&mut self, scores: &mut Array2<f64>, rng: &mut ThreadRng) {
-        let (nvtr, ncand) = scores.dim();
+    // See the note on IssuesSim::add_to_scores: out of line on purpose.
+    #[inline(never)]
+    fn add_to_scores<R: Rng + ?Sized>(&mut self, scores: &mut Array2<f64>, rng: &mut R) {
+        let (_nvtr, ncand) = scores.dim();
         if self.p.uses_camps() {
             let (ncamps, ncand_from_self) = self.camp_scores.dim();
             assert_eq!(ncand_from_self, ncand);
@@ -203,12 +203,9 @@ mod tests {
         let mut scores = Array2::zeros((sim.nvtr, sim.ncand));
         csim.add_to_scores(&mut scores, &mut rand::rng());
 
-        let n = scores.len() as f64;
-        let mean = scores.sum() / n;
-        let var = scores.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / n;
-        // Uniform(0, sqrt(12)): mean sqrt(3), standard deviation 1 (== sigma).
-        assert!((mean - SQRT_3).abs() < 0.1, "mean {mean}");
-        assert!((var.sqrt() - 1.0).abs() < 0.1, "std {}", var.sqrt());
+        // Scores are Uniform(0, sqrt(12) * sigma): mean sqrt(3) * sigma, std sigma.
+        assert!((scores.mean().unwrap() - SQRT_3).abs() < 0.1, "mean");
+        assert!((scores.std(0.0) - 1.0).abs() < 0.1, "std");
     }
 
     #[test]
@@ -260,6 +257,27 @@ mod tests {
         for &s in scores.iter() {
             assert!((0.0..=SQRT12).contains(&s), "out of range: {s}");
         }
+    }
+
+    #[test]
+    fn seeded_rng_makes_add_to_scores_reproducible() {
+        use rand::SeedableRng;
+        use rand::rngs::StdRng;
+
+        let sim = Sim::new(5, 50);
+        let irr = Irrational {
+            sigma: 1.5,
+            camps: 3,
+            individualism_deg: 25.0,
+        };
+        let run = || {
+            let mut csim = irr.new_sim(&sim);
+            let mut scores = Array2::zeros((sim.nvtr, sim.ncand));
+            csim.add_to_scores(&mut scores, &mut StdRng::seed_from_u64(0xC0FFEE));
+            scores
+        };
+        // Same seed -> bit-for-bit identical scores (the point of the generic RNG).
+        assert_eq!(run(), run());
     }
 
     #[test]

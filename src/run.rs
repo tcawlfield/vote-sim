@@ -14,7 +14,7 @@ use std::{error::Error, sync::Arc};
 use work_queue::Queue;
 
 use crate::config::Config;
-use crate::considerations::ConsiderationSim;
+use crate::considerations::{ConsiderationSim, ConsiderationSimKind};
 use crate::cov_matrix::CovMatrix;
 use crate::method_tracker::{MethodTracker, SendableMethodReport};
 use crate::methods::Strategy;
@@ -141,7 +141,7 @@ fn run_batch(
 
     let mut sim_primary = config.primary_candidates.map(|pcand| Sim::new(pcand, nvtr));
 
-    let mut axes: Vec<Box<dyn ConsiderationSim>> = {
+    let mut axes: Vec<ConsiderationSimKind> = {
         let max_sim = sim_primary.as_ref().unwrap_or(&sim);
         config
             .considerations
