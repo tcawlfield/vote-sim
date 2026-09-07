@@ -5,9 +5,9 @@ use log::debug;
 use ndarray::Axis;
 use serde::{Deserialize, Serialize};
 
+use super::MethodSim;
 use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
 use super::tallies::Tallies;
-use super::MethodSim;
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

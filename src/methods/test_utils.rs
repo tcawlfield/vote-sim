@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::sim::Sim;
-use ndarray::{s, ArrayView};
+use ndarray::{ArrayView, s};
 
 #[allow(dead_code)]
 pub fn sim_from_scores(scores: &[(&[f64], usize)]) -> Sim {

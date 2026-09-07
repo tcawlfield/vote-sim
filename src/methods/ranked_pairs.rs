@@ -5,9 +5,9 @@ use log::*;
 use ndarray::Array2;
 use serde::{Deserialize, Serialize};
 
-use super::condorcet_util::{find_candidate_pairoffs, find_locked_in_winner, lock_in, CandPair};
-use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
 use super::MethodSim;
+use super::condorcet_util::{CandPair, find_candidate_pairoffs, find_locked_in_winner, lock_in};
+use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

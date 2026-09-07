@@ -3,8 +3,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
 use super::MethodSim;
+use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
