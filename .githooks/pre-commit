@@ -1,0 +1,4 @@
+#!/bin/sh
+# Fast check only -- keep this instant so it never tempts a --no-verify.
+# Heavier checks (clippy, tests) live in .githooks/pre-push.
+exec cargo fmt --all -- --check
