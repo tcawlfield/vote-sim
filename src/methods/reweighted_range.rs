@@ -50,12 +50,12 @@ impl MWMethodSim for RRVSim {
         nwinners: usize,
     ) -> &Vec<ElectResult> {
         self.ballots.fill(0);
-        for icit in 0..sim.nvtr {
+        for ivtr in 0..sim.nvtr {
             fill_range_ballot(
-                &sim.scores.index_axis(Axis(0), icit),
+                &sim.scores.index_axis(Axis(0), ivtr),
                 self.p.ranks,
                 self.ballots
-                    .index_axis_mut(Axis(0), icit)
+                    .index_axis_mut(Axis(0), ivtr)
                     .as_slice_mut()
                     .unwrap(),
             );
@@ -117,21 +117,21 @@ mod tests {
             k: 1.0,
         }
         .new_sim(&sim);
-        for icit in 0..60 {
+        for ivtr in 0..60 {
             // Team A
-            sim.scores[(icit, 0)] = 10.; // A1
-            sim.scores[(icit, 1)] = 9.; // A2
-            sim.scores[(icit, 2)] = 8.; // A3
-            sim.scores[(icit, 3)] = 1.; // B1
-            sim.scores[(icit, 4)] = 0.; // B2
+            sim.scores[(ivtr, 0)] = 10.; // A1
+            sim.scores[(ivtr, 1)] = 9.; // A2
+            sim.scores[(ivtr, 2)] = 8.; // A3
+            sim.scores[(ivtr, 3)] = 1.; // B1
+            sim.scores[(ivtr, 4)] = 0.; // B2
         }
-        for icit in 60..100 {
+        for ivtr in 60..100 {
             // Team B
-            sim.scores[(icit, 0)] = 0.; // A1
-            sim.scores[(icit, 1)] = 0.; // A2
-            sim.scores[(icit, 2)] = 0.; // A3
-            sim.scores[(icit, 3)] = 10.; // B1
-            sim.scores[(icit, 4)] = 10.; // B2
+            sim.scores[(ivtr, 0)] = 0.; // A1
+            sim.scores[(ivtr, 1)] = 0.; // A2
+            sim.scores[(ivtr, 2)] = 0.; // A3
+            sim.scores[(ivtr, 3)] = 10.; // B1
+            sim.scores[(ivtr, 4)] = 10.; // B2
         }
 
         let results = rrv.multi_elect(&sim, None, 3);

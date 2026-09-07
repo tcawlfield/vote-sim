@@ -12,8 +12,8 @@ use super::ConsiderationSim;
 // Irrational is a random utility generator.
 // Voters can be assigned to a given number of "camps", where each camp has a
 // core set of preferences --
-// (All citizens are the same in this regard.)
-// Or at least we assume there are enough citizens that every representative
+// (All voters are the same in this regard.)
+// Or at least we assume there are enough voters that every representative
 // group in position-space spans all degrees of Irrational alignment.
 // If there is a bias in Irrational (Republicans see Trump as highly charismatic)
 // then that becomes an issue, not a Irrational.
@@ -27,7 +27,7 @@ pub struct Irrational {
     /// Scores are uniform distributions, and sigma is the standard deviation.
     /// Uniform variates range from 0 to sqrt(12) * sigma.
     pub sigma: f64,
-    /// Voters fall into camps, when camps > 1. (icit % camps) gives the camp index.
+    /// Voters fall into camps, when camps > 1. (ivtr % camps) gives the camp index.
     pub camps: usize,
     /// Also when camps > 1, individuals within each camp can deviate from the group.
     /// individualism_deg ranges from 0 to 90, and is an angle in degrees. 0 means
@@ -78,7 +78,7 @@ impl Irrational {
 impl ConsiderationSim for IrrationalSim {
     #[allow(unused_variables)]
     fn add_to_scores(&mut self, scores: &mut Array2<f64>, rng: &mut ThreadRng) {
-        let (ncit, ncand) = scores.dim();
+        let (nvtr, ncand) = scores.dim();
         if self.p.uses_camps() {
             let (ncamps, ncand_from_self) = self.camp_scores.dim();
             assert_eq!(ncand_from_self, ncand);
@@ -86,8 +86,8 @@ impl ConsiderationSim for IrrationalSim {
                 let uniform_sample: f64 = rng.sample(StandardUniform);
                 *u = uniform_sample * self.camp_scale;
             }
-            for ((icit, icand), cand_score) in scores.indexed_iter_mut() {
-                let icamp = icit % ncamps;
+            for ((ivtr, icand), cand_score) in scores.indexed_iter_mut() {
+                let icamp = ivtr % ncamps;
                 let uniform_sample: f64 = rng.sample(StandardUniform);
                 *cand_score +=
                     self.camp_scores[(icamp, icand)] + uniform_sample * self.individual_scale;

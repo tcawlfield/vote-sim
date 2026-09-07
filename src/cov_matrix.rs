@@ -23,23 +23,23 @@ impl CovMatrix {
     }
 
     pub fn compute(&mut self, scores: &Array2<f64>) {
-        let (ncit, ncand) = scores.dim();
+        let (nvtr, ncand) = scores.dim();
         assert_eq!(self.elements.dim().0, ncand);
         self.mean.fill(0.0);
         self.elements.fill(0.0);
-        for icit in 0..ncit {
-            let n = (icit + 1) as f64;
+        for ivtr in 0..nvtr {
+            let n = (ivtr + 1) as f64;
             for ix in 0..ncand {
-                let dx = scores[(icit, ix)] - self.mean[ix];
+                let dx = scores[(ivtr, ix)] - self.mean[ix];
                 self.mean[ix] += dx / n;
                 for iy in 0..(ix + 1) {
-                    self.elements[(ix, iy)] += dx * (scores[(icit, iy)] - self.mean[iy]);
+                    self.elements[(ix, iy)] += dx * (scores[(ivtr, iy)] - self.mean[iy]);
                 }
             }
         }
         for ix in 0..ncand {
             for iy in 0..(ix + 1) {
-                self.elements[(ix, iy)] /= (ncit - 1) as f64;
+                self.elements[(ix, iy)] /= (nvtr - 1) as f64;
             }
             for iy in 0..ix {
                 self.elements[(iy, ix)] = self.elements[(ix, iy)];

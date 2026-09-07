@@ -135,11 +135,11 @@ fn run_batch(
     let mut rng = rand::rng();
 
     let ncand = config.candidates;
-    let ncit = config.voters;
+    let nvtr = config.voters;
 
-    let mut sim = Sim::new(ncand, ncit);
+    let mut sim = Sim::new(ncand, nvtr);
 
-    let mut sim_primary = config.primary_candidates.map(|pcand| Sim::new(pcand, ncit));
+    let mut sim_primary = config.primary_candidates.map(|pcand| Sim::new(pcand, nvtr));
 
     let mut axes: Vec<Box<dyn ConsiderationSim>> = {
         let max_sim = sim_primary.as_ref().unwrap_or(&sim);

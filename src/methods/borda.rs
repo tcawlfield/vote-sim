@@ -4,9 +4,9 @@
 use ndarray::Axis;
 use serde::{Deserialize, Serialize};
 
-use super::results::{default_honest, Strategy, WinnerAndRunnerup};
-use super::tallies::{tally_votes, Tallies};
 use super::MethodSim;
+use super::results::{Strategy, WinnerAndRunnerup, default_honest};
+use super::tallies::{Tallies, tally_votes};
 use crate::sim::Sim;
 
 /// The Borda Count method is a *ranked* voting method.
@@ -78,22 +78,22 @@ impl MethodSim for BordaSim {
                 }
             }
             Strategy::Strategic => {
-                // Note strategic scoring is reduced by 1 so that enemy == 0 always.
-                for (icit, cand_fav_list) in sim.ranks.lanes(Axis(1)).into_iter().enumerate() {
+                // Note strategic scoring is reduced by 1 so that threat == 0 always.
+                for (ivtr, cand_fav_list) in sim.ranks.lanes(Axis(1)).into_iter().enumerate() {
                     let pre_elect = honest_rslt.unwrap();
-                    let (friend, enemy) = if sim.scores[(icit, pre_elect.winner.cand)]
-                        >= sim.scores[(icit, pre_elect.runnerup.cand)]
+                    let (preferred, threat) = if sim.scores[(ivtr, pre_elect.winner.cand)]
+                        >= sim.scores[(ivtr, pre_elect.runnerup.cand)]
                     {
                         (pre_elect.winner.cand, pre_elect.runnerup.cand)
                     } else {
                         (pre_elect.runnerup.cand, pre_elect.winner.cand)
                     };
-                    let mut score_shift: i32 = -2; // leave room for friend to score max
+                    let mut score_shift: i32 = -2; // leave room for preferred to score max
                     for (cand_rank, &icand) in cand_fav_list.indexed_iter() {
-                        if icand == friend {
-                            self.tallies[icand] += top_ncand as i32 - 1; // Score friend the highest
+                        if icand == preferred {
+                            self.tallies[icand] += top_ncand as i32 - 1; // Score preferred the highest
                             score_shift += 1;
-                        } else if icand == enemy {
+                        } else if icand == threat {
                             score_shift += 1;
                         } else if (top_ncand - cand_rank) as i32 + score_shift > 0 {
                             self.tallies[icand] += (top_ncand - cand_rank) as i32 + score_shift;
@@ -160,7 +160,7 @@ mod tests {
         }
         .new_sim(&sim);
         let strat_results = method.elect(&sim, Some(honest_results));
-        // scores: Note strategic scoring is reduced by 1 so that enemy == 0 always
+        // scores: Note strategic scoring is reduced by 1 so that threat == 0 always
         // 3 0 2 1
         // 0 3 1 2
         // 0 3 2 1
@@ -198,7 +198,7 @@ mod tests {
         }
         .new_sim(&sim);
         let strat_results = method.elect(&sim, Some(honest_results));
-        // scores: Note strategic scoring is reduced by 1 so that enemy == 0 always
+        // scores: Note strategic scoring is reduced by 1 so that threat == 0 always
         // 2 0 1 0
         // 0 2 0 1
         // 0 2 1 0

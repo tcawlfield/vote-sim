@@ -74,8 +74,8 @@ impl MethodSim for PluralitySim {
                     prev
                 };
                 self.tallies.fill(0);
-                for cit_ranks in sim.ranks.rows() {
-                    for &icand in cit_ranks {
+                for vtr_ranks in sim.ranks.rows() {
+                    for &icand in vtr_ranks {
                         if icand == pre_poll.winner.cand || icand == pre_poll.runnerup.cand {
                             self.tallies[icand] += 1;
                             break;

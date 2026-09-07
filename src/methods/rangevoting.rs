@@ -41,7 +41,6 @@ impl RangeVoting {
 impl MethodSim for RangeVotingSim {
     fn elect(&mut self, sim: &Sim, honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup {
         self.tallies.fill(0);
-        // for icit in 0..sim.ncit {
         for vscores in sim.scores.outer_iter() {
             match self.params.strat {
                 Strategy::Honest => {

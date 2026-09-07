@@ -43,7 +43,7 @@ impl MethodSim for MultivoteSim {
             return tally_votes(&self.tallies);
         }
 
-        for (icit, utilities) in sim.scores.axis_iter(Axis(0)).enumerate() {
+        for (ivtr, utilities) in sim.scores.axis_iter(Axis(0)).enumerate() {
             let min_score = utilities.iter().copied().reduce(f64::min).unwrap();
             let ttl_score: f64 = utilities.iter().copied().sum();
             self.cand_scores
@@ -51,7 +51,7 @@ impl MethodSim for MultivoteSim {
 
             let reduction = self.p.spread_fact * (ttl_score - min_score * sim.ncand as f64)
                 / (self.p.votes as f64);
-            log::debug!("  voter {} has reduction {}", icit, reduction);
+            log::debug!("  voter {} has reduction {}", ivtr, reduction);
             for _ in 0..self.p.votes {
                 let mut max_score = self.cand_scores[0];
                 let mut best_cand = 0;
@@ -65,7 +65,7 @@ impl MethodSim for MultivoteSim {
                 self.cand_scores[best_cand] -= reduction;
                 log::debug!(
                     "Voter {} votes for {}, scores are now {:?}",
-                    icit,
+                    ivtr,
                     best_cand,
                     self.cand_scores
                 );

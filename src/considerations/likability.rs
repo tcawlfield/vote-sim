@@ -10,8 +10,8 @@ use rand_distr::StandardNormal;
 use super::ConsiderationSim;
 
 /// Likability is an attribute of each candidate that gives them universal appeal.
-/// (All citizens are the same in this regard.)
-/// Or at least we assume there are enough citizens that every representative
+/// (All voters are the same in this regard.)
+/// Or at least we assume there are enough voters that every representative
 /// group in position-space spans all degrees of likability alignment.
 /// If there is a bias in likability (Republicans see Trump as highly charismatic)
 /// then that becomes an issue, not a likability.

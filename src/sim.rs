@@ -92,17 +92,17 @@ impl Sim {
     /// rank_candidates uses the score table to fix the table of
     /// candidate rankings (Sim.ranks), and also fills in the i_beats_j_by matrix.
     pub fn rank_candidates(&mut self) {
-        // for i in 0..self.ncit {
+        // for i in 0..self.nvtr {
         self.i_beats_j_by.fill(0);
-        for (icit, cit_scores) in self.scores.axis_iter(Axis(0)).enumerate() {
+        for (ivtr, vtr_scores) in self.scores.axis_iter(Axis(0)).enumerate() {
             self.scratch_ranks
-                .sort_by(|&a, &b| cit_scores[b].partial_cmp(&cit_scores[a]).unwrap());
+                .sort_by(|&a, &b| vtr_scores[b].partial_cmp(&vtr_scores[a]).unwrap());
             for icand in 0..self.ncand {
-                self.ranks[(icit, icand)] = self.scratch_ranks[icand];
+                self.ranks[(ivtr, icand)] = self.scratch_ranks[icand];
                 for jcand in 0..icand {
-                    if cit_scores[icand] > cit_scores[jcand] {
+                    if vtr_scores[icand] > vtr_scores[jcand] {
                         self.i_beats_j_by[(icand, jcand)] += 1;
-                    } else if cit_scores[icand] < cit_scores[jcand] {
+                    } else if vtr_scores[icand] < vtr_scores[jcand] {
                         // This is a slowdown, but handles equal-score cases (which should be nearly nonexistent)
                         self.i_beats_j_by[(jcand, icand)] += 1;
                     }

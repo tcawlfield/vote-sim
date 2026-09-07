@@ -4,10 +4,10 @@
 use ndarray::Array2;
 use serde::{Deserialize, Serialize};
 
+use super::MethodSim;
 use super::rangevoting::{fill_range_ballot, fill_range_ballot_strat};
 use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
-use super::tallies::{tally_votes, Tallies};
-use super::MethodSim;
+use super::tallies::{Tallies, tally_votes};
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -50,7 +50,6 @@ impl MethodSim for STARSim {
     fn elect(&mut self, sim: &Sim, honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup {
         self.tallies.fill(0);
         self.preference_matrix.fill(0);
-        // for icit in 0..sim.ncit {
         for vscores in sim.scores.outer_iter() {
             match self.params.strat {
                 Strategy::Honest => {
@@ -74,7 +73,7 @@ impl MethodSim for STARSim {
                 self.tallies[icand] += self.ballot[icand];
                 for jcand in icand..sim.ncand {
                     // preference_matrix[(i,j)] counts voters who prefer i to j.
-                    // pm[i,j] + pm[j,i] may be less than ncit because a citizen may score i and j equally.
+                    // pm[i,j] + pm[j,i] may be less than nvtr because a voter may score i and j equally.
                     if self.ballot[icand] > self.ballot[jcand] {
                         self.preference_matrix[(icand, jcand)] += 1;
                     } else if self.ballot[icand] < self.ballot[jcand] {
