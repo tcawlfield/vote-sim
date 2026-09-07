@@ -39,8 +39,8 @@ pub fn run_sims(
     outfile: &Option<std::ffi::OsString>,
 ) -> Result<(), Box<dyn Error>> {
     let num_workers = std::thread::available_parallelism().unwrap().get();
-    let min_chunks = num_workers.max((trials + MAX_TRIALS_PER_JOB - 1) / MAX_TRIALS_PER_JOB);
-    let chunks_per_worker = (min_chunks + num_workers - 1) / num_workers;
+    let min_chunks = num_workers.max(trials.div_ceil(MAX_TRIALS_PER_JOB));
+    let chunks_per_worker = min_chunks.div_ceil(num_workers);
     let chunks = chunks_per_worker * num_workers;
     let trials_per_chunk = (trials + 1) / chunks;
     log::info!(
@@ -55,7 +55,7 @@ pub fn run_sims(
     let queue: Queue<Task> = Queue::new(num_workers, 4);
     let mut trials_left = trials;
     for chunks_to_do in (1..chunks + 1).rev() {
-        let task_trials = (trials_left + chunks_to_do - 1) / chunks_to_do;
+        let task_trials = trials_left.div_ceil(chunks_to_do);
         let task = Task {
             config: config.clone(),
             trials: task_trials,
@@ -86,10 +86,10 @@ pub fn run_sims(
             "Completed a batch of {} elections",
             task_result.method_stats[0].ntrials
         );
-        if writer.is_none() {
-            if let Some(filename) = outfile {
-                writer = Some(get_writer(&config, &filename, &task_result.batch));
-            }
+        if writer.is_none()
+            && let Some(filename) = outfile
+        {
+            writer = Some(get_writer(config, filename, &task_result.batch));
         }
         if let Some(writer) = writer.as_mut() {
             writer.write(&task_result.batch)?;
@@ -139,11 +139,7 @@ fn run_batch(
 
     let mut sim = Sim::new(ncand, ncit);
 
-    let mut sim_primary = if let Some(pcand) = config.primary_candidates {
-        Some(Sim::new(pcand, ncit))
-    } else {
-        None
-    };
+    let mut sim_primary = config.primary_candidates.map(|pcand| Sim::new(pcand, ncit));
 
     let mut axes: Vec<Box<dyn ConsiderationSim>> = {
         let max_sim = sim_primary.as_ref().unwrap_or(&sim);
@@ -185,11 +181,9 @@ fn run_batch(
 
     let mut cov_matrix = CovMatrix::new(sim.ncand);
 
-    let mut mwms = if let Some(sim_primary) = &sim_primary {
-        Some(config.primary_method.new_sim(&sim_primary))
-    } else {
-        None
-    };
+    let mut mwms = sim_primary
+        .as_ref()
+        .map(|sim_primary| config.primary_method.new_sim(sim_primary));
 
     // ordered_final_cands is a list of candidates in order of increasing regret.
     // With no primary, ordered_final_cands is identical to sim.cand_by_regret.
@@ -202,9 +196,9 @@ fn run_batch(
         if let Some(rrv) = &mut mwms {
             let sim_primary: &mut Sim = sim_primary.as_mut().unwrap();
             sim_primary.election(&mut axes, &mut rng);
-            let final_candidates = rrv.multi_elect(&sim_primary, None, sim.ncand);
+            let final_candidates = rrv.multi_elect(sim_primary, None, sim.ncand);
             log::debug!("primary election winners: {:?}", final_candidates);
-            sim.take_from_primary(sim_primary, &final_candidates);
+            sim.take_from_primary(sim_primary, final_candidates);
 
             ordered_final_cands.clear();
             for &fc in sim_primary.cand_by_regret.iter() {
@@ -387,7 +381,6 @@ fn get_writer(
             config_str,
         )]))
         .build();
-    let file = fs::File::create(&filename).unwrap();
-    let writer = ArrowWriter::try_new(file, sample_batch.schema(), Some(props)).unwrap();
-    writer
+    let file = fs::File::create(filename).unwrap();
+    ArrowWriter::try_new(file, sample_batch.schema(), Some(props)).unwrap()
 }

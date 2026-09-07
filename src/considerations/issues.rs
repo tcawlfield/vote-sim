@@ -93,7 +93,7 @@ impl ConsiderationSim for IssuesSim {
         "issues".to_string()
     }
 
-    fn push_posn_elements(&self, report: &mut dyn FnMut(f64, bool), final_choices: &Vec<usize>) {
+    fn push_posn_elements(&self, report: &mut dyn FnMut(f64, bool), final_choices: &[usize]) {
         let (_nchoices, npos) = self.choice_positions.dim();
         for &fc in final_choices.iter() {
             for ipos in 0..npos {

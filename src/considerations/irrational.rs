@@ -108,7 +108,7 @@ impl ConsiderationSim for IrrationalSim {
         "Irrational".to_string()
     }
 
-    fn push_posn_elements(&self, report: &mut dyn FnMut(f64, bool), final_candidates: &Vec<usize>) {
+    fn push_posn_elements(&self, report: &mut dyn FnMut(f64, bool), final_candidates: &[usize]) {
         for _fc in final_candidates.iter() {
             report(f64::NAN, true);
         }

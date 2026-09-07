@@ -1,9 +1,9 @@
 // © Copyright 2025 Topher Cawlfield
 // SPDX-License-Identifier: Apache-2.0
 
-use super::results::{Strategy, WinnerAndRunnerup};
-use super::tallies::{tally_votes, Tallies};
 use super::MethodSim;
+use super::results::{Strategy, WinnerAndRunnerup};
+use super::tallies::{Tallies, tally_votes};
 use crate::sim::Sim;
 use serde::{Deserialize, Serialize};
 
@@ -69,7 +69,7 @@ impl MethodSim for PluralitySim {
                     prev
                 } else {
                     self.params.strat = Strategy::Honest;
-                    let prev = self.elect(&sim, None);
+                    let prev = self.elect(sim, None);
                     self.params.strat = Strategy::Strategic;
                     prev
                 };
@@ -99,8 +99,8 @@ impl MethodSim for PluralitySim {
 
     fn colname(&self) -> String {
         match self.params.strat {
-            Strategy::Honest => format!("pl_h"),
-            Strategy::Strategic => format!("pl_s"),
+            Strategy::Honest => "pl_h".to_string(),
+            Strategy::Strategic => "pl_s".to_string(),
         }
     }
 

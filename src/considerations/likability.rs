@@ -71,7 +71,7 @@ impl ConsiderationSim for LikabilitySim {
         "likability".to_string()
     }
 
-    fn push_posn_elements(&self, report: &mut dyn FnMut(f64, bool), final_candidates: &Vec<usize>) {
+    fn push_posn_elements(&self, report: &mut dyn FnMut(f64, bool), final_candidates: &[usize]) {
         for &fc in final_candidates.iter() {
             report(self.scores[fc], true);
         }

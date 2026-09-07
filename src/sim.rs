@@ -139,7 +139,7 @@ impl Sim {
     /// will swap runnerup and winner if the runnerup would win a plurality vote.
     pub fn break_tie_with_plurality(&self, result: &WinnerAndRunnerup) -> WinnerAndRunnerup {
         if !result.is_tied() {
-            result.clone()
+            *result
         } else {
             let mut runup_votes = 0;
             let mut winner_votes = 0;
@@ -157,7 +157,7 @@ impl Sim {
                     runnerup: result.winner,
                 }
             } else {
-                result.clone()
+                *result
             }
         }
     }

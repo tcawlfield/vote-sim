@@ -55,9 +55,9 @@ mod tests {
     use ndarray::array;
 
     #[test]
+    #[rustfmt::skip]
     fn test_cov_matrix() {
         // Using Python's numpy.cov for comparison.
-        #[cfg_attr(rustfmt, rustfmt_skip)]
         {
             let utilities = array![
                 [0.30900160, 2.24721985, 0.58539738, 2.85872826, 0.78623712],

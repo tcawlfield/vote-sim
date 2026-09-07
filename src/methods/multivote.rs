@@ -4,9 +4,9 @@
 use ndarray::Axis;
 use serde::{Deserialize, Serialize};
 
-use super::results::{Strategy, WinnerAndRunnerup};
-use super::tallies::{tally_votes, Tallies};
 use super::MethodSim;
+use super::results::{Strategy, WinnerAndRunnerup};
+use super::tallies::{Tallies, tally_votes};
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -44,8 +44,8 @@ impl MethodSim for MultivoteSim {
         }
 
         for (icit, utilities) in sim.scores.axis_iter(Axis(0)).enumerate() {
-            let min_score = utilities.iter().map(|x| *x).reduce(f64::min).unwrap();
-            let ttl_score: f64 = utilities.iter().map(|x| *x).sum();
+            let min_score = utilities.iter().copied().reduce(f64::min).unwrap();
+            let ttl_score: f64 = utilities.iter().copied().sum();
             self.cand_scores
                 .clone_from_slice(utilities.as_slice().unwrap());
 
