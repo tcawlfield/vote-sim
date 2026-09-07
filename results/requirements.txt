@@ -1,9 +1,0 @@
-seaborn
-pyarrow!=19.0.0
-awkward
-s3fs
-ipyleaflet
-tomlkit
-pandas
-ipykernel
-pyyaml
