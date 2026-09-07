@@ -44,3 +44,10 @@ config etc., the term "option" is more overloaded. So I'm going to use
     * For each candidate, score utility by winners in preference order. Most
       preferred gets 100%, next-most gets ... 50% maybe? Etc. What is natural
       here?
+
+
+## Coverage
+
+```bash
+cargo watch -d 2 -x 'llvm-cov nextest --lcov --output-path=./target/lcov.info' -x 'llvm-cov report'
+```

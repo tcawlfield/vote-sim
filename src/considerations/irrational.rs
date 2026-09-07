@@ -114,3 +114,169 @@ impl ConsiderationSim for IrrationalSim {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn uses_camps_needs_more_than_one_camp() {
+        let mut irr = Irrational {
+            sigma: 1.0,
+            camps: 0,
+            individualism_deg: 0.0,
+        };
+        assert!(!irr.uses_camps());
+        irr.camps = 1;
+        assert!(!irr.uses_camps());
+        irr.camps = 2;
+        assert!(irr.uses_camps());
+    }
+
+    #[test]
+    fn new_sim_without_camps() {
+        let sim = Sim::new(4, 10);
+        let irr = Irrational {
+            sigma: 2.0,
+            camps: 1,
+            // individualism is meaningless without camps and must be ignored.
+            individualism_deg: 45.0,
+        };
+        let csim = irr.new_sim(&sim);
+        assert_eq!(csim.camp_scale, 0.0);
+        assert_eq!(csim.individual_scale, 2.0 * SQRT12);
+        assert_eq!(csim.camp_scores.dim(), (0, 4));
+    }
+
+    #[test]
+    fn new_sim_with_camps_splits_scale_by_individualism_angle() {
+        let sim = Sim::new(5, 10);
+        let irr = Irrational {
+            sigma: 3.0,
+            camps: 3,
+            individualism_deg: 30.0,
+        };
+        let csim = irr.new_sim(&sim);
+        let rad = 30.0 * RAD_PER_DEG;
+        assert!((csim.camp_scale - rad.cos() * 3.0 * SQRT12).abs() < 1e-12);
+        assert!((csim.individual_scale - rad.sin() * 3.0 * SQRT12).abs() < 1e-12);
+        assert_eq!(csim.camp_scores.dim(), (3, 5));
+        // Pythagoras: the two scales combine back to the full sqrt(12) * sigma.
+        let combined = csim.camp_scale.hypot(csim.individual_scale);
+        assert!((combined - 3.0 * SQRT12).abs() < 1e-12);
+    }
+
+    #[test]
+    fn add_to_scores_without_camps_accumulates_within_range() {
+        let sim = Sim::new(6, 400);
+        let irr = Irrational {
+            sigma: 1.0,
+            camps: 1,
+            individualism_deg: 0.0,
+        };
+        let mut csim = irr.new_sim(&sim);
+
+        let mut scores = Array2::from_elem((sim.nvtr, sim.ncand), 10.0);
+        csim.add_to_scores(&mut scores, &mut rand::rng());
+
+        // Every cell had a uniform sample in [0, sqrt(12) * sigma] added to its
+        // starting value of 10.
+        for &s in scores.iter() {
+            assert!((10.0..=10.0 + SQRT12).contains(&s), "out of range: {s}");
+        }
+        // With that many samples at least one should land in the top and bottom
+        // deciles, proving the values really are spread across the range.
+        assert!(scores.iter().any(|&s| s < 10.0 + 0.1 * SQRT12));
+        assert!(scores.iter().any(|&s| s > 10.0 + 0.9 * SQRT12));
+    }
+
+    #[test]
+    fn add_to_scores_without_camps_matches_uniform_moments() {
+        let sim = Sim::new(20, 3000);
+        let irr = Irrational {
+            sigma: 1.0,
+            camps: 1,
+            individualism_deg: 0.0,
+        };
+        let mut csim = irr.new_sim(&sim);
+
+        let mut scores = Array2::zeros((sim.nvtr, sim.ncand));
+        csim.add_to_scores(&mut scores, &mut rand::rng());
+
+        let n = scores.len() as f64;
+        let mean = scores.sum() / n;
+        let var = scores.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / n;
+        // Uniform(0, sqrt(12)): mean sqrt(3), standard deviation 1 (== sigma).
+        assert!((mean - SQRT_3).abs() < 0.1, "mean {mean}");
+        assert!((var.sqrt() - 1.0).abs() < 0.1, "std {}", var.sqrt());
+    }
+
+    #[test]
+    fn add_to_scores_with_camps_is_shared_within_a_camp() {
+        let sim = Sim::new(4, 6);
+        let irr = Irrational {
+            sigma: 1.0,
+            camps: 2,
+            // No individualism: every voter in a camp gets exactly the camp's scores.
+            individualism_deg: 0.0,
+        };
+        let mut csim = irr.new_sim(&sim);
+
+        let mut scores = Array2::zeros((sim.nvtr, sim.ncand));
+        csim.add_to_scores(&mut scores, &mut rand::rng());
+
+        // Voter i belongs to camp (i % 2), so rows 0/2/4 and rows 1/3/5 match.
+        for ivtr in 0..sim.nvtr {
+            assert_eq!(
+                scores.row(ivtr),
+                scores.row(ivtr % 2),
+                "row {ivtr} should match its camp representative"
+            );
+        }
+        // The two camps drew independently and should differ.
+        assert_ne!(scores.row(0), scores.row(1));
+        // Camp scores are uniform in [0, sqrt(12) * sigma].
+        for &s in scores.iter() {
+            assert!((0.0..=SQRT12).contains(&s), "out of range: {s}");
+        }
+    }
+
+    #[test]
+    fn add_to_scores_with_camps_adds_individual_deviation() {
+        let sim = Sim::new(4, 6);
+        let irr = Irrational {
+            sigma: 1.0,
+            camps: 2,
+            individualism_deg: 90.0, // all individual, no shared camp component
+        };
+        let mut csim = irr.new_sim(&sim);
+        assert!(csim.camp_scale.abs() < 1e-12);
+
+        let mut scores = Array2::zeros((sim.nvtr, sim.ncand));
+        csim.add_to_scores(&mut scores, &mut rand::rng());
+
+        // Camp component is zero, so voters in the same camp no longer agree.
+        assert_ne!(scores.row(0), scores.row(2));
+        for &s in scores.iter() {
+            assert!((0.0..=SQRT12).contains(&s), "out of range: {s}");
+        }
+    }
+
+    #[test]
+    fn trait_metadata() {
+        let sim = Sim::new(3, 4);
+        let irr = Irrational {
+            sigma: 1.0,
+            camps: 1,
+            individualism_deg: 0.0,
+        };
+        let csim = irr.new_sim(&sim);
+        assert_eq!(csim.get_dim(), 1);
+        assert_eq!(csim.get_name(), "Irrational");
+
+        let mut reported = Vec::new();
+        csim.push_posn_elements(&mut |v, last| reported.push((v, last)), &[0, 2]);
+        assert_eq!(reported.len(), 2);
+        assert!(reported.iter().all(|(v, last)| v.is_nan() && *last));
+    }
+}
