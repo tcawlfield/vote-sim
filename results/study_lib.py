@@ -12,7 +12,7 @@ import pandas as pd
 from IPython.display import display
 
 MODULE_PATH = Path(__file__).parent
-VOTING = MODULE_PATH / '..' / 'target' / 'release' / 'voting'
+VOTING = MODULE_PATH / '..' / 'target' / 'release' / 'mcelect'
 
 
 def do_run(config, trials) -> ak.Array:

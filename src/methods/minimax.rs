@@ -3,8 +3,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
 use super::MethodSim;
+use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -36,9 +36,9 @@ impl MethodSim for MinimaxSim {
         // in pair-wise matchups.
         self.min_victory_margin.fill(i32::MAX);
         for (icand, mvm) in self.min_victory_margin.iter_mut().enumerate() {
-            for jopnt in 0..sim.ncand {
-                if icand != jopnt && sim.i_beats_j_by[(icand, jopnt)] < *mvm {
-                    *mvm = sim.i_beats_j_by[(icand, jopnt)];
+            for (jopnt, &margin) in sim.i_beats_j_by.row(icand).iter().enumerate() {
+                if icand != jopnt && margin < *mvm {
+                    *mvm = margin;
                 }
             }
         }

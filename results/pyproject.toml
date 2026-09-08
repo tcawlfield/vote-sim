@@ -1,0 +1,19 @@
+[project]
+name = "vote-sim-results"
+version = "0.1.0"
+description = "Notebooks and analysis scripts for exploring mcelect simulation output"
+requires-python = ">=3.12"
+dependencies = [
+    "seaborn",
+    "pyarrow!=19.0.0",
+    "awkward",
+    "s3fs",
+    "ipyleaflet",
+    "tomlkit",
+    "pandas",
+    "ipykernel",
+    "pyyaml",
+]
+
+[tool.uv]
+package = false

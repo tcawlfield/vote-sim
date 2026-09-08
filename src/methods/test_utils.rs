@@ -2,22 +2,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::sim::Sim;
-use ndarray::{s, ArrayView};
+use ndarray::{ArrayView, s};
 
 #[allow(dead_code)]
 pub fn sim_from_scores(scores: &[(&[f64], usize)]) -> Sim {
     let ncand = scores[0].0.len();
-    let mut ncit = 0;
-    for &cits in scores.iter() {
-        ncit += cits.1;
+    let mut nvtr = 0;
+    for &vtrs in scores.iter() {
+        nvtr += vtrs.1;
     }
-    let mut sim = Sim::new(ncand, ncit);
-    let mut icit = 0;
-    for (cit_scores, repeat) in scores.iter() {
-        let scores_view = ArrayView::from(cit_scores);
+    let mut sim = Sim::new(ncand, nvtr);
+    let mut ivtr = 0;
+    for (vtr_scores, repeat) in scores.iter() {
+        let scores_view = ArrayView::from(vtr_scores);
         for _ in 0..*repeat {
-            sim.scores.slice_mut(s![icit, ..]).assign(&scores_view);
-            icit += 1;
+            sim.scores.slice_mut(s![ivtr, ..]).assign(&scores_view);
+            ivtr += 1;
         }
     }
     sim

@@ -1,9 +1,9 @@
 // © Copyright 2025 Topher Cawlfield
 // SPDX-License-Identifier: Apache-2.0
 
-use super::results::{Strategy, WinnerAndRunnerup};
-use super::tallies::{tally_votes, Tallies};
 use super::MethodSim;
+use super::results::{Strategy, WinnerAndRunnerup};
+use super::tallies::{Tallies, tally_votes};
 use crate::sim::Sim;
 use serde::{Deserialize, Serialize};
 
@@ -60,8 +60,8 @@ impl MethodSim for PluralitySim {
         match self.params.strat {
             Strategy::Honest => {
                 self.tallies.fill(0);
-                for icit in 0..sim.ncit {
-                    self.tallies[sim.ranks[(icit, 0)]] += 1;
+                for &ivtr in sim.ranks.column(0) {
+                    self.tallies[ivtr] += 1;
                 }
             }
             Strategy::Strategic => {
@@ -69,14 +69,13 @@ impl MethodSim for PluralitySim {
                     prev
                 } else {
                     self.params.strat = Strategy::Honest;
-                    let prev = self.elect(&sim, None);
+                    let prev = self.elect(sim, None);
                     self.params.strat = Strategy::Strategic;
                     prev
                 };
                 self.tallies.fill(0);
-                for icit in 0..sim.ncit {
-                    for rank in 0..sim.ncand {
-                        let icand = sim.ranks[(icit, rank)];
+                for vtr_ranks in sim.ranks.rows() {
+                    for &icand in vtr_ranks {
                         if icand == pre_poll.winner.cand || icand == pre_poll.runnerup.cand {
                             self.tallies[icand] += 1;
                             break;
@@ -99,8 +98,8 @@ impl MethodSim for PluralitySim {
 
     fn colname(&self) -> String {
         match self.params.strat {
-            Strategy::Honest => format!("pl_h"),
-            Strategy::Strategic => format!("pl_s"),
+            Strategy::Honest => "pl_h".to_string(),
+            Strategy::Strategic => "pl_s".to_string(),
         }
     }
 

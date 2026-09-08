@@ -4,9 +4,9 @@
 use ndarray::{ArrayView, Ix1};
 use serde::{Deserialize, Serialize};
 
-use super::results::{Strategy, WinnerAndRunnerup};
-use super::tallies::{tally_votes, Tallies};
 use super::MethodSim;
+use super::results::{Strategy, WinnerAndRunnerup};
+use super::tallies::{Tallies, tally_votes};
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -41,7 +41,6 @@ impl RangeVoting {
 impl MethodSim for RangeVotingSim {
     fn elect(&mut self, sim: &Sim, honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup {
         self.tallies.fill(0);
-        // for icit in 0..sim.ncit {
         for vscores in sim.scores.outer_iter() {
             match self.params.strat {
                 Strategy::Honest => {
@@ -61,8 +60,8 @@ impl MethodSim for RangeVotingSim {
                     );
                 }
             }
-            for icand in 0..vscores.len() {
-                self.tallies[icand] += self.ballot[icand];
+            for (tally, ballot) in self.tallies.iter_mut().zip(&self.ballot) {
+                *tally += ballot;
             }
         }
         log::debug!("{} tallies: {:?}", self.name(), self.tallies);
@@ -80,8 +79,8 @@ impl MethodSim for RangeVotingSim {
     fn colname(&self) -> String {
         if self.params.nranks == 2 {
             match self.params.strat {
-                Strategy::Honest => format!("aprv_h"),
-                Strategy::Strategic => format!("aprv_s"),
+                Strategy::Honest => "aprv_h".to_string(),
+                Strategy::Strategic => "aprv_s".to_string(),
             }
         } else {
             match self.params.strat {
@@ -97,8 +96,8 @@ impl MethodSim for RangeVotingSim {
 }
 
 pub fn fill_range_ballot(scores: &ArrayView<f64, Ix1>, ranks: i32, ballot: &mut [i32]) {
-    let min_score = scores.iter().map(|x| *x).reduce(f64::min).unwrap();
-    let max_score = scores.iter().map(|x| *x).reduce(f64::max).unwrap();
+    let min_score = scores.iter().copied().reduce(f64::min).unwrap();
+    let max_score = scores.iter().copied().reduce(f64::max).unwrap();
     // "ranks - 1" -- we give half a ranksz to the max and min score regions,
     // making our max and min score more likely to be given to only one candidate.
     let ranksz = (max_score - min_score) / ((ranks - 1) as f64);
@@ -116,8 +115,8 @@ pub fn fill_range_ballot_strat(
     score_break: f64,
     stretch_factor: f64,
 ) {
-    let min_score = scores.iter().map(|x| *x).reduce(f64::min).unwrap();
-    let max_score = scores.iter().map(|x| *x).reduce(f64::max).unwrap();
+    let min_score = scores.iter().copied().reduce(f64::min).unwrap();
+    let max_score = scores.iter().copied().reduce(f64::max).unwrap();
     let score_range = max_score - min_score;
     let stretched_max = min_score + score_range * stretch_factor;
     let ranksz = score_range * stretch_factor / ((ranks - 1) as f64);

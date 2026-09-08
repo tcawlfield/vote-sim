@@ -4,7 +4,6 @@
 use super::ConsiderationSim;
 use crate::sim::Sim;
 use ndarray::{Array2, azip};
-use rand::rngs::ThreadRng;
 use rand::{Rng, RngExt as _};
 use rand_distr::StandardNormal;
 
@@ -69,7 +68,11 @@ pub fn new_issues_sim(issues: Vec<Issue>, sim: &Sim) -> IssuesSim {
 }
 
 impl ConsiderationSim for IssuesSim {
-    fn add_to_scores(&mut self, scores: &mut Array2<f64>, mut rng: &mut ThreadRng) {
+    // Called once per election, not in a hot loop. Keeping it out of line stops
+    // the generic instantiation from being inlined into the enum dispatch, which
+    // otherwise perturbs codegen of the RNG loop below (~12% on the bench).
+    #[inline(never)]
+    fn add_to_scores<R: Rng + ?Sized>(&mut self, scores: &mut Array2<f64>, mut rng: &mut R) {
         // All voters are the same in this regard.
         // Or at least we assume there are enough voters that every representative
         // group in position-space spans all degrees of likability alignment.
@@ -93,7 +96,7 @@ impl ConsiderationSim for IssuesSim {
         "issues".to_string()
     }
 
-    fn push_posn_elements(&self, report: &mut dyn FnMut(f64, bool), final_choices: &Vec<usize>) {
+    fn push_posn_elements(&self, report: &mut dyn FnMut(f64, bool), final_choices: &[usize]) {
         let (_nchoices, npos) = self.choice_positions.dim();
         for &fc in final_choices.iter() {
             for ipos in 0..npos {
@@ -159,6 +162,7 @@ impl Issue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use approx::assert_abs_diff_eq;
     use ndarray::array;
 
     /// Build an IssuesSim directly from choice positions and per-issue
@@ -209,7 +213,7 @@ mod tests {
 
         // choice 0: -sqrt(3 + 1) = -2, choice 1: -sqrt(3 + 9) = -sqrt(12)
         assert_eq!(scores[(0, 0)], -2.0);
-        assert!((scores[(0, 1)] - -12.0_f64.sqrt()).abs() < 1e-12);
+        assert_abs_diff_eq!(scores[(0, 1)], -12.0_f64.sqrt(), epsilon = 1e-12);
     }
 
     #[test]
@@ -222,6 +226,6 @@ mod tests {
         sim.one_voters_scores(&vtr_positions, scores.row_mut(0));
 
         // min(9, 4) + min(16, 4) = 8
-        assert!((scores[(0, 0)] - -8.0_f64.sqrt()).abs() < 1e-12);
+        assert_abs_diff_eq!(scores[(0, 0)], -8.0_f64.sqrt(), epsilon = 1e-12);
     }
 }

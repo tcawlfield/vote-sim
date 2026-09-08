@@ -5,9 +5,9 @@ use log::debug;
 use ndarray::Axis;
 use serde::{Deserialize, Serialize};
 
+use super::MethodSim;
 use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
 use super::tallies::Tallies;
-use super::MethodSim;
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -53,7 +53,7 @@ impl MethodSim for IRVSim {
             let mut top_cand = sim.ncand; // invalid index
             let mut bot_cand = sim.ncand;
             let mut top_votes = 0;
-            let mut bot_votes = sim.ncit as i32;
+            let mut bot_votes = sim.nvtr as i32;
             let mut runner_up = sim.ncand;
             let mut runup_votes = 0;
             for (icand, &votes) in self.tallies.iter().enumerate() {
@@ -80,7 +80,7 @@ impl MethodSim for IRVSim {
                 top_cand, runner_up, bot_cand
             );
             // Do we have an election, or not?
-            if top_votes >= (sim.ncit as i32 + 1) / 2 || runner_up == bot_cand {
+            if top_votes >= (sim.nvtr as i32 + 1) / 2 || runner_up == bot_cand {
                 return WinnerAndRunnerup {
                     winner: ElectResult {
                         cand: top_cand,

@@ -3,15 +3,14 @@
 
 use crate::sim::Sim;
 use ndarray::Array2;
-use rand::RngExt as _;
-use rand::rngs::ThreadRng;
+use rand::{Rng, RngExt as _};
 use rand_distr::StandardNormal;
 
 use super::ConsiderationSim;
 
 /// Likability is an attribute of each candidate that gives them universal appeal.
-/// (All citizens are the same in this regard.)
-/// Or at least we assume there are enough citizens that every representative
+/// (All voters are the same in this regard.)
+/// Or at least we assume there are enough voters that every representative
 /// group in position-space spans all degrees of likability alignment.
 /// If there is a bias in likability (Republicans see Trump as highly charismatic)
 /// then that becomes an issue, not a likability.
@@ -48,18 +47,15 @@ impl Likability {
 }
 
 impl ConsiderationSim for LikabilitySim {
-    #[allow(unused_variables)]
-    fn add_to_scores(&mut self, scores: &mut Array2<f64>, rng: &mut ThreadRng) {
-        let (ncit, ncand) = scores.dim();
-
+    // See the note on IssuesSim::add_to_scores: out of line on purpose.
+    #[inline(never)]
+    fn add_to_scores<R: Rng + ?Sized>(&mut self, scores: &mut Array2<f64>, rng: &mut R) {
         self.scores.clear();
-        for i in 0..ncand {
+        for mut cand_scores in scores.columns_mut() {
             let variant: f64 = rng.sample(StandardNormal);
             let cand_like = variant.powi(2) * self.p.mean;
             self.scores.push(cand_like);
-            for j in 0..ncit {
-                *scores.get_mut((j, i)).unwrap() += cand_like;
-            }
+            cand_scores += cand_like;
         }
     }
 
@@ -71,7 +67,7 @@ impl ConsiderationSim for LikabilitySim {
         "likability".to_string()
     }
 
-    fn push_posn_elements(&self, report: &mut dyn FnMut(f64, bool), final_candidates: &Vec<usize>) {
+    fn push_posn_elements(&self, report: &mut dyn FnMut(f64, bool), final_candidates: &[usize]) {
         for &fc in final_candidates.iter() {
             report(self.scores[fc], true);
         }

@@ -4,9 +4,9 @@
 use ndarray::{Array2, Axis};
 use serde::{Deserialize, Serialize};
 
+use super::MWMethodSim;
 use super::rangevoting::fill_range_ballot;
 use super::results::{Strategy, WinnerAndRunnerup};
-use super::MWMethodSim;
 use crate::methods::ElectResult;
 use crate::sim::Sim;
 
@@ -35,7 +35,7 @@ impl RRV {
         RRVSim {
             p: self.clone(),
             wtd_scores: vec![0.; sim.ncand],
-            ballots: Array2::zeros((sim.ncit, sim.ncand)),
+            ballots: Array2::zeros((sim.nvtr, sim.ncand)),
             winners: Vec::with_capacity(sim.ncand),
             remaining: Vec::with_capacity(sim.ncand),
         }
@@ -50,12 +50,12 @@ impl MWMethodSim for RRVSim {
         nwinners: usize,
     ) -> &Vec<ElectResult> {
         self.ballots.fill(0);
-        for icit in 0..sim.ncit {
+        for ivtr in 0..sim.nvtr {
             fill_range_ballot(
-                &sim.scores.index_axis(Axis(0), icit),
+                &sim.scores.index_axis(Axis(0), ivtr),
                 self.p.ranks,
                 self.ballots
-                    .index_axis_mut(Axis(0), icit)
+                    .index_axis_mut(Axis(0), ivtr)
                     .as_slice_mut()
                     .unwrap(),
             );
@@ -66,7 +66,7 @@ impl MWMethodSim for RRVSim {
         self.winners.clear();
         while self.winners.len() < nwinners {
             self.wtd_scores.fill(0.0);
-            for i in 0..sim.ncit {
+            for i in 0..sim.nvtr {
                 // Weight is K / (K + SUM/MAX)
                 let sum = self
                     .winners
@@ -101,7 +101,7 @@ impl MWMethodSim for RRVSim {
 
 #[cfg(test)]
 mod tests {
-    use float_eq::assert_float_eq;
+    use approx::assert_ulps_eq;
 
     use super::*;
     use crate::methods::ElectResult;
@@ -117,21 +117,21 @@ mod tests {
             k: 1.0,
         }
         .new_sim(&sim);
-        for icit in 0..60 {
+        for ivtr in 0..60 {
             // Team A
-            sim.scores[(icit, 0)] = 10.; // A1
-            sim.scores[(icit, 1)] = 9.; // A2
-            sim.scores[(icit, 2)] = 8.; // A3
-            sim.scores[(icit, 3)] = 1.; // B1
-            sim.scores[(icit, 4)] = 0.; // B2
+            sim.scores[(ivtr, 0)] = 10.; // A1
+            sim.scores[(ivtr, 1)] = 9.; // A2
+            sim.scores[(ivtr, 2)] = 8.; // A3
+            sim.scores[(ivtr, 3)] = 1.; // B1
+            sim.scores[(ivtr, 4)] = 0.; // B2
         }
-        for icit in 60..100 {
+        for ivtr in 60..100 {
             // Team B
-            sim.scores[(icit, 0)] = 0.; // A1
-            sim.scores[(icit, 1)] = 0.; // A2
-            sim.scores[(icit, 2)] = 0.; // A3
-            sim.scores[(icit, 3)] = 10.; // B1
-            sim.scores[(icit, 4)] = 10.; // B2
+            sim.scores[(ivtr, 0)] = 0.; // A1
+            sim.scores[(ivtr, 1)] = 0.; // A2
+            sim.scores[(ivtr, 2)] = 0.; // A3
+            sim.scores[(ivtr, 3)] = 10.; // B1
+            sim.scores[(ivtr, 4)] = 10.; // B2
         }
 
         let results = rrv.multi_elect(&sim, None, 3);
@@ -163,7 +163,7 @@ mod tests {
         let a2_score = a_weight * 9. * 60.;
         // assert_eq!(results[2], ElectResult{cand: 1, score: a2_score});
         assert_eq!(results[2].cand, 1);
-        assert_float_eq!(results[2].score, a2_score, ulps <= 2); // forgive last two digits
+        assert_ulps_eq!(results[2].score, a2_score, max_ulps = 2); // forgive last two digits
 
         // Just checking the score to vote scaling. Would do this sooner but borrow checker whines.
         assert_eq!(rrv.ballots[(0, 0)], 10);

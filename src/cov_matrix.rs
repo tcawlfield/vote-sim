@@ -23,23 +23,23 @@ impl CovMatrix {
     }
 
     pub fn compute(&mut self, scores: &Array2<f64>) {
-        let (ncit, ncand) = scores.dim();
+        let (nvtr, ncand) = scores.dim();
         assert_eq!(self.elements.dim().0, ncand);
         self.mean.fill(0.0);
         self.elements.fill(0.0);
-        for icit in 0..ncit {
-            let n = (icit + 1) as f64;
+        for ivtr in 0..nvtr {
+            let n = (ivtr + 1) as f64;
             for ix in 0..ncand {
-                let dx = scores[(icit, ix)] - self.mean[ix];
+                let dx = scores[(ivtr, ix)] - self.mean[ix];
                 self.mean[ix] += dx / n;
                 for iy in 0..(ix + 1) {
-                    self.elements[(ix, iy)] += dx * (scores[(icit, iy)] - self.mean[iy]);
+                    self.elements[(ix, iy)] += dx * (scores[(ivtr, iy)] - self.mean[iy]);
                 }
             }
         }
         for ix in 0..ncand {
             for iy in 0..(ix + 1) {
-                self.elements[(ix, iy)] /= (ncit - 1) as f64;
+                self.elements[(ix, iy)] /= (nvtr - 1) as f64;
             }
             for iy in 0..ix {
                 self.elements[(iy, ix)] = self.elements[(ix, iy)];
@@ -51,13 +51,13 @@ impl CovMatrix {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use float_eq::assert_float_eq;
+    use approx::assert_abs_diff_eq;
     use ndarray::array;
 
     #[test]
+    #[rustfmt::skip]
     fn test_cov_matrix() {
         // Using Python's numpy.cov for comparison.
-        #[cfg_attr(rustfmt, rustfmt_skip)]
         {
             let utilities = array![
                 [0.30900160, 2.24721985, 0.58539738, 2.85872826, 0.78623712],
@@ -83,7 +83,7 @@ mod tests {
 
             println!("Got covariance matrix: {}", covm.elements);
             for (computed, expect) in covm.elements.iter().zip(expected.iter()) {
-                assert_float_eq!(*computed, *expect, abs <= 0.000001);
+                assert_abs_diff_eq!(*computed, *expect, epsilon = 1e-6);
             }
         }
 

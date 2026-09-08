@@ -108,8 +108,8 @@ impl MethodTracker {
             name: self.method.name(),
             ntrials: self.ntrials,
             ntrials_subopt: self.ntrials_subopt,
-            mean_regret: self.mean_regret.clone(),
-            mean_subopt_regret: self.mean_subopt_regret.clone(),
+            mean_regret: self.mean_regret,
+            mean_subopt_regret: self.mean_subopt_regret,
         }
     }
 }

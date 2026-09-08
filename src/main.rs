@@ -52,8 +52,8 @@ fn run() -> Result<(), Box<dyn Error>> {
     if let Some(ncand) = args.candidates {
         config.candidates = ncand;
     }
-    if let Some(ncit) = args.voters {
-        config.voters = ncit;
+    if let Some(nvtr) = args.voters {
+        config.voters = nvtr;
     }
     if let Some(pcand) = args.primary_candidates {
         config.primary_candidates = Some(pcand);
