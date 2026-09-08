@@ -7,11 +7,10 @@ This tool is not primary about simulating political elections, thus "citizen" is
 not an ideal name. Voter is preferred, and is now used throughout (including
 `nvtr`/`ivtr` for counts and indices).
 
-"Candidate" is also not great. It implies that the options that voters express
-their opinions on are people. "Options", "Choices", or "Alternatives" are
-better. "Alternatives" is too long, so... In programming and user interfaces,
-config etc., the term "option" is more overloaded. So I'm going to use
-"choice(s)" throughout, gradually.
+"Candidate" is used consistently here but also in voting method and simulation
+literature. "Alternative" is also used when it's desirable to distinguish
+between voting on people rather than options in general. But "alternative" feels
+a little strained in the context of this code.
 
 ## To-Do
 
