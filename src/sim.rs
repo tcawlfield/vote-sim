@@ -163,6 +163,7 @@ impl Sim {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use approx::assert_abs_diff_eq;
     use ndarray::array;
 
     #[test]
@@ -220,9 +221,9 @@ mod tests {
         sim.scores = array![[3., 2., 0.], [3., 1., 0.], [3., 2., 0.], [3., 1., 0.]];
         sim.compute_regrets();
         // regret = (max - total) / (max - avg) = (12 - total) / 6
-        assert!((sim.regrets[0] - 0.0).abs() < 1e-12);
-        assert!((sim.regrets[1] - 1.0).abs() < 1e-12); // the average candidate
-        assert!((sim.regrets[2] - 2.0).abs() < 1e-12);
+        assert_abs_diff_eq!(sim.regrets[0], 0.0, epsilon = 1e-12);
+        assert_abs_diff_eq!(sim.regrets[1], 1.0, epsilon = 1e-12); // the average candidate
+        assert_abs_diff_eq!(sim.regrets[2], 2.0, epsilon = 1e-12);
     }
 
     #[test]
@@ -233,7 +234,7 @@ mod tests {
         sim.compute_regrets();
 
         assert_eq!(sim.cand_by_regret, vec![2, 0, 1, 3]);
-        assert!(sim.regrets[2].abs() < 1e-12); // best candidate has zero regret
+        assert_abs_diff_eq!(sim.regrets[2], 0.0, epsilon = 1e-12); // best candidate has zero regret
 
         // regret_rank is the inverse permutation of cand_by_regret
         for (rank, &icand) in sim.cand_by_regret.iter().enumerate() {
@@ -268,8 +269,8 @@ mod tests {
 
         assert_eq!(sim.scores, array![[40., 20.], [41., 21.], [42., 22.]]);
         // Totals 123 and 63, avg 93 -> regrets (123 - total) / 30.
-        assert!((sim.regrets[0] - 0.0).abs() < 1e-12);
-        assert!((sim.regrets[1] - 2.0).abs() < 1e-12);
+        assert_abs_diff_eq!(sim.regrets[0], 0.0, epsilon = 1e-12);
+        assert_abs_diff_eq!(sim.regrets[1], 2.0, epsilon = 1e-12);
         assert_eq!(sim.cand_by_regret, vec![0, 1]);
     }
 
@@ -384,7 +385,7 @@ mod tests {
         assert_eq!(sim.smith_set_size(), 1);
         let best = sim.cand_by_regret[0];
         assert!(sim.in_smith_set[best]);
-        assert!(sim.regrets[best].abs() < 1e-12);
+        assert_abs_diff_eq!(sim.regrets[best], 0.0, epsilon = 1e-12);
 
         // Unanimous: every voter produces the same ranking.
         let first = sim.ranks.row(0).to_vec();

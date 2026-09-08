@@ -101,7 +101,7 @@ impl MWMethodSim for RRVSim {
 
 #[cfg(test)]
 mod tests {
-    use float_eq::assert_float_eq;
+    use approx::assert_ulps_eq;
 
     use super::*;
     use crate::methods::ElectResult;
@@ -163,7 +163,7 @@ mod tests {
         let a2_score = a_weight * 9. * 60.;
         // assert_eq!(results[2], ElectResult{cand: 1, score: a2_score});
         assert_eq!(results[2].cand, 1);
-        assert_float_eq!(results[2].score, a2_score, ulps <= 2); // forgive last two digits
+        assert_ulps_eq!(results[2].score, a2_score, max_ulps = 2); // forgive last two digits
 
         // Just checking the score to vote scaling. Would do this sooner but borrow checker whines.
         assert_eq!(rrv.ballots[(0, 0)], 10);

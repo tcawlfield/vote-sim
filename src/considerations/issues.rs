@@ -162,6 +162,7 @@ impl Issue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use approx::assert_abs_diff_eq;
     use ndarray::array;
 
     /// Build an IssuesSim directly from choice positions and per-issue
@@ -212,7 +213,7 @@ mod tests {
 
         // choice 0: -sqrt(3 + 1) = -2, choice 1: -sqrt(3 + 9) = -sqrt(12)
         assert_eq!(scores[(0, 0)], -2.0);
-        assert!((scores[(0, 1)] - -12.0_f64.sqrt()).abs() < 1e-12);
+        assert_abs_diff_eq!(scores[(0, 1)], -12.0_f64.sqrt(), epsilon = 1e-12);
     }
 
     #[test]
@@ -225,6 +226,6 @@ mod tests {
         sim.one_voters_scores(&vtr_positions, scores.row_mut(0));
 
         // min(9, 4) + min(16, 4) = 8
-        assert!((scores[(0, 0)] - -8.0_f64.sqrt()).abs() < 1e-12);
+        assert_abs_diff_eq!(scores[(0, 0)], -8.0_f64.sqrt(), epsilon = 1e-12);
     }
 }

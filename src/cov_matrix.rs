@@ -51,7 +51,7 @@ impl CovMatrix {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use float_eq::assert_float_eq;
+    use approx::assert_abs_diff_eq;
     use ndarray::array;
 
     #[test]
@@ -83,7 +83,7 @@ mod tests {
 
             println!("Got covariance matrix: {}", covm.elements);
             for (computed, expect) in covm.elements.iter().zip(expected.iter()) {
-                assert_float_eq!(*computed, *expect, abs <= 0.000001);
+                assert_abs_diff_eq!(*computed, *expect, epsilon = 1e-6);
             }
         }
 

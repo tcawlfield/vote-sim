@@ -118,6 +118,7 @@ impl ConsiderationSim for IrrationalSim {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use approx::assert_abs_diff_eq;
 
     #[test]
     fn uses_camps_needs_more_than_one_camp() {
@@ -158,12 +159,16 @@ mod tests {
         };
         let csim = irr.new_sim(&sim);
         let rad = 30.0 * RAD_PER_DEG;
-        assert!((csim.camp_scale - rad.cos() * 3.0 * SQRT12).abs() < 1e-12);
-        assert!((csim.individual_scale - rad.sin() * 3.0 * SQRT12).abs() < 1e-12);
+        assert_abs_diff_eq!(csim.camp_scale, rad.cos() * 3.0 * SQRT12, epsilon = 1e-12);
+        assert_abs_diff_eq!(
+            csim.individual_scale,
+            rad.sin() * 3.0 * SQRT12,
+            epsilon = 1e-12
+        );
         assert_eq!(csim.camp_scores.dim(), (3, 5));
         // Pythagoras: the two scales combine back to the full sqrt(12) * sigma.
         let combined = csim.camp_scale.hypot(csim.individual_scale);
-        assert!((combined - 3.0 * SQRT12).abs() < 1e-12);
+        assert_abs_diff_eq!(combined, 3.0 * SQRT12, epsilon = 1e-12);
     }
 
     #[test]
@@ -204,8 +209,8 @@ mod tests {
         csim.add_to_scores(&mut scores, &mut rand::rng());
 
         // Scores are Uniform(0, sqrt(12) * sigma): mean sqrt(3) * sigma, std sigma.
-        assert!((scores.mean().unwrap() - SQRT_3).abs() < 0.1, "mean");
-        assert!((scores.std(0.0) - 1.0).abs() < 0.1, "std");
+        assert_abs_diff_eq!(scores.mean().unwrap(), SQRT_3, epsilon = 0.1);
+        assert_abs_diff_eq!(scores.std(0.0), 1.0, epsilon = 0.1);
     }
 
     #[test]
@@ -247,7 +252,7 @@ mod tests {
             individualism_deg: 90.0, // all individual, no shared camp component
         };
         let mut csim = irr.new_sim(&sim);
-        assert!(csim.camp_scale.abs() < 1e-12);
+        assert_abs_diff_eq!(csim.camp_scale, 0.0, epsilon = 1e-12);
 
         let mut scores = Array2::zeros((sim.nvtr, sim.ncand));
         csim.add_to_scores(&mut scores, &mut rand::rng());
