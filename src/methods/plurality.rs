@@ -107,3 +107,135 @@ impl MethodSim for PluralitySim {
         self.params.strat
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::methods::ElectResult;
+    use crate::methods::test_utils::sim_from_scores;
+    use crate::sim::Sim;
+
+    fn honest(sim: &Sim) -> PluralitySim {
+        Plurality {
+            strat: Strategy::Honest,
+        }
+        .new_sim(sim)
+    }
+
+    fn strategic(sim: &Sim) -> PluralitySim {
+        Plurality {
+            strat: Strategy::Strategic,
+        }
+        .new_sim(sim)
+    }
+
+    #[test]
+    fn honest_plurality_counts_first_choices() {
+        let mut sim = sim_from_scores(&[
+            (&[3., 1., 0.], 5), // 5 voters rank candidate 0 first
+            (&[1., 3., 0.], 3), // 3 rank candidate 1 first
+            (&[0., 1., 3.], 2), // 2 rank candidate 2 first
+        ]);
+        sim.rank_candidates();
+
+        let mut method = honest(&sim);
+        let result = method.elect(&sim, None);
+
+        assert_eq!(method.tallies, vec![5, 3, 2]);
+        assert_eq!(result.winner.cand, 0);
+        assert_eq!(result.winner.score, 5.0);
+        assert_eq!(result.runnerup.cand, 1);
+        assert_eq!(result.runnerup.score, 3.0);
+    }
+
+    #[test]
+    fn honest_plurality_ignores_honest_rslt_argument() {
+        let mut sim =
+            sim_from_scores(&[(&[3., 1., 0.], 5), (&[1., 3., 0.], 3), (&[0., 1., 3.], 2)]);
+        sim.rank_candidates();
+
+        let bogus = WinnerAndRunnerup {
+            winner: ElectResult {
+                cand: 2,
+                score: 99.0,
+            },
+            runnerup: ElectResult {
+                cand: 2,
+                score: 99.0,
+            },
+        };
+        let with_hint = honest(&sim).elect(&sim, Some(bogus));
+        let without_hint = honest(&sim).elect(&sim, None);
+        assert_eq!(with_hint.winner.cand, without_hint.winner.cand);
+        assert_eq!(with_hint.winner.cand, 0);
+    }
+
+    #[test]
+    fn honest_plurality_elects_a_polarizing_candidate_over_a_consensus_one() {
+        // Candidate 2 is every voter's 2nd choice (a Condorcet winner) yet gets
+        // no first-choice votes, so Plurality never considers it.
+        let mut sim = sim_from_scores(&[
+            (&[3., 0., 2.], 5), // 0 > 2 > 1
+            (&[0., 3., 2.], 4), // 1 > 2 > 0
+        ]);
+        sim.rank_candidates();
+
+        let mut method = honest(&sim);
+        let result = method.elect(&sim, None);
+
+        assert_eq!(method.tallies, vec![5, 4, 0]);
+        assert_eq!(result.winner.cand, 0);
+    }
+
+    #[test]
+    fn strategic_plurality_defects_to_the_preferred_frontrunner() {
+        let mut sim = sim_from_scores(&[
+            (&[3., 2., 0.], 4), // 0 > 1 > 2
+            (&[0., 3., 1.], 3), // 1 > 2 > 0
+            (&[0., 2., 3.], 2), // 2 > 1 > 0
+        ]);
+        sim.rank_candidates();
+
+        let honest_result = honest(&sim).elect(&sim, None);
+        assert_eq!(honest_result.winner.cand, 0);
+        assert_eq!(honest_result.runnerup.cand, 1);
+
+        let mut method = strategic(&sim);
+        let result = method.elect(&sim, Some(honest_result));
+
+        // Frontrunners are 0 and 1. The 2 candidate-2 voters prefer 1 to 0, so
+        // they abandon 2 and vote 1, which overtakes 0.
+        assert_eq!(method.tallies, vec![4, 5, 0]);
+        assert_eq!(result.winner.cand, 1);
+    }
+
+    #[test]
+    fn strategic_plurality_runs_its_own_pre_poll_when_none_is_given() {
+        let mut sim =
+            sim_from_scores(&[(&[3., 2., 0.], 4), (&[0., 3., 1.], 3), (&[0., 2., 3.], 2)]);
+        sim.rank_candidates();
+
+        let mut method = strategic(&sim);
+        let result = method.elect(&sim, None);
+
+        assert_eq!(method.tallies, vec![4, 5, 0]);
+        assert_eq!(result.winner.cand, 1);
+        // The temporary switch to Honest for the pre-poll is reverted.
+        assert!(matches!(method.strat(), Strategy::Strategic));
+    }
+
+    #[test]
+    fn method_metadata() {
+        let sim = Sim::new(3, 1);
+
+        let h = honest(&sim);
+        assert_eq!(h.colname(), "pl_h");
+        assert_eq!(h.name(), "Plurality, Honest");
+        assert!(matches!(h.strat(), Strategy::Honest));
+
+        let s = strategic(&sim);
+        assert_eq!(s.colname(), "pl_s");
+        assert_eq!(s.name(), "Plurality, Strategic");
+        assert!(matches!(s.strat(), Strategy::Strategic));
+    }
+}

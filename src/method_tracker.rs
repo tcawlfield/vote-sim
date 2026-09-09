@@ -1,15 +1,10 @@
 // © Copyright 2025 Topher Cawlfield
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
-
-use arrow_array::builder::PrimitiveBuilder;
-use arrow_array::types::{Float64Type, Int32Type};
-use arrow_array::{ArrayRef, Float64Array, Int32Array, StructArray};
-use arrow_schema::{DataType, Field, Fields};
 use meansd::MeanSD;
 
 use crate::methods::{Method, MethodSim, WinnerAndRunnerup};
+use crate::out_types::MethodResult;
 use crate::sim::Sim;
 
 pub struct MethodTracker {
@@ -18,28 +13,27 @@ pub struct MethodTracker {
     ntrials_subopt: usize,
     mean_regret: MeanSD,
     mean_subopt_regret: MeanSD,
-    result_bldr: PrimitiveBuilder<Float64Type>,
-    winner_bldr: PrimitiveBuilder<Int32Type>,
 }
 
 impl MethodTracker {
-    pub fn new(method: &Method, sim: &Sim, max_trials: usize) -> MethodTracker {
+    pub fn new(method: &Method, sim: &Sim) -> MethodTracker {
         MethodTracker {
             method: method.new_sim(sim),
             ntrials: 0,
             ntrials_subopt: 0,
             mean_regret: MeanSD::default(),
             mean_subopt_regret: MeanSD::default(),
-            result_bldr: Float64Array::builder(max_trials),
-            winner_bldr: Int32Array::builder(max_trials),
         }
     }
 
+    /// Run the method for one trial. Returns the winner/runner-up pairing (for
+    /// the honest pre-poll that strategic methods consume) and the per-trial
+    /// [`MethodResult`] destined for the output.
     pub fn elect(
         &mut self,
         sim: &Sim,
         honest_rslt: Option<WinnerAndRunnerup>,
-    ) -> WinnerAndRunnerup {
+    ) -> (WinnerAndRunnerup, MethodResult) {
         let mut result = self.method.elect(sim, honest_rslt);
 
         if result.is_tied() {
@@ -54,40 +48,15 @@ impl MethodTracker {
             self.mean_subopt_regret.update(regret);
         }
 
-        self.result_bldr.append_value(regret);
-        self.winner_bldr
-            .append_value(sim.regret_rank[result.winner.cand] as i32);
-        result
+        let method_result = MethodResult {
+            winner: sim.regret_rank[result.winner.cand] as u32,
+            regret,
+        };
+        (result, method_result)
     }
 
     pub fn colname(&self) -> String {
         self.method.colname()
-    }
-
-    pub fn data_type() -> DataType {
-        DataType::Struct(Fields::from(vec![
-            Arc::new(Field::new("winner", DataType::Int32, false)),
-            Arc::new(Field::new("regret", DataType::Float64, false)),
-        ]))
-    }
-
-    // pub fn get_field(&self) -> Field {
-    //     Field::new(self.method.colname(), Self::data_type(), false)
-    // }
-
-    pub fn get_column(&mut self) -> arrow_array::ArrayRef {
-        // Arc::new(self.result_bldr.finish())
-        let struct_array = StructArray::from(vec![
-            (
-                Arc::new(Field::new("winner", DataType::Int32, false)),
-                Arc::new(self.winner_bldr.finish()) as ArrayRef,
-            ),
-            (
-                Arc::new(Field::new("regret", DataType::Float64, false)),
-                Arc::new(self.result_bldr.finish()) as ArrayRef,
-            ),
-        ]);
-        Arc::new(struct_array)
     }
 
     #[allow(dead_code)]
