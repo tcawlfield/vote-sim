@@ -1,16 +1,14 @@
 // © Copyright 2025 Topher Cawlfield
 // SPDX-License-Identifier: Apache-2.0
 
-use arrow_array::builder::{
-    BooleanBuilder, FixedSizeListBuilder, Float64Builder, Int32Builder, ListBuilder,
-};
-use arrow_array::{RecordBatch, StructArray};
-use arrow_schema::{DataType, Field, SchemaBuilder};
-use parquet::file::metadata::KeyValue;
-use parquet::{arrow::ArrowWriter, basic::Compression, file::properties::WriterProperties};
+use std::collections::BTreeMap;
+use std::error::Error;
 use std::fs;
 use std::sync::mpsc;
-use std::{error::Error, sync::Arc};
+
+use arrow_array::RecordBatch;
+use parquet::file::metadata::KeyValue;
+use parquet::{arrow::ArrowWriter, basic::Compression, file::properties::WriterProperties};
 use work_queue::Queue;
 
 use crate::config::Config;
@@ -18,6 +16,7 @@ use crate::considerations::{ConsiderationSim, ConsiderationSimKind};
 use crate::cov_matrix::CovMatrix;
 use crate::method_tracker::{MethodTracker, SendableMethodReport};
 use crate::methods::Strategy;
+use crate::out_types::{ExperimentResult, MethodResult};
 use crate::sim::Sim;
 
 static MAX_TRIALS_PER_JOB: usize = 10000;
@@ -30,7 +29,7 @@ struct Task {
 
 struct TaskResult {
     method_stats: Vec<SendableMethodReport>,
-    batch: RecordBatch,
+    results: Vec<ExperimentResult>,
 }
 
 pub fn run_sims(
@@ -77,46 +76,35 @@ pub fn run_sims(
         .collect();
     drop(task_result_tx);
 
-    // Loop over task_result_rx
-
-    let mut writer = None;
+    // Collect every worker's trial results into one growing Vec, and fold the
+    // per-method summary statistics together as batches arrive.
+    let mut all_results: Vec<ExperimentResult> = Vec::with_capacity(trials);
     let mut summaries: Option<Vec<SendableMethodReport>> = None;
-    while let Ok(mut task_result) = task_result_rx.recv() {
+    while let Ok(task_result) = task_result_rx.recv() {
         log::info!(
             "Completed a batch of {} elections",
-            task_result.method_stats[0].ntrials
+            task_result.results.len()
         );
-        if writer.is_none()
-            && let Some(filename) = outfile
-        {
-            writer = Some(get_writer(config, filename, &task_result.batch));
-        }
-        if let Some(writer) = writer.as_mut() {
-            writer.write(&task_result.batch)?;
-        }
-        if let Some(summaries) = summaries.as_mut() {
-            for (whole_summary, task_summary) in
-                summaries.iter_mut().zip(task_result.method_stats.iter())
-            {
-                whole_summary.combine(task_summary);
+        all_results.extend(task_result.results);
+        match summaries.as_mut() {
+            Some(summaries) => {
+                for (whole, part) in summaries.iter_mut().zip(task_result.method_stats.iter()) {
+                    whole.combine(part);
+                }
             }
-        } else {
-            summaries = Some(std::mem::take(&mut task_result.method_stats));
+            None => summaries = Some(task_result.method_stats),
         }
     }
 
-    // for method in methods.iter() {
-    //     method.report();
-    // }
-    if let Some(writer) = writer {
-        // writer must be closed to write footer
-        writer.close().unwrap();
-        println!("Wrote {}", outfile.as_ref().unwrap().to_str().unwrap());
+    if let Some(filename) = outfile
+        && !all_results.is_empty()
+    {
+        let batch = ExperimentResult::to_record_batch(&all_results);
+        let mut writer = get_writer(config, filename, &batch);
+        writer.write(&batch)?;
+        writer.close()?; // writer must be closed to write the footer
+        println!("Wrote {}", filename.to_str().unwrap());
     }
-
-    // for handle in handles {
-    //     handle.join().unwrap();
-    // }
 
     if let Some(summaries) = summaries {
         for method_report in summaries {
@@ -138,7 +126,6 @@ fn run_batch(
     let nvtr = config.voters;
 
     let mut sim = Sim::new(ncand, nvtr);
-
     let mut sim_primary = config.primary_candidates.map(|pcand| Sim::new(pcand, nvtr));
 
     let mut axes: Vec<ConsiderationSimKind> = {
@@ -153,31 +140,8 @@ fn run_batch(
     let mut methods: Vec<MethodTracker> = config
         .methods
         .iter()
-        .map(|m| MethodTracker::new(m, &sim, trials))
+        .map(|m| MethodTracker::new(m, &sim))
         .collect();
-
-    // Create Arrow array builders:
-    let mut cov_bld = ListBuilder::new(ListBuilder::new(Float64Builder::new()));
-    let mut ideal_cnd_bld = Int32Builder::with_capacity(trials);
-    let mut cand_regret_bld = FixedSizeListBuilder::new(
-        Float64Builder::with_capacity(trials * sim.ncand),
-        sim.ncand as i32,
-    );
-    let mut cand_posn_blds = Vec::new();
-    for consid in axes.iter() {
-        cand_posn_blds.push(FixedSizeListBuilder::new(
-            FixedSizeListBuilder::new(
-                Float64Builder::with_capacity(trials * sim.ncand * consid.get_dim()),
-                consid.get_dim() as i32,
-            ),
-            sim.ncand as i32,
-        ));
-    }
-    let mut smith_candidates_bld = Int32Builder::with_capacity(trials);
-    let mut in_smith_set_bld = FixedSizeListBuilder::new(
-        BooleanBuilder::with_capacity(trials * sim.ncand),
-        sim.ncand as i32,
-    );
 
     let mut cov_matrix = CovMatrix::new(sim.ncand);
 
@@ -186,9 +150,11 @@ fn run_batch(
         .map(|sim_primary| config.primary_method.new_sim(sim_primary));
 
     // ordered_final_cands is a list of candidates in order of increasing regret.
-    // With no primary, ordered_final_cands is identical to sim.cand_by_regret.
-    // With a primary, it's a list containing only winning primary candidates.
+    // With no primary, it is identical to sim.cand_by_regret. With a primary, it
+    // contains only the winning primary candidates.
     let mut ordered_final_cands = vec![0; sim.ncand];
+
+    let mut results: Vec<ExperimentResult> = Vec::with_capacity(trials);
 
     for itrial in 0..trials {
         log::debug!("Sim election {}", itrial + 1);
@@ -214,158 +180,109 @@ fn run_batch(
         cov_matrix.compute(&sim.scores);
         log::debug!("Cov matrix: {}", cov_matrix.elements);
 
+        let mut method_results: BTreeMap<String, MethodResult> = BTreeMap::new();
         let mut prev_rslt = None;
         for method in methods.iter_mut() {
-            let rslt = method.elect(&sim, prev_rslt);
-            let regret = sim.regrets[rslt.winner.cand];
+            let (pairing, result) = method.elect(&sim, prev_rslt);
             if let Strategy::Honest = method.method.strat() {
-                prev_rslt = Some(rslt);
+                prev_rslt = Some(pairing);
             }
             log::debug!(
                 "Method {:?} found winner {} -- regret {}",
                 method.method.name(),
-                rslt.winner.cand,
-                regret
+                result.winner,
+                result.regret
             );
+            method_results.insert(method.colname(), result);
         }
 
-        ideal_cnd_bld.append_value(0);
-        let cbr = &sim.cand_by_regret;
-        for &icand in cbr.iter() {
-            cand_regret_bld.values().append_value(sim.regrets[icand]);
-        }
-        cand_regret_bld.append(true);
-        for ix in 0..sim.ncand {
-            for iy in 0..(ix + 1) {
-                cov_bld
-                    .values()
-                    .values()
-                    .append_value(cov_matrix.elements[(cbr[ix], cbr[iy])]);
-            }
-            cov_bld.values().append(true); // End of row
-        }
-        cov_bld.append(true); // End of matrix
-
-        for (consid, pos_bld) in axes.iter().zip(cand_posn_blds.iter_mut()) {
-            consid.push_posn_elements(
-                &mut |x, next_row| {
-                    if x.is_nan() {
-                        pos_bld.values().values().append_null();
-                    } else {
-                        pos_bld.values().values().append_value(x);
-                    }
-                    if next_row {
-                        pos_bld.values().append(true);
-                    }
-                },
-                &ordered_final_cands,
-            );
-            pos_bld.append(true);
-        }
-        smith_candidates_bld.append_value(sim.smith_set_size() as i32);
-        for &icand in cbr.iter() {
-            in_smith_set_bld
-                .values()
-                .append_value(sim.in_smith_set[icand]);
-        }
-        in_smith_set_bld.append(true);
-    }
-
-    let mut columns: Vec<arrow_array::ArrayRef> = Vec::new();
-    columns.push(Arc::new(ideal_cnd_bld.finish()) as arrow_array::ArrayRef);
-    columns.push(Arc::new(cand_regret_bld.finish()) as arrow_array::ArrayRef);
-    for cpb in cand_posn_blds.iter_mut() {
-        columns.push(Arc::new(cpb.finish()) as arrow_array::ArrayRef);
-    }
-    columns.push(Arc::new(cov_bld.finish()) as arrow_array::ArrayRef);
-    columns.push(Arc::new(smith_candidates_bld.finish()) as arrow_array::ArrayRef);
-    columns.push(Arc::new(in_smith_set_bld.finish()) as arrow_array::ArrayRef);
-    let mut method_cols = Vec::new();
-    for method in methods.iter_mut() {
-        method_cols.push((
-            Arc::new(Field::new(
-                method.colname(),
-                MethodTracker::data_type(),
-                false,
-            )),
-            method.get_column(),
+        results.push(experiment_result(
+            &sim,
+            &axes,
+            &cov_matrix,
+            &ordered_final_cands,
+            method_results,
         ));
     }
-    columns.push(Arc::new(StructArray::from(method_cols)));
 
-    let mut schema = SchemaBuilder::new();
-    schema.push(Field::new("ideal_cand", DataType::Int32, true));
-    schema.push(Field::new(
-        "cand_regret",
-        DataType::FixedSizeList(
-            Arc::new(Field::new("item", DataType::Float64, true)),
-            sim.ncand as i32,
-        ),
-        true,
-    ));
-    for consid in axes.iter() {
-        schema.push(Field::new(
-            consid.get_name(),
-            DataType::FixedSizeList(
-                Arc::new(Field::new(
-                    "item",
-                    DataType::FixedSizeList(
-                        Arc::new(Field::new("item", DataType::Float64, true)),
-                        consid.get_dim() as i32,
-                    ),
-                    true,
-                )),
-                sim.ncand as i32,
-            ),
-            true,
-        ));
-    }
-    schema.push(Field::new(
-        "cov_matrix",
-        DataType::List(Arc::new(Field::new(
-            "item",
-            DataType::List(Arc::new(Field::new("item", DataType::Float64, true))),
-            true,
-        ))),
-        true,
-    ));
-    schema.push(Field::new("num_smith", DataType::Int32, true));
-    schema.push(Field::new(
-        "in_smith",
-        DataType::FixedSizeList(
-            Arc::new(Field::new("item", DataType::Boolean, true)),
-            sim.ncand as i32,
-        ),
-        true,
-    ));
-
-    //for method in methods.iter() {
-    //    schema.push(method.get_field());
-    //}
-    let mut meth_schema_bld = SchemaBuilder::new();
-    for method in methods.iter() {
-        meth_schema_bld.push(Field::new(
-            method.colname(),
-            MethodTracker::data_type(),
-            false,
-        ));
-    }
-    schema.push(Field::new(
-        "methods",
-        DataType::Struct(meth_schema_bld.finish().fields),
-        false,
-    ));
-    let batch: RecordBatch = RecordBatch::try_new(Arc::new(schema.finish()), columns).unwrap();
-    let sendable_reports: Vec<SendableMethodReport> =
-        methods.iter().map(|m| m.sendable_report()).collect();
+    let method_stats = methods.iter().map(|m| m.sendable_report()).collect();
     task_result_tx
         .send(TaskResult {
-            method_stats: sendable_reports,
-            batch,
+            method_stats,
+            results,
         })
-        .expect("Could not send batch summry");
+        .expect("Could not send batch results");
 
     Ok(())
+}
+
+/// Assemble one trial's [`ExperimentResult`] from the just-run `sim`.
+fn experiment_result(
+    sim: &Sim,
+    axes: &[ConsiderationSimKind],
+    cov_matrix: &CovMatrix,
+    ordered_final_cands: &[usize],
+    methods: BTreeMap<String, MethodResult>,
+) -> ExperimentResult {
+    let by_regret = &sim.cand_by_regret;
+
+    let cand_regret = by_regret.iter().map(|&ic| sim.regrets[ic]).collect();
+    let in_smith = by_regret.iter().map(|&ic| sim.in_smith_set[ic]).collect();
+
+    // Lower-triangular covariance, reindexed into increasing-regret order.
+    let cov = (0..sim.ncand)
+        .map(|ix| {
+            (0..=ix)
+                .map(|iy| cov_matrix.elements[(by_regret[ix], by_regret[iy])])
+                .collect()
+        })
+        .collect();
+
+    let mut likability = None;
+    let mut issues = None;
+    for consid in axes {
+        match consid.get_name().as_str() {
+            "likability" => {
+                likability = Some(
+                    collect_positions(consid, ordered_final_cands)
+                        .into_iter()
+                        .map(|coords| coords[0])
+                        .collect(),
+                );
+            }
+            "issues" => issues = Some(collect_positions(consid, ordered_final_cands)),
+            _ => {}
+        }
+    }
+
+    ExperimentResult {
+        ideal_cand: 0,
+        cand_regret,
+        likability,
+        issues,
+        cov_matrix: cov,
+        num_smith: sim.smith_set_size() as u32,
+        in_smith,
+        methods,
+    }
+}
+
+/// Collect a consideration's candidate positions as `ncand` rows of `dim`
+/// coordinates, in `order`. NaN sentinels (used by considerations without a
+/// spatial position) are passed through unchanged.
+fn collect_positions(consid: &ConsiderationSimKind, order: &[usize]) -> Vec<Vec<f64>> {
+    let mut rows: Vec<Vec<f64>> = Vec::new();
+    let mut current: Vec<f64> = Vec::new();
+    consid.push_posn_elements(
+        &mut |x, end_of_row| {
+            current.push(x);
+            if end_of_row {
+                rows.push(std::mem::take(&mut current));
+            }
+        },
+        order,
+    );
+    rows
 }
 
 fn get_writer(
