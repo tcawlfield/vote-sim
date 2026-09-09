@@ -81,7 +81,10 @@ pub fn run_sims(
     let mut all_results: Vec<ExperimentResult> = Vec::with_capacity(trials);
     let mut summaries: Option<Vec<SendableMethodReport>> = None;
     while let Ok(task_result) = task_result_rx.recv() {
-        log::info!(
+        if task_result.results.is_empty() {
+            continue;
+        }
+        log::debug!(
             "Completed a batch of {} elections",
             task_result.results.len()
         );
