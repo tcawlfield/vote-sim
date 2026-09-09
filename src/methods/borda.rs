@@ -102,7 +102,7 @@ impl MethodSim for BordaSim {
                 }
             }
         }
-        log::info!("Borda tallies are: {:?}", self.tallies);
+        log::debug!("Borda tallies are: {:?}", self.tallies);
         tally_votes(&self.tallies)
     }
 

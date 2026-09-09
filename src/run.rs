@@ -84,7 +84,7 @@ pub fn run_sims(
         if task_result.results.is_empty() {
             continue;
         }
-        log::debug!(
+        log::info!(
             "Completed a batch of {} elections",
             task_result.results.len()
         );
