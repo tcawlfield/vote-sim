@@ -14,14 +14,8 @@ a little strained in the context of this code.
 
 ## To-Do
 
-* Cargo clippy needs to be happy
-* Apply "no raw loops" principles as much as I can
-* Rename candidate -> choice (citizen -> voter is done)
 * Clean up Issues
-  * Horizon feels problematic -- no slope beyond it. Substitute with Gaussian as
-    an option. Does this imply re-structuring? Probably yes, because of the way
-    multiple dimensions add.
-* New consideration, IssueFactions
+* New consideration, Factions
 * Strategic voting improvements
   * Allow a fraction of the population to be strategic
   * Allow a political faction to be more strategic than another

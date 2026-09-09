@@ -1,3 +1,6 @@
+// © Copyright 2025 Topher Cawlfield
+// SPDX-License-Identifier: Apache-2.0
+
 //! Plain-data structs for the per-trial output of the simulation.
 //!
 //! The simulation loop fills a `Vec<ExperimentResult>` (one entry per election
@@ -26,6 +29,9 @@ pub struct ExperimentResult {
     /// Candidate positions in issue space in the same order, when the config has
     /// an Issues consideration (`ncand` rows of `dim` coordinates).
     pub issues: Option<Vec<Vec<f64>>>,
+    /// Candidate positions in faction space in the same order, when the config
+    /// has a Factions consideration (`ncand` rows of `dim` coordinates).
+    pub factions: Option<Vec<Vec<f64>>>,
     /// Lower-triangular candidate/candidate utility covariance, reordered by
     /// increasing regret (row `i` has `i + 1` entries).
     pub cov_matrix: Vec<Vec<f64>>,
@@ -63,10 +69,12 @@ impl ExperimentResult {
             "cannot derive a schema from zero results"
         );
         let ncand = results[0].cand_regret.len();
-        let issue_dim = results
-            .iter()
-            .find_map(|r| r.issues.as_deref())
-            .map(|rows| rows.first().map_or(0, Vec::len));
+        let positions_dim = |pick: fn(&ExperimentResult) -> Option<&Vec<Vec<f64>>>| {
+            results
+                .iter()
+                .find_map(pick)
+                .map(|rows| rows.first().map_or(0, Vec::len))
+        };
 
         let mut fixed = vec![
             fixed_list("cand_regret", "F64", ncand, false),
@@ -76,8 +84,11 @@ impl ExperimentResult {
         if results[0].likability.is_some() {
             fixed.push(fixed_list("likability", "F64", ncand, true));
         }
-        if let Some(dim) = issue_dim {
-            fixed.push(issues_field("issues", ncand, dim));
+        if let Some(dim) = positions_dim(|r| r.issues.as_ref()) {
+            fixed.push(positions_field("issues", ncand, dim));
+        }
+        if let Some(dim) = positions_dim(|r| r.factions.as_ref()) {
+            fixed.push(positions_field("factions", ncand, dim));
         }
 
         let mut opts = tracing_options();
@@ -128,7 +139,8 @@ fn fixed_list(name: &str, element_type: &str, n: usize, nullable: bool) -> serde
 }
 
 /// `FixedSizeList<FixedSizeList<F64>[dim]>[ncand]`, nullable at the outer level.
-fn issues_field(name: &str, ncand: usize, dim: usize) -> serde_json::Value {
+/// Used for spatial consideration columns (`issues`, `factions`).
+fn positions_field(name: &str, ncand: usize, dim: usize) -> serde_json::Value {
     serde_json::json!({
         "name": name,
         "data_type": format!("FixedSizeList({ncand})"),
@@ -173,6 +185,7 @@ mod tests {
             cand_regret: vec![0.0, 1.0, 2.5],
             likability: Some(vec![0.3, 0.1, 0.2]),
             issues: with_issues.then(|| vec![vec![0.0, 1.0], vec![-1.0, 0.5], vec![2.0, -2.0]]),
+            factions: None,
             cov_matrix: vec![vec![1.0], vec![0.2, 1.5], vec![-0.1, 0.3, 2.0]],
             num_smith,
             in_smith: vec![true, false, false],
@@ -198,6 +211,7 @@ mod tests {
                 "cand_regret",
                 "likability",
                 "issues",
+                "factions",
                 "cov_matrix",
                 "num_smith",
                 "in_smith",

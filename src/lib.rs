@@ -1,3 +1,6 @@
+// © Copyright 2025 Topher Cawlfield
+// SPDX-License-Identifier: Apache-2.0
+
 pub mod config;
 pub mod considerations;
 mod cov_matrix;

@@ -243,6 +243,7 @@ fn experiment_result(
 
     let mut likability = None;
     let mut issues = None;
+    let mut factions = None;
     for consid in axes {
         match consid.get_name().as_str() {
             "likability" => {
@@ -254,6 +255,7 @@ fn experiment_result(
                 );
             }
             "issues" => issues = Some(collect_positions(consid, ordered_final_cands)),
+            "factions" => factions = Some(collect_positions(consid, ordered_final_cands)),
             _ => {}
         }
     }
@@ -263,6 +265,7 @@ fn experiment_result(
         cand_regret,
         likability,
         issues,
+        factions,
         cov_matrix: cov,
         num_smith: sim.smith_set_size() as u32,
         in_smith,
@@ -471,6 +474,7 @@ mod tests {
                 "cand_regret",
                 "likability",
                 "issues",
+                "factions",
                 "cov_matrix",
                 "num_smith",
                 "in_smith",

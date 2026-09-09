@@ -6,10 +6,12 @@ use ndarray::Array2;
 use rand::Rng;
 use std::fmt;
 
+mod factions;
 mod irrational;
 mod issues;
 mod likability;
 
+pub use factions::{DistanceFunction, Faction, Factions, FactionsSim};
 pub use irrational::{Irrational, IrrationalSim};
 pub use issues::{Issue, IssuesSim, new_issues_sim};
 pub use likability::{Likability, LikabilitySim};
@@ -33,6 +35,7 @@ pub enum Consideration {
     Likability(Likability),
     Issues(Vec<Issue>),
     Irrational(Irrational),
+    Factions(Factions),
 }
 
 impl Consideration {
@@ -43,6 +46,7 @@ impl Consideration {
                 ConsiderationSimKind::Issues(new_issues_sim(issues.clone(), sim))
             }
             Consideration::Irrational(c) => ConsiderationSimKind::Irrational(c.new_sim(sim)),
+            Consideration::Factions(c) => ConsiderationSimKind::Factions(c.new_sim(sim)),
         }
     }
 }
@@ -55,6 +59,7 @@ pub enum ConsiderationSimKind {
     Likability(LikabilitySim),
     Issues(IssuesSim),
     Irrational(IrrationalSim),
+    Factions(FactionsSim),
 }
 
 macro_rules! dispatch {
@@ -63,6 +68,7 @@ macro_rules! dispatch {
             ConsiderationSimKind::Likability($inner) => $call,
             ConsiderationSimKind::Issues($inner) => $call,
             ConsiderationSimKind::Irrational($inner) => $call,
+            ConsiderationSimKind::Factions($inner) => $call,
         }
     };
 }
