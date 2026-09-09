@@ -53,6 +53,7 @@ impl Sim {
         }
         self.compute_regrets();
         self.rank_candidates();
+        self.find_smith_set();
     }
 
     fn get_scores<R: Rng + ?Sized>(&mut self, axes: &mut [ConsiderationSimKind], rng: &mut R) {
