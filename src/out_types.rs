@@ -31,7 +31,7 @@ pub struct ExperimentResult {
     pub issues: Option<Vec<Vec<f64>>>,
     /// Candidate positions in faction space in the same order, when the config
     /// has a Factions consideration (`ncand` rows of `dim` coordinates).
-    pub factions: Option<Vec<Vec<f64>>>,
+    pub factions: Option<FactionInfo>,
     /// Lower-triangular candidate/candidate utility covariance, reordered by
     /// increasing regret (row `i` has `i + 1` entries).
     pub cov_matrix: Vec<Vec<f64>>,
@@ -53,6 +53,17 @@ pub struct MethodResult {
     pub winner: u32,
     /// Regret of the method's winner.
     pub regret: f64,
+}
+
+/// Faction info for candidates
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
+pub struct FactionInfo {
+    /// The faction to which each candidate belongs.
+    pub positions: Vec<Vec<f64>>,
+    pub faction: Vec<u32>,
+    pub universal_likability: Vec<f64>,
+    pub in_group_likability: Vec<f64>,
 }
 
 impl ExperimentResult {

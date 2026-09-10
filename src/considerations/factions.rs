@@ -100,6 +100,12 @@ pub struct FactionsSim {
     cand_positions: Array2<f64>,
     /// Faction index of each candidate.
     cand_factions: Vec<usize>,
+    /// universal likability bonus for each candidate
+    universal_like: Vec<f64>,
+    /// in-group likability bonus for each candidate
+    in_group_like: Vec<f64>,
+    /// Position of some voter in issue space (scratch vector, reused for every voter).
+    vtr_pos: Vec<f64>,
 }
 
 impl Factions {
@@ -150,6 +156,9 @@ impl Factions {
             total_popularity: ttl_popularity,
             cand_positions: Array2::zeros((sim.ncand, self.dimensions)),
             cand_factions: vec![0; sim.ncand],
+            universal_like: vec![0.0f64; sim.ncand],
+            in_group_like: vec![0.0f64; sim.ncand],
+            vtr_pos: vec![0.0f64; self.dimensions],
         }
     }
 }
@@ -164,8 +173,6 @@ impl ConsiderationSim for FactionsSim {
         // Candidates: round-robin from a random starting faction. Each also draws
         // its universal and in-group likability bonuses.
         let start = rng.random_range(0..nfactions);
-        let mut universal_like = vec![0.0f64; ncand];
-        let mut in_group_like = vec![0.0f64; ncand];
         for icand in 0..ncand {
             let ifac = (start + icand) % nfactions;
             self.cand_factions[icand] = ifac;
@@ -176,19 +183,18 @@ impl ConsiderationSim for FactionsSim {
                 let z: f64 = rng.sample(StandardNormal);
                 *pos = c + z * spread;
             }
-            universal_like[icand] = draw_ceiling(rng, faction.universal_likability_ceiling);
-            in_group_like[icand] = draw_ceiling(rng, faction.in_group_likability_ceiling);
+            self.universal_like[icand] = draw_ceiling(rng, faction.universal_likability_ceiling);
+            self.in_group_like[icand] = draw_ceiling(rng, faction.in_group_likability_ceiling);
         }
         log::debug!("faction candidate positions: {:?}", self.cand_positions);
 
         // Voters: each is assigned a faction weighted by popularity, drawn around
         // that faction's center, then scored against every candidate.
-        let mut vtr_pos = vec![0.0f64; self.dims];
         for mut vtr_scores in scores.rows_mut() {
             let r = rng.random_range(0.0..self.total_popularity);
             let vfac = self.popularity_cdf.partition_point(|&c| c <= r);
             let faction = &self.factions[vfac];
-            for (pos, &c) in vtr_pos.iter_mut().zip(&faction.voter_center) {
+            for (pos, &c) in self.vtr_pos.iter_mut().zip(&faction.voter_center) {
                 let z: f64 = rng.sample(StandardNormal);
                 *pos = c + z * faction.voter_spread;
             }
@@ -197,13 +203,13 @@ impl ConsiderationSim for FactionsSim {
                     .cand_positions
                     .row(icand)
                     .iter()
-                    .zip(&vtr_pos)
+                    .zip(&self.vtr_pos)
                     .map(|(&cp, &vp)| (cp - vp).powi(2))
                     .sum();
                 let mut utility = self.distance_scaling.utility(dist_sq);
-                utility += universal_like[icand];
+                utility += self.universal_like[icand];
                 if self.cand_factions[icand] == vfac {
-                    utility += in_group_like[icand];
+                    utility += self.in_group_like[icand];
                 }
                 vtr_scores[icand] += utility;
             }
