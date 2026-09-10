@@ -1,8 +1,6 @@
 // © Copyright 2025 Topher Cawlfield
 // SPDX-License-Identifier: Apache-2.0
 
-use std::arch::x86_64::_MM_EXCEPT_UNDERFLOW;
-
 use super::ConsiderationSim;
 use crate::sim::Sim;
 use ndarray::Array2;
@@ -23,8 +21,8 @@ use rand_distr::StandardNormal;
 pub struct Factions {
     /// Dimensionality of the issue space. Every `*_center` must be this long.
     pub dimensions: usize,
-    /// How a voter/choice distance becomes a perceived utility.
-    pub distance_scaling: DistanceFunction,
+    /// How a voter/candidate distance becomes a perceived utility.
+    pub distance_function: DistanceFunction,
     /// List of the separate factions.
     pub factions: Vec<Faction>,
 }
@@ -77,7 +75,7 @@ pub enum DistanceFunction {
 }
 
 impl DistanceFunction {
-    /// Utility for a given *squared* voter/choice distance.
+    /// Utility for a given *squared* voter/candidate distance.
     fn utility(&self, dist_sq: f64) -> f64 {
         match self {
             DistanceFunction::NegativeEuclidean => -dist_sq.sqrt(),
@@ -126,20 +124,23 @@ impl Factions {
             );
         }
 
-        assert!(
-            self.factions.iter().all(|f| f.popularity > 0.0),
-            "All factions require positive popularity"
-        );
         let popularity_cdf: Vec<f64> = self
             .factions
             .iter()
-            .scan(0.0, |cdf, f| Some(*cdf + f.popularity))
+            .scan(0.0, |cdf, f| {
+                *cdf += f.popularity;
+                Some(*cdf)
+            })
             .collect();
         let ttl_popularity = *popularity_cdf.last().unwrap();
+        assert!(
+            ttl_popularity > 0.0,
+            "Factions needs positive total popularity"
+        );
 
         FactionsSim {
             dims: self.dimensions,
-            distance_scaling: self.distance_scaling.clone(),
+            distance_scaling: self.distance_function.clone(),
             factions: self.factions.clone(),
             popularity_cdf,
             total_popularity: ttl_popularity,
@@ -161,20 +162,20 @@ impl ConsiderationSim for FactionsSim {
         let start = rng.random_range(0..nfactions);
         let mut universal_like = vec![0.0f64; ncand];
         let mut in_group_like = vec![0.0f64; ncand];
-        for ichoice in 0..ncand {
-            let ifac = (start + ichoice) % nfactions;
-            self.cand_factions[ichoice] = ifac;
+        for icand in 0..ncand {
+            let ifac = (start + icand) % nfactions;
+            self.cand_factions[icand] = ifac;
             let faction = &self.factions[ifac];
             let center = faction.candidate_center();
             let spread = faction.candidate_spread();
-            for (pos, &c) in self.cand_positions.row_mut(ichoice).iter_mut().zip(center) {
+            for (pos, &c) in self.cand_positions.row_mut(icand).iter_mut().zip(center) {
                 let z: f64 = rng.sample(StandardNormal);
                 *pos = c + z * spread;
             }
-            universal_like[ichoice] = draw_ceiling(rng, faction.universal_likability_ceiling);
-            in_group_like[ichoice] = draw_ceiling(rng, faction.in_group_likability_ceiling);
+            universal_like[icand] = draw_ceiling(rng, faction.universal_likability_ceiling);
+            in_group_like[icand] = draw_ceiling(rng, faction.in_group_likability_ceiling);
         }
-        log::debug!("faction choice positions: {:?}", self.cand_positions);
+        log::debug!("faction candidate positions: {:?}", self.cand_positions);
 
         // Voters: each is assigned a faction weighted by popularity, drawn around
         // that faction's center, then scored against every candidate.
@@ -187,20 +188,20 @@ impl ConsiderationSim for FactionsSim {
                 let z: f64 = rng.sample(StandardNormal);
                 *pos = c + z * faction.voter_spread;
             }
-            for ichoice in 0..ncand {
+            for icand in 0..ncand {
                 let dist_sq: f64 = self
                     .cand_positions
-                    .row(ichoice)
+                    .row(icand)
                     .iter()
                     .zip(&vtr_pos)
                     .map(|(&cp, &vp)| (cp - vp).powi(2))
                     .sum();
                 let mut utility = self.distance_scaling.utility(dist_sq);
-                utility += universal_like[ichoice];
-                if self.cand_factions[ichoice] == vfac {
-                    utility += in_group_like[ichoice];
+                utility += universal_like[icand];
+                if self.cand_factions[icand] == vfac {
+                    utility += in_group_like[icand];
                 }
-                vtr_scores[ichoice] += utility;
+                vtr_scores[icand] += utility;
             }
         }
     }
@@ -213,8 +214,8 @@ impl ConsiderationSim for FactionsSim {
         "factions".to_string()
     }
 
-    fn push_posn_elements(&self, report: &mut dyn FnMut(f64, bool), final_choices: &[usize]) {
-        for &fc in final_choices {
+    fn push_posn_elements(&self, report: &mut dyn FnMut(f64, bool), final_candidates: &[usize]) {
+        for &fc in final_candidates {
             for d in 0..self.dims {
                 report(self.cand_positions[(fc, d)], d == self.dims - 1);
             }
@@ -277,7 +278,7 @@ mod tests {
     fn new_sim_rejects_no_factions() {
         Factions {
             dimensions: 2,
-            distance_scaling: DistanceFunction::NegativeEuclidean,
+            distance_function: DistanceFunction::NegativeEuclidean,
             factions: vec![],
         }
         .new_sim(&Sim::new(3, 5));
@@ -288,7 +289,7 @@ mod tests {
     fn new_sim_rejects_mismatched_center_length() {
         Factions {
             dimensions: 3,
-            distance_scaling: DistanceFunction::NegativeEuclidean,
+            distance_function: DistanceFunction::NegativeEuclidean,
             factions: vec![faction([0.0, 0.0], 1.0)], // 2 coords, dimensions = 3
         }
         .new_sim(&Sim::new(3, 5));
@@ -299,7 +300,7 @@ mod tests {
     fn new_sim_rejects_zero_total_popularity() {
         Factions {
             dimensions: 2,
-            distance_scaling: DistanceFunction::NegativeEuclidean,
+            distance_function: DistanceFunction::NegativeEuclidean,
             factions: vec![faction([0.0, 0.0], 0.0), faction([1.0, 1.0], 0.0)],
         }
         .new_sim(&Sim::new(3, 5));
@@ -308,10 +309,10 @@ mod tests {
     #[test]
     fn scores_are_negative_distance_when_spreads_and_likability_are_zero() {
         // One faction, voters pinned to the center (spread 0) but candidates
-        // scattered. Every voter should score candidate c at -||choice_pos[c]||.
+        // scattered. Every voter should score candidate c at -||candidate_pos[c]||.
         let params = Factions {
             dimensions: 2,
-            distance_scaling: DistanceFunction::NegativeEuclidean,
+            distance_function: DistanceFunction::NegativeEuclidean,
             factions: vec![Faction {
                 voter_spread: 0.0,
                 candidate_spread: Some(3.0),
@@ -322,26 +323,26 @@ mod tests {
         let mut scores = Array2::zeros((6, 4));
         sim.add_to_scores(&mut scores, &mut StdRng::seed_from_u64(1));
 
-        for ichoice in 0..4 {
+        for icand in 0..4 {
             let (x, y) = (
-                sim.cand_positions[(ichoice, 0)],
-                sim.cand_positions[(ichoice, 1)],
+                sim.cand_positions[(icand, 0)],
+                sim.cand_positions[(icand, 1)],
             );
             let expected = -(x * x + y * y).sqrt();
             for ivtr in 0..6 {
-                assert_abs_diff_eq!(scores[(ivtr, ichoice)], expected, epsilon = 1e-12);
+                assert_abs_diff_eq!(scores[(ivtr, icand)], expected, epsilon = 1e-12);
             }
         }
     }
 
     #[test]
-    fn in_group_likability_only_benefits_own_faction_choices() {
+    fn in_group_likability_only_benefits_own_faction_candidates() {
         // Both factions share a center (distance contributes nothing) and all
         // spreads are 0, so the only signal is in-group likability. Popularity
         // [1, 0] puts every voter in faction 0.
         let params = Factions {
             dimensions: 2,
-            distance_scaling: DistanceFunction::NegativeEuclidean,
+            distance_function: DistanceFunction::NegativeEuclidean,
             factions: vec![
                 Faction {
                     in_group_likability_ceiling: 5.0,
@@ -357,14 +358,14 @@ mod tests {
         let mut scores = Array2::zeros((8, 4));
         sim.add_to_scores(&mut scores, &mut StdRng::seed_from_u64(7));
 
-        for ichoice in 0..4 {
-            let in_faction_0 = sim.cand_factions[ichoice] == 0;
+        for icand in 0..4 {
+            let in_faction_0 = sim.cand_factions[icand] == 0;
             for ivtr in 0..8 {
-                let s = scores[(ivtr, ichoice)];
+                let s = scores[(ivtr, icand)];
                 if in_faction_0 {
-                    assert!((0.0..=5.0).contains(&s), "faction-0 choice score {s}");
+                    assert!((0.0..=5.0).contains(&s), "faction-0 candidate score {s}");
                 } else {
-                    assert_eq!(s, 0.0, "other-faction choice score");
+                    assert_eq!(s, 0.0, "other-faction candidate score");
                 }
             }
         }
@@ -376,7 +377,7 @@ mod tests {
     fn seeded_rng_makes_scores_reproducible() {
         let params = Factions {
             dimensions: 2,
-            distance_scaling: DistanceFunction::QGaussian2(0.5),
+            distance_function: DistanceFunction::QGaussian2(0.5),
             factions: vec![
                 Faction {
                     voter_spread: 1.0,
