@@ -22,6 +22,7 @@ pub struct Factions {
     /// Dimensionality of the issue space. Every `*_center` must be this long.
     pub dimensions: usize,
     /// How a voter/candidate distance becomes a perceived utility.
+    #[serde(default)]
     pub distance_function: DistanceFunction,
     /// List of the separate factions.
     pub factions: Vec<Faction>,
@@ -64,13 +65,16 @@ impl Faction {
 }
 
 /// Scaling function for the distance between a voter and candidate in the issue space.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default, PartialEq)]
 pub enum DistanceFunction {
     /// Perceived utility is the negative of the Euclidean distance between the voter and
     /// candidate in the issue space.
+    #[default]
+    #[serde(alias = "negative_euclidean")]
     NegativeEuclidean,
     /// Perceived utility is 1/(1 + sigma x^2) where x is the Euclidean distance between the voter
     /// and candidate in the issue space.
+    #[serde(alias = "q_gaussian_2")]
     QGaussian2(f64),
 }
 

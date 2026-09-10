@@ -32,9 +32,13 @@ pub trait ConsiderationSim: fmt::Debug {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub enum Consideration {
+    #[serde(alias = "likability")]
     Likability(Likability),
+    #[serde(alias = "issues")]
     Issues(Vec<Issue>),
+    #[serde(alias = "irrational")]
     Irrational(Irrational),
+    #[serde(alias = "factions")]
     Factions(Factions),
 }
 
@@ -88,5 +92,45 @@ impl ConsiderationSim for ConsiderationSimKind {
 
     fn push_posn_elements(&self, report: &mut dyn FnMut(f64, bool), final_candidates: &[usize]) {
         dispatch!(self, c => c.push_posn_elements(report, final_candidates))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn factions_from_json() {
+        let json = r#"
+        {
+            "factions": {
+                "dimensions": 2,
+                "distance_function": {"q_gaussian_2": 1.5},
+                "factions": [
+                    {
+                        "popularity": 0.6,
+                        "voter_center": [0.0, 0.0],
+                        "voter_spread": 0.5
+                    },
+                    {
+                        "popularity": 0.4,
+                        "voter_center": [1.0, 2.0],
+                        "voter_spread": 0.5
+                    }
+                ]
+            }
+        }
+        "#;
+
+        let consid: Consideration = serde_json::from_str(json).unwrap();
+        if let Consideration::Factions(factions) = consid {
+            assert_eq!(factions.factions.len(), 2);
+            assert_eq!(factions.dimensions, 2);
+            assert_eq!(
+                factions.distance_function,
+                DistanceFunction::QGaussian2(1.5)
+            );
+        } else {
+            panic!("Expected Factions consideration");
+        }
     }
 }
