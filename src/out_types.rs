@@ -13,6 +13,7 @@ use std::sync::Arc;
 use arrow_array::RecordBatch;
 use arrow_schema::{FieldRef, Schema};
 use serde_arrow::schema::{SchemaLike, TracingOptions};
+use serde_json::json;
 
 /// This type defines a row of our Parquet output, one per trial.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -62,7 +63,6 @@ pub struct FactionInfo {
     /// The faction to which each candidate belongs.
     pub positions: Vec<Vec<f64>>,
     pub faction: Vec<u32>,
-    pub universal_likability: Vec<f64>,
     pub in_group_likability: Vec<f64>,
 }
 
@@ -90,6 +90,8 @@ impl ExperimentResult {
         let mut fixed = vec![
             fixed_list("cand_regret", "F64", ncand, false),
             fixed_list("in_smith", "Bool", ncand, false),
+            fixed_list("factions.faction", "U32", ncand, false),
+            fixed_list("factions.in_group_likability", "F64", ncand, false),
             cov_matrix_field("cov_matrix", ncand),
         ];
         if results[0].likability.is_some() {
@@ -98,16 +100,20 @@ impl ExperimentResult {
         if let Some(dim) = positions_dim(|r| r.issues.as_ref()) {
             fixed.push(positions_field("issues", ncand, dim));
         }
-        if let Some(dim) = positions_dim(|r| r.factions.as_ref()) {
-            fixed.push(positions_field("factions", ncand, dim));
+        if let Some(dim) = positions_dim(|r| r.factions.as_ref().map(|fact| &fact.positions)) {
+            fixed.push(positions_field("factions.positions", ncand, dim));
         }
 
         let mut opts = tracing_options();
-        for field in fixed {
+        for mut field in fixed {
             let name = field["name"]
                 .as_str()
                 .expect("overwrite has a name")
                 .to_owned();
+            let name_final = name.split('.').next_back().unwrap();
+            if name_final != name {
+                *field.get_mut("name").unwrap() = json!(name_final);
+            }
             opts = opts.overwrite(name, field).expect("valid schema overwrite");
         }
 
@@ -136,12 +142,12 @@ fn tracing_options() -> TracingOptions {
 }
 
 fn f64_element() -> serde_json::Value {
-    serde_json::json!({"name": "element", "data_type": "F64", "nullable": false})
+    json!({"name": "element", "data_type": "F64", "nullable": false})
 }
 
 /// `FixedSizeList<T>[n]` for a primitive element type (`"F64"`, `"Bool"`, ...).
 fn fixed_list(name: &str, element_type: &str, n: usize, nullable: bool) -> serde_json::Value {
-    serde_json::json!({
+    json!({
         "name": name,
         "data_type": format!("FixedSizeList({n})"),
         "nullable": nullable,
@@ -152,7 +158,7 @@ fn fixed_list(name: &str, element_type: &str, n: usize, nullable: bool) -> serde
 /// `FixedSizeList<FixedSizeList<F64>[dim]>[ncand]`, nullable at the outer level.
 /// Used for spatial consideration columns (`issues`, `factions`).
 fn positions_field(name: &str, ncand: usize, dim: usize) -> serde_json::Value {
-    serde_json::json!({
+    json!({
         "name": name,
         "data_type": format!("FixedSizeList({ncand})"),
         "nullable": true,
@@ -167,7 +173,7 @@ fn positions_field(name: &str, ncand: usize, dim: usize) -> serde_json::Value {
 
 /// `FixedSizeList<List<F64>>[ncand]` -- outer fixed, inner ragged (triangular).
 fn cov_matrix_field(name: &str, ncand: usize) -> serde_json::Value {
-    serde_json::json!({
+    json!({
         "name": name,
         "data_type": format!("FixedSizeList({ncand})"),
         "nullable": false,

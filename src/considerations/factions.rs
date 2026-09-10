@@ -2,21 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::ConsiderationSim;
-use crate::sim::Sim;
+use crate::{out_types::FactionInfo, sim::Sim};
 use ndarray::Array2;
 use rand::{Rng, RngExt as _};
 use rand_distr::StandardNormal;
 
-/// A Factions consideration is an N-dimensional issue space (utilities fall off
-/// with the Euclidean distance between a voter and a candidate), but instead of
-/// defining each axis separately, the config lists factions -- each a cluster of
-/// voters and candidates.
+/// A Factions consideration is an N-dimensional issue space (utilities fall off with the Euclidean
+/// distance between a voter and a candidate), but instead of defining each axis separately, the
+/// config lists factions -- each a cluster of voters and candidates.
 ///
-/// Each candidate belongs to exactly one faction and carries two utility
-/// bonuses: `universal_likability_ceiling` (added to every voter's utility for
-/// that candidate) and `in_group_likability_ceiling` (added on top, only for
-/// voters in the candidate's own faction). Both are drawn `U(0, ceiling)` once
-/// per candidate.
+/// Each candidate belongs to exactly one faction and carries a special utility bonus:
+/// `in_group_likability_ceiling` (added on top, only for voters in the candidate's own faction)
+/// drawn `U(0, ceiling)` once per candidate.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Factions {
     /// Dimensionality of the issue space. Every `*_center` must be this long.
@@ -43,9 +40,6 @@ pub struct Faction {
     /// Scatter of candidates around their center. Defaults to `voter_spread`.
     #[serde(default)]
     pub candidate_spread: Option<f64>,
-    /// Upper bound of the per-candidate likability bonus every voter sees.
-    #[serde(default)]
-    pub universal_likability_ceiling: f64,
     /// Upper bound of the extra per-candidate likability bonus that only voters
     /// in the candidate's own faction see (added on top of the universal one).
     #[serde(default)]
@@ -100,8 +94,6 @@ pub struct FactionsSim {
     cand_positions: Array2<f64>,
     /// Faction index of each candidate.
     cand_factions: Vec<usize>,
-    /// universal likability bonus for each candidate
-    universal_like: Vec<f64>,
     /// in-group likability bonus for each candidate
     in_group_like: Vec<f64>,
     /// Position of some voter in issue space (scratch vector, reused for every voter).
@@ -156,7 +148,6 @@ impl Factions {
             total_popularity: ttl_popularity,
             cand_positions: Array2::zeros((sim.ncand, self.dimensions)),
             cand_factions: vec![0; sim.ncand],
-            universal_like: vec![0.0f64; sim.ncand],
             in_group_like: vec![0.0f64; sim.ncand],
             vtr_pos: vec![0.0f64; self.dimensions],
         }
@@ -171,7 +162,7 @@ impl ConsiderationSim for FactionsSim {
         let nfactions = self.factions.len();
 
         // Candidates: round-robin from a random starting faction. Each also draws
-        // its universal and in-group likability bonuses.
+        // its in-group likability bonuses.
         let start = rng.random_range(0..nfactions);
         for icand in 0..ncand {
             let ifac = (start + icand) % nfactions;
@@ -183,7 +174,6 @@ impl ConsiderationSim for FactionsSim {
                 let z: f64 = rng.sample(StandardNormal);
                 *pos = c + z * spread;
             }
-            self.universal_like[icand] = draw_ceiling(rng, faction.universal_likability_ceiling);
             self.in_group_like[icand] = draw_ceiling(rng, faction.in_group_likability_ceiling);
         }
         log::debug!("faction candidate positions: {:?}", self.cand_positions);
@@ -207,7 +197,6 @@ impl ConsiderationSim for FactionsSim {
                     .map(|(&cp, &vp)| (cp - vp).powi(2))
                     .sum();
                 let mut utility = self.distance_scaling.utility(dist_sq);
-                utility += self.universal_like[icand];
                 if self.cand_factions[icand] == vfac {
                     utility += self.in_group_like[icand];
                 }
@@ -230,6 +219,25 @@ impl ConsiderationSim for FactionsSim {
                 report(self.cand_positions[(fc, d)], d == self.dims - 1);
             }
         }
+    }
+}
+
+impl FactionsSim {
+    pub fn make_faction_info(
+        &self,
+        premade_positions: Vec<Vec<f64>>,
+        final_candidates: &[usize],
+    ) -> FactionInfo {
+        let mut fi = FactionInfo {
+            positions: premade_positions,
+            faction: Vec::with_capacity(final_candidates.len()),
+            in_group_likability: Vec::with_capacity(final_candidates.len()),
+        };
+        for &fc in final_candidates {
+            fi.faction.push(self.cand_factions[fc] as u32);
+            fi.in_group_likability.push(self.in_group_like[fc]);
+        }
+        fi
     }
 }
 
@@ -256,7 +264,6 @@ mod tests {
             candidate_center: None,
             voter_spread: 0.0,
             candidate_spread: None,
-            universal_likability_ceiling: 0.0,
             in_group_likability_ceiling: 0.0,
         }
     }
@@ -391,7 +398,6 @@ mod tests {
             factions: vec![
                 Faction {
                     voter_spread: 1.0,
-                    universal_likability_ceiling: 0.5,
                     in_group_likability_ceiling: 1.0,
                     ..faction([0.0, 0.0], 3.0)
                 },
