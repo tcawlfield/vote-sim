@@ -1,3 +1,6 @@
+# © Copyright 2026 Topher Cawlfield
+# SPDX-License-Identifier: Apache-2.0
+
 import re
 import os
 import csv
