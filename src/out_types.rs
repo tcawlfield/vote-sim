@@ -90,8 +90,6 @@ impl ExperimentResult {
         let mut fixed = vec![
             fixed_list("cand_regret", "F64", ncand, false),
             fixed_list("in_smith", "Bool", ncand, false),
-            fixed_list("factions.faction", "U32", ncand, false),
-            fixed_list("factions.in_group_likability", "F64", ncand, false),
             cov_matrix_field("cov_matrix", ncand),
         ];
         if results[0].likability.is_some() {
@@ -102,6 +100,13 @@ impl ExperimentResult {
         }
         if let Some(dim) = positions_dim(|r| r.factions.as_ref().map(|fact| &fact.positions)) {
             fixed.push(positions_field("factions.positions", ncand, dim));
+            fixed.push(fixed_list("factions.faction", "U32", ncand, false));
+            fixed.push(fixed_list(
+                "factions.in_group_likability",
+                "F64",
+                ncand,
+                false,
+            ));
         }
 
         let mut opts = tracing_options();
