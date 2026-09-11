@@ -77,7 +77,7 @@ impl DistanceFunction {
     fn utility(&self, dist_sq: f64) -> f64 {
         match self {
             DistanceFunction::NegativeEuclidean => -dist_sq.sqrt(),
-            DistanceFunction::QGaussian2(sigma) => 1.0 / (1.0 + sigma * dist_sq),
+            DistanceFunction::QGaussian2(sigma) => 1.0 / (1.0 + dist_sq / (sigma * sigma)),
         }
     }
 }
@@ -158,7 +158,7 @@ impl ConsiderationSim for FactionsSim {
     // See the note on IssuesSim::add_to_scores: out of line on purpose.
     #[inline(never)]
     fn add_to_scores<R: Rng + ?Sized>(&mut self, scores: &mut Array2<f64>, rng: &mut R) {
-        let (_nvtr, ncand) = scores.dim();
+        let (nvtr, ncand) = scores.dim();
         let nfactions = self.factions.len();
 
         // Candidates: round-robin from a random starting faction. Each also draws
@@ -176,7 +176,8 @@ impl ConsiderationSim for FactionsSim {
             }
             self.in_group_like[icand] = draw_ceiling(rng, faction.in_group_likability_ceiling);
         }
-        log::debug!("faction candidate positions: {:?}", self.cand_positions);
+        log::debug!("candidate faction numbers: {:?}", self.cand_factions);
+        log::debug!("faction candidate positions:\n{}", self.cand_positions);
 
         // Voters: each is assigned a faction weighted by popularity, drawn around
         // that faction's center, then scored against every candidate.
@@ -187,6 +188,9 @@ impl ConsiderationSim for FactionsSim {
             for (pos, &c) in self.vtr_pos.iter_mut().zip(&faction.voter_center) {
                 let z: f64 = rng.sample(StandardNormal);
                 *pos = c + z * faction.voter_spread;
+            }
+            if nvtr < 50 {
+                log::debug!("Candiate faction={} pos={:?}", vfac, self.vtr_pos);
             }
             for icand in 0..ncand {
                 let dist_sq: f64 = self

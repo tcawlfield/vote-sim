@@ -181,7 +181,7 @@ fn run_batch(
         };
 
         cov_matrix.compute(&sim.scores);
-        log::debug!("Cov matrix: {}", cov_matrix.elements);
+        log::debug!("Cov matrix:\n{}", cov_matrix.elements);
 
         let mut method_results: BTreeMap<String, MethodResult> = BTreeMap::new();
         let mut prev_rslt = None;

@@ -1,32 +1,37 @@
 voters = 1001
 candidates = 4
 
-[[considerations]]
-likability = { mean = 0.1 }
+# [[considerations]]
+# likability = { mean = 0.1 }
 
 [[considerations]]
 [considerations.factions]
 dimensions = 2
 distance_function = { "q_gaussian_2" = 1.0 }
-[[considerations.factions.factions]]
-popularity = 1.0
-voter_center = [-1.0, 0.5]
-voter_spread = 0.6
 
 [[considerations.factions.factions]]
-popularity = 0.9
-voter_center = [1.0, 0.5]
-voter_spread = 0.6
+popularity = 0.8
+voter_center = [-1.0, 0.4]
+voter_spread = 0.3
+candidate_spread = 0.1
 
 [[considerations.factions.factions]]
-popularity = 0.25
-voter_center = [-1.0, -0.5]
-voter_spread = 0.4
+popularity = 0.85
+voter_center = [1.0, 0.4]
+voter_spread = 0.3
+candidate_spread = 0.1
 
 [[considerations.factions.factions]]
-popularity = 0.1
-voter_center = [1.0, -0.5]
-voter_spread = 0.4
+popularity = 0.2
+voter_center = [-1.0, -0.4]
+voter_spread = 0.3
+candidate_spread = 0.1
+
+[[considerations.factions.factions]]
+popularity = 0.05
+voter_center = [1.3, -0.4]
+voter_spread = 0.3
+candidate_spread = 0.1
 
 
 [[methods]]

@@ -61,7 +61,7 @@ impl Sim {
         for ax in axes.iter_mut() {
             ax.add_to_scores(&mut self.scores, rng);
         }
-        log::debug!("Voter utilities:\n{:?}", self.scores);
+        log::debug!("Voter utilities:\n{}", self.scores);
     }
 
     // Side-effects: compute self.regrets and self.cand_by_regret
@@ -88,12 +88,13 @@ impl Sim {
         for (irr, &icand) in self.cand_by_regret.iter().enumerate() {
             self.regret_rank[icand] = irr;
         }
+        log::debug!("Regrets: {:?}", self.regrets);
+        log::debug!("Regret ranks: {:?}", self.regret_rank);
     }
 
     /// rank_candidates uses the score table to fix the table of
     /// candidate rankings (Sim.ranks), and also fills in the i_beats_j_by matrix.
     pub fn rank_candidates(&mut self) {
-        // for i in 0..self.nvtr {
         self.i_beats_j_by.fill(0);
         for (ivtr, vtr_scores) in self.scores.axis_iter(Axis(0)).enumerate() {
             self.scratch_ranks
@@ -125,6 +126,7 @@ impl Sim {
     /// Requires rank_candidates to have been called.
     pub fn find_smith_set(&mut self) {
         mark_smith_candidates(self);
+        log::debug!("In smith set? {:?}", self.in_smith_set);
     }
 
     /// Returns the size of the Smith set.
