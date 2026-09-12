@@ -75,3 +75,7 @@ strategic_stretch_factor = 2.0
 [[methods]]
 [methods.RP]
 strat = "Honest"
+
+[[methods]]
+[methods.MM]
+strat = "Honest"
