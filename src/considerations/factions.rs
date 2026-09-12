@@ -276,8 +276,8 @@ mod tests {
     fn distance_function_utilities() {
         // NegativeEuclidean takes the sqrt of the squared distance.
         assert_eq!(DistanceFunction::NegativeEuclidean.utility(9.0), -3.0);
-        // QGaussian2: 1 / (1 + sigma * dist_sq)
-        assert_eq!(DistanceFunction::QGaussian2(0.0).utility(100.0), 1.0);
+        // QGaussian2: 1 / (1 + dist_sq / sigma^2))
+        assert_eq!(DistanceFunction::QGaussian2(10.0).utility(100.0), 0.5);
         assert_eq!(DistanceFunction::QGaussian2(1.0).utility(3.0), 0.25);
     }
 
