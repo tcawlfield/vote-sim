@@ -66,7 +66,7 @@ pub enum DistanceFunction {
     #[default]
     #[serde(alias = "negative_euclidean")]
     NegativeEuclidean,
-    /// Perceived utility is 1/(1 + sigma x^2) where x is the Euclidean distance between the voter
+    /// Perceived utility is 1/(1 + x^2 / sigma^2) where x is the Euclidean distance between the voter
     /// and candidate in the issue space.
     #[serde(alias = "q_gaussian_2")]
     QGaussian2(f64),
@@ -190,7 +190,7 @@ impl ConsiderationSim for ElectorateSim {
                 *pos = c + z * faction.voter_spread;
             }
             if nvtr < 50 {
-                log::debug!("Candiate faction={} pos={:?}", vfac, self.vtr_pos);
+                log::debug!("Voter faction={} pos={:?}", vfac, self.vtr_pos);
             }
             for icand in 0..ncand {
                 let dist_sq: f64 = self
@@ -214,7 +214,7 @@ impl ConsiderationSim for ElectorateSim {
     }
 
     fn get_name(&self) -> String {
-        "factions".to_string()
+        "electorate".to_string()
     }
 
     fn push_posn_elements(&self, report: &mut dyn FnMut(f64, bool), final_candidates: &[usize]) {

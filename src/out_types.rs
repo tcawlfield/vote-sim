@@ -60,9 +60,11 @@ pub struct MethodResult {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub struct ElectorateInfo {
-    /// The faction to which each candidate belongs.
+    /// The positions of each candidate in the electorate's issue space.
     pub positions: Vec<Vec<f64>>,
+    /// The faction to which each candidate belongs.
     pub faction: Vec<u32>,
+    /// The likability of each candidate within their faction.
     pub in_group_likability: Vec<f64>,
 }
 
@@ -218,6 +220,17 @@ mod tests {
         }
     }
 
+    fn sample_with_electorate(num_smith: u32) -> ExperimentResult {
+        ExperimentResult {
+            electorate: Some(ElectorateInfo {
+                positions: vec![vec![0.1, 0.2], vec![-0.3, 0.4], vec![1.0, -1.0]],
+                faction: vec![0, 1, 0],
+                in_group_likability: vec![0.5, 0.0, 0.25],
+            }),
+            ..sample(num_smith, true)
+        }
+    }
+
     #[test]
     fn to_record_batch_has_a_column_per_field_and_a_row_per_result() {
         let results = [sample(1, true), sample(3, true)];
@@ -304,12 +317,77 @@ mod tests {
 
     #[test]
     fn absent_consideration_still_produces_a_readable_column() {
-        // No result carries `issues`; the column must still exist, one entry per
-        // row, and hold no data (serde_arrow traces it as the Null type).
+        // No result carries `issues` or `electorate`; both columns must still
+        // exist, one entry per row, and hold no data (serde_arrow traces them
+        // as the Null type).
         let results = [sample(1, false), sample(2, false)];
         let batch = ExperimentResult::to_record_batch(&results);
-        let issues = batch.column_by_name("issues").unwrap();
-        assert_eq!(issues.len(), 2);
-        assert_eq!(issues.data_type(), &arrow_schema::DataType::Null);
+        for name in ["issues", "electorate"] {
+            let column = batch.column_by_name(name).unwrap();
+            assert_eq!(column.len(), 2, "{name}");
+            assert_eq!(column.data_type(), &arrow_schema::DataType::Null, "{name}");
+        }
+    }
+
+    #[test]
+    fn electorate_becomes_a_struct_of_fixed_size_lists() {
+        use arrow_schema::DataType;
+
+        let batch = ExperimentResult::to_record_batch(&[
+            sample_with_electorate(1),
+            sample_with_electorate(2),
+        ]);
+
+        let electorate = batch.column_by_name("electorate").unwrap().as_struct();
+        let field_names: Vec<&str> = electorate
+            .fields()
+            .iter()
+            .map(|f| f.name().as_str())
+            .collect();
+        assert_eq!(field_names, ["positions", "faction", "in_group_likability"]);
+
+        // 3 candidates (from `sample`), positions have 2 coordinates each.
+        match electorate.column_by_name("positions").unwrap().data_type() {
+            DataType::FixedSizeList(inner, 3) => {
+                assert!(matches!(inner.data_type(), DataType::FixedSizeList(_, 2)));
+            }
+            other => panic!("positions: {other:?}"),
+        }
+        assert!(matches!(
+            electorate.column_by_name("faction").unwrap().data_type(),
+            DataType::FixedSizeList(_, 3)
+        ));
+        assert!(matches!(
+            electorate
+                .column_by_name("in_group_likability")
+                .unwrap()
+                .data_type(),
+            DataType::FixedSizeList(_, 3)
+        ));
+
+        // The data still reads back correctly through the fixed layout.
+        let faction = electorate
+            .column_by_name("faction")
+            .unwrap()
+            .as_fixed_size_list();
+        let row0_factions = faction.value(0);
+        assert_eq!(
+            row0_factions
+                .as_primitive::<arrow_array::types::UInt32Type>()
+                .values(),
+            &[0, 1, 0]
+        );
+
+        let positions = electorate
+            .column_by_name("positions")
+            .unwrap()
+            .as_fixed_size_list();
+        let cand1_coords = positions.value(0).as_fixed_size_list().value(1);
+        assert_eq!(
+            cand1_coords
+                .as_primitive::<arrow_array::types::Float64Type>()
+                .values(),
+            &[-0.3, 0.4]
+        );
     }
 }
