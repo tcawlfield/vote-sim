@@ -1,3 +1,6 @@
+// © Copyright 2026 Topher Cawlfield
+// SPDX-License-Identifier: Apache-2.0
+
 //! Plain-data structs for the per-trial output of the simulation.
 //!
 //! The simulation loop fills a `Vec<ExperimentResult>` (one entry per election
@@ -10,6 +13,7 @@ use std::sync::Arc;
 use arrow_array::RecordBatch;
 use arrow_schema::{FieldRef, Schema};
 use serde_arrow::schema::{SchemaLike, TracingOptions};
+use serde_json::json;
 
 /// This type defines a row of our Parquet output, one per trial.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -26,6 +30,9 @@ pub struct ExperimentResult {
     /// Candidate positions in issue space in the same order, when the config has
     /// an Issues consideration (`ncand` rows of `dim` coordinates).
     pub issues: Option<Vec<Vec<f64>>>,
+    /// Candidate positions in faction-issue space in the same order, when the config
+    /// has an electorate consideration (`ncand` rows of `dim` coordinates).
+    pub electorate: Option<ElectorateInfo>,
     /// Lower-triangular candidate/candidate utility covariance, reordered by
     /// increasing regret (row `i` has `i + 1` entries).
     pub cov_matrix: Vec<Vec<f64>>,
@@ -49,6 +56,16 @@ pub struct MethodResult {
     pub regret: f64,
 }
 
+/// Electorate info for candidates
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
+pub struct ElectorateInfo {
+    /// The faction to which each candidate belongs.
+    pub positions: Vec<Vec<f64>>,
+    pub faction: Vec<u32>,
+    pub in_group_likability: Vec<f64>,
+}
+
 impl ExperimentResult {
     /// The Arrow fields for the output columns, inferred from a batch of results.
     ///
@@ -63,10 +80,12 @@ impl ExperimentResult {
             "cannot derive a schema from zero results"
         );
         let ncand = results[0].cand_regret.len();
-        let issue_dim = results
-            .iter()
-            .find_map(|r| r.issues.as_deref())
-            .map(|rows| rows.first().map_or(0, Vec::len));
+        let positions_dim = |pick: fn(&ExperimentResult) -> Option<&Vec<Vec<f64>>>| {
+            results
+                .iter()
+                .find_map(pick)
+                .map(|rows| rows.first().map_or(0, Vec::len))
+        };
 
         let mut fixed = vec![
             fixed_list("cand_regret", "F64", ncand, false),
@@ -76,16 +95,30 @@ impl ExperimentResult {
         if results[0].likability.is_some() {
             fixed.push(fixed_list("likability", "F64", ncand, true));
         }
-        if let Some(dim) = issue_dim {
-            fixed.push(issues_field("issues", ncand, dim));
+        if let Some(dim) = positions_dim(|r| r.issues.as_ref()) {
+            fixed.push(positions_field("issues", ncand, dim));
+        }
+        if let Some(dim) = positions_dim(|r| r.electorate.as_ref().map(|fact| &fact.positions)) {
+            fixed.push(positions_field("electorate.positions", ncand, dim));
+            fixed.push(fixed_list("electorate.faction", "U32", ncand, false));
+            fixed.push(fixed_list(
+                "electorate.in_group_likability",
+                "F64",
+                ncand,
+                false,
+            ));
         }
 
         let mut opts = tracing_options();
-        for field in fixed {
+        for mut field in fixed {
             let name = field["name"]
                 .as_str()
                 .expect("overwrite has a name")
                 .to_owned();
+            let name_final = name.split('.').next_back().unwrap();
+            if name_final != name {
+                *field.get_mut("name").unwrap() = json!(name_final);
+            }
             opts = opts.overwrite(name, field).expect("valid schema overwrite");
         }
 
@@ -114,12 +147,12 @@ fn tracing_options() -> TracingOptions {
 }
 
 fn f64_element() -> serde_json::Value {
-    serde_json::json!({"name": "element", "data_type": "F64", "nullable": false})
+    json!({"name": "element", "data_type": "F64", "nullable": false})
 }
 
 /// `FixedSizeList<T>[n]` for a primitive element type (`"F64"`, `"Bool"`, ...).
 fn fixed_list(name: &str, element_type: &str, n: usize, nullable: bool) -> serde_json::Value {
-    serde_json::json!({
+    json!({
         "name": name,
         "data_type": format!("FixedSizeList({n})"),
         "nullable": nullable,
@@ -128,8 +161,9 @@ fn fixed_list(name: &str, element_type: &str, n: usize, nullable: bool) -> serde
 }
 
 /// `FixedSizeList<FixedSizeList<F64>[dim]>[ncand]`, nullable at the outer level.
-fn issues_field(name: &str, ncand: usize, dim: usize) -> serde_json::Value {
-    serde_json::json!({
+/// Used for spatial consideration columns (`issues`, `electorate`).
+fn positions_field(name: &str, ncand: usize, dim: usize) -> serde_json::Value {
+    json!({
         "name": name,
         "data_type": format!("FixedSizeList({ncand})"),
         "nullable": true,
@@ -144,7 +178,7 @@ fn issues_field(name: &str, ncand: usize, dim: usize) -> serde_json::Value {
 
 /// `FixedSizeList<List<F64>>[ncand]` -- outer fixed, inner ragged (triangular).
 fn cov_matrix_field(name: &str, ncand: usize) -> serde_json::Value {
-    serde_json::json!({
+    json!({
         "name": name,
         "data_type": format!("FixedSizeList({ncand})"),
         "nullable": false,
@@ -173,6 +207,7 @@ mod tests {
             cand_regret: vec![0.0, 1.0, 2.5],
             likability: Some(vec![0.3, 0.1, 0.2]),
             issues: with_issues.then(|| vec![vec![0.0, 1.0], vec![-1.0, 0.5], vec![2.0, -2.0]]),
+            electorate: None,
             cov_matrix: vec![vec![1.0], vec![0.2, 1.5], vec![-0.1, 0.3, 2.0]],
             num_smith,
             in_smith: vec![true, false, false],
@@ -198,6 +233,7 @@ mod tests {
                 "cand_regret",
                 "likability",
                 "issues",
+                "electorate",
                 "cov_matrix",
                 "num_smith",
                 "in_smith",

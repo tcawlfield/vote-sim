@@ -1,14 +1,16 @@
-// © Copyright 2025 Topher Cawlfield
+// © Copyright 2026 Topher Cawlfield
 // SPDX-License-Identifier: Apache-2.0
 
+//! Utilities for handling some Condorcet-criteria methods
+
+use std::fmt;
+
 use crate::sim::Sim;
-use log::*;
-/// Utilities for handling some Condorcet-criteria methods
 use ndarray::Array2;
 
 /// CandPair describes a pair-off for ranked systems: most voters rank the winner higher than the loser.
 /// margin is the difference in votes: winner votes minus loser votes.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct CandPair {
     pub winner: usize,
     pub loser: usize,
@@ -45,14 +47,14 @@ pub fn lock_in(locked_in: &mut Array2<bool>, pair: &CandPair, set: bool) {
 }
 
 pub fn find_locked_in_winner(locked_in: &mut Array2<bool>, sim: &Sim) -> Option<usize> {
-    debug!("locked_in = {:?}", locked_in);
+    log::trace!("locked_in =\n{}", locked_in);
     'candidate: for iwin in 0..sim.ncand {
         let mut really_wins = false;
         let pi1 = (0..iwin).map(|i| (i, iwin, -1));
         let pi2 = (iwin + 1..sim.ncand).map(|j| (iwin, j, 1));
         let pair_iter = pi1.chain(pi2);
         for (i, j, i_is_iwin) in pair_iter {
-            debug!(
+            log::trace!(
                 "iwin={}, i={}, j={}, locked_in? {}, i_beats_j_by={}",
                 iwin,
                 i,
@@ -126,6 +128,12 @@ pub fn mark_smith_candidates(sim: &mut Sim) {
             }
         }
         icand += 1;
+    }
+}
+
+impl fmt::Debug for CandPair {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{{C{}>C{} by {}}}", self.winner, self.loser, self.margin)
     }
 }
 

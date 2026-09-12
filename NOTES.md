@@ -14,15 +14,10 @@ a little strained in the context of this code.
 
 ## To-Do
 
-* Cargo clippy needs to be happy
-* Apply "no raw loops" principles as much as I can
-* Rename candidate -> choice (citizen -> voter is done)
-* Clean up Issues
-  * Horizon feels problematic -- no slope beyond it. Substitute with Gaussian as
-    an option. Does this imply re-structuring? Probably yes, because of the way
-    multiple dimensions add.
-* New consideration, IssueFactions
+* Re-order methods so that honest ones precede strategic
+  * Methods can be non-reporting now, and may be inserted out of necessity
 * Strategic voting improvements
+  * Should I expand the runner-up concept? How?
   * Allow a fraction of the population to be strategic
   * Allow a political faction to be more strategic than another
     * Under different methods, how much are strategic voters wrongly rewarded?

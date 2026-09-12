@@ -1,4 +1,4 @@
-// © Copyright 2025 Topher Cawlfield
+// © Copyright 2026 Topher Cawlfield
 // SPDX-License-Identifier: Apache-2.0
 
 mod borda;

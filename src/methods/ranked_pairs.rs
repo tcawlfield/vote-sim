@@ -1,4 +1,4 @@
-// © Copyright 2025 Topher Cawlfield
+// © Copyright 2026 Topher Cawlfield
 // SPDX-License-Identifier: Apache-2.0
 
 use log::*;
@@ -83,10 +83,10 @@ impl RPSim {
         // Lock in the first two pairs
         if let Some(p) = pair_iter.next() {
             lock_in(&mut self.locked_in, p, true);
-            log::debug!("Locked in {:?}", p);
+            log::trace!("Locked in {:?}", p);
             if let Some(p) = pair_iter.next() {
                 lock_in(&mut self.locked_in, p, true);
-                log::debug!("Locked in {:?}", p);
+                log::trace!("Locked in {:?}", p);
             }
         }
         // Lock in remaining pairs provided they do not create a cycle.
@@ -96,11 +96,11 @@ impl RPSim {
             match find_locked_in_winner(&mut self.locked_in, sim) {
                 Some(w) => {
                     winner = w;
-                    debug!("Locked in {:?} -- current winner is {}", p, w);
+                    log::trace!("Locked in {:?} -- current winner is {}", p, w);
                 }
                 None => {
                     lock_in(&mut self.locked_in, p, false);
-                    debug!("Won't lock in {:?} -- creates Condorcet cycle", p);
+                    log::trace!("Won't lock in {:?} -- creates Condorcet cycle", p);
                 }
             }
         }

@@ -1,0 +1,81 @@
+voters = 1001
+candidates = 4
+
+# [[considerations]]
+# likability = { mean = 0.1 }
+
+[[considerations]]
+[considerations.electorate]
+dimensions = 2
+distance_function = { "q_gaussian_2" = 1.0 }
+
+[[considerations.electorate.factions]]
+popularity = 0.8
+voter_center = [-2.0, 0.8]
+voter_spread = 0.6
+candidate_spread = 0.2
+
+[[considerations.electorate.factions]]
+popularity = 0.85
+voter_center = [2.0, 0.8]
+voter_spread = 0.6
+candidate_spread = 0.2
+
+[[considerations.electorate.factions]]
+popularity = 0.2
+voter_center = [-2.0, -0.8]
+voter_spread = 0.6
+candidate_spread = 0.2
+
+[[considerations.electorate.factions]]
+popularity = 0.05
+voter_center = [2.3, -0.8]
+voter_spread = 0.6
+candidate_spread = 0.2
+
+
+[[methods]]
+Plurality = { strat = "Honest" }
+
+[[methods]]
+Plurality = { strat = "Strategic" }
+
+[[methods]]
+[methods.Range]
+strat = "Honest"
+nranks = 10
+
+[[methods]]
+[methods.Range]
+strat = "Strategic"
+nranks = 10
+
+[[methods]] # Approval voting, honest
+[methods.Range]
+strat = "Honest"
+nranks = 2
+
+[[methods]] # Approval voting, strategic
+[methods.Range]
+strat = "Strategic"
+nranks = 2
+
+[[methods]] # IRV honest
+[methods.InstantRunoff]
+
+[[methods]]
+[methods.STAR]
+strat = "Honest"
+
+[[methods]]
+[methods.STAR]
+strat = "Strategic"
+strategic_stretch_factor = 2.0
+
+[[methods]]
+[methods.RP]
+strat = "Honest"
+
+[[methods]]
+[methods.MM]
+strat = "Honest"

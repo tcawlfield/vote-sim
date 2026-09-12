@@ -1,4 +1,4 @@
-// © Copyright 2025 Topher Cawlfield
+// © Copyright 2026 Topher Cawlfield
 // SPDX-License-Identifier: Apache-2.0
 
 use std::collections::BTreeMap;
@@ -181,7 +181,7 @@ fn run_batch(
         };
 
         cov_matrix.compute(&sim.scores);
-        log::debug!("Cov matrix: {}", cov_matrix.elements);
+        log::debug!("Cov matrix:\n{}", cov_matrix.elements);
 
         let mut method_results: BTreeMap<String, MethodResult> = BTreeMap::new();
         let mut prev_rslt = None;
@@ -190,11 +190,12 @@ fn run_batch(
             if let Strategy::Honest = method.method.strat() {
                 prev_rslt = Some(pairing);
             }
+            // Note here that result.winner is the regret-ranked index of the winner, not the candidate number.
             log::debug!(
                 "Method {:?} found winner {} -- regret {}",
                 method.method.name(),
-                result.winner,
-                result.regret
+                pairing.winner.cand,
+                result.regret,
             );
             method_results.insert(method.colname(), result);
         }
@@ -227,6 +228,7 @@ fn experiment_result(
     ordered_final_cands: &[usize],
     methods: BTreeMap<String, MethodResult>,
 ) -> ExperimentResult {
+    use ConsiderationSimKind::*;
     let by_regret = &sim.cand_by_regret;
 
     let cand_regret = by_regret.iter().map(|&ic| sim.regrets[ic]).collect();
@@ -243,17 +245,24 @@ fn experiment_result(
 
     let mut likability = None;
     let mut issues = None;
+    let mut factions = None;
     for consid in axes {
-        match consid.get_name().as_str() {
-            "likability" => {
+        match consid {
+            Likability(likability_sim) => {
                 likability = Some(
-                    collect_positions(consid, ordered_final_cands)
+                    collect_positions(likability_sim, ordered_final_cands)
                         .into_iter()
                         .map(|coords| coords[0])
                         .collect(),
                 );
             }
-            "issues" => issues = Some(collect_positions(consid, ordered_final_cands)),
+            Issues(issues_sim) => {
+                issues = Some(collect_positions(issues_sim, ordered_final_cands));
+            }
+            Electorate(factions_sim) => {
+                let positions = collect_positions(factions_sim, ordered_final_cands);
+                factions = Some(factions_sim.make_faction_info(positions, ordered_final_cands));
+            }
             _ => {}
         }
     }
@@ -263,6 +272,7 @@ fn experiment_result(
         cand_regret,
         likability,
         issues,
+        electorate: factions,
         cov_matrix: cov,
         num_smith: sim.smith_set_size() as u32,
         in_smith,
@@ -273,14 +283,16 @@ fn experiment_result(
 /// Collect a consideration's candidate positions as `ncand` rows of `dim`
 /// coordinates, in `order`. NaN sentinels (used by considerations without a
 /// spatial position) are passed through unchanged.
-fn collect_positions(consid: &ConsiderationSimKind, order: &[usize]) -> Vec<Vec<f64>> {
-    let mut rows: Vec<Vec<f64>> = Vec::new();
+fn collect_positions<CST: ConsiderationSim>(consid: &CST, order: &[usize]) -> Vec<Vec<f64>> {
+    let mut rows: Vec<Vec<f64>> = Vec::with_capacity(order.len());
     let mut current: Vec<f64> = Vec::new();
     consid.push_posn_elements(
         &mut |x, end_of_row| {
             current.push(x);
             if end_of_row {
-                rows.push(std::mem::take(&mut current));
+                // rows.push(std::mem::take(&mut current));
+                rows.push(current.clone());
+                current.clear(); // Capacity remains sufficient
             }
         },
         order,
@@ -471,6 +483,7 @@ mod tests {
                 "cand_regret",
                 "likability",
                 "issues",
+                "electorate",
                 "cov_matrix",
                 "num_smith",
                 "in_smith",
