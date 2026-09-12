@@ -1,21 +1,21 @@
 // © Copyright 2026 Topher Cawlfield
 // SPDX-License-Identifier: Apache-2.0
 
+//! Defines Electorate and friends
+
 use super::ConsiderationSim;
-use crate::{out_types::FactionInfo, sim::Sim};
+use crate::{out_types::ElectorateInfo, sim::Sim};
 use ndarray::Array2;
 use rand::{Rng, RngExt as _};
 use rand_distr::StandardNormal;
 
-/// A Factions consideration is an N-dimensional issue space (utilities fall off with the Euclidean
-/// distance between a voter and a candidate), but instead of defining each axis separately, the
-/// config lists factions -- each a cluster of voters and candidates.
-///
-/// Each candidate belongs to exactly one faction and carries a special utility bonus:
-/// `in_group_likability_ceiling` (added on top, only for voters in the candidate's own faction)
-/// drawn `U(0, ceiling)` once per candidate.
+/// An Electorate consideration is an N-dimensional issue space in which voters and candidates
+/// are divided into factions. Each faction has a center and a spread (isotropic Gaussian) for
+/// both voters and candidates. Voter utility is a function of the distance between a voter
+/// and candidate in the issue space, optionally with a special in-group likability bonus for
+/// candidates in the voter's own faction.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Factions {
+pub struct Electorate {
     /// Dimensionality of the issue space. Every `*_center` must be this long.
     pub dimensions: usize,
     /// How a voter/candidate distance becomes a perceived utility.
@@ -83,7 +83,7 @@ impl DistanceFunction {
 }
 
 #[derive(Debug)]
-pub struct FactionsSim {
+pub struct ElectorateSim {
     dims: usize,
     distance_scaling: DistanceFunction,
     factions: Vec<Faction>,
@@ -100,8 +100,8 @@ pub struct FactionsSim {
     vtr_pos: Vec<f64>,
 }
 
-impl Factions {
-    pub fn new_sim(&self, sim: &Sim) -> FactionsSim {
+impl Electorate {
+    pub fn new_sim(&self, sim: &Sim) -> ElectorateSim {
         assert!(
             !self.factions.is_empty(),
             "Factions consideration needs at least one faction"
@@ -140,7 +140,7 @@ impl Factions {
             "Factions needs positive total popularity"
         );
 
-        FactionsSim {
+        ElectorateSim {
             dims: self.dimensions,
             distance_scaling: self.distance_function.clone(),
             factions: self.factions.clone(),
@@ -154,7 +154,7 @@ impl Factions {
     }
 }
 
-impl ConsiderationSim for FactionsSim {
+impl ConsiderationSim for ElectorateSim {
     // See the note on IssuesSim::add_to_scores: out of line on purpose.
     #[inline(never)]
     fn add_to_scores<R: Rng + ?Sized>(&mut self, scores: &mut Array2<f64>, rng: &mut R) {
@@ -226,13 +226,13 @@ impl ConsiderationSim for FactionsSim {
     }
 }
 
-impl FactionsSim {
+impl ElectorateSim {
     pub fn make_faction_info(
         &self,
         premade_positions: Vec<Vec<f64>>,
         final_candidates: &[usize],
-    ) -> FactionInfo {
-        let mut fi = FactionInfo {
+    ) -> ElectorateInfo {
+        let mut fi = ElectorateInfo {
             positions: premade_positions,
             faction: Vec::with_capacity(final_candidates.len()),
             in_group_likability: Vec::with_capacity(final_candidates.len()),
@@ -297,7 +297,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "at least one faction")]
     fn new_sim_rejects_no_factions() {
-        Factions {
+        Electorate {
             dimensions: 2,
             distance_function: DistanceFunction::NegativeEuclidean,
             factions: vec![],
@@ -308,7 +308,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "wrong length")]
     fn new_sim_rejects_mismatched_center_length() {
-        Factions {
+        Electorate {
             dimensions: 3,
             distance_function: DistanceFunction::NegativeEuclidean,
             factions: vec![faction([0.0, 0.0], 1.0)], // 2 coords, dimensions = 3
@@ -319,7 +319,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "positive total popularity")]
     fn new_sim_rejects_zero_total_popularity() {
-        Factions {
+        Electorate {
             dimensions: 2,
             distance_function: DistanceFunction::NegativeEuclidean,
             factions: vec![faction([0.0, 0.0], 0.0), faction([1.0, 1.0], 0.0)],
@@ -331,7 +331,7 @@ mod tests {
     fn scores_are_negative_distance_when_spreads_and_likability_are_zero() {
         // One faction, voters pinned to the center (spread 0) but candidates
         // scattered. Every voter should score candidate c at -||candidate_pos[c]||.
-        let params = Factions {
+        let params = Electorate {
             dimensions: 2,
             distance_function: DistanceFunction::NegativeEuclidean,
             factions: vec![Faction {
@@ -361,7 +361,7 @@ mod tests {
         // Both factions share a center (distance contributes nothing) and all
         // spreads are 0, so the only signal is in-group likability. Popularity
         // [1, 0] puts every voter in faction 0.
-        let params = Factions {
+        let params = Electorate {
             dimensions: 2,
             distance_function: DistanceFunction::NegativeEuclidean,
             factions: vec![
@@ -396,7 +396,7 @@ mod tests {
 
     #[test]
     fn seeded_rng_makes_scores_reproducible() {
-        let params = Factions {
+        let params = Electorate {
             dimensions: 2,
             distance_function: DistanceFunction::QGaussian2(0.5),
             factions: vec![

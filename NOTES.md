@@ -14,9 +14,10 @@ a little strained in the context of this code.
 
 ## To-Do
 
-* Clean up Issues
-* New consideration, Factions
+* Re-order methods so that honest ones precede strategic
+  * Methods can be non-reporting now, and may be inserted out of necessity
 * Strategic voting improvements
+  * Should I expand the runner-up concept? How?
   * Allow a fraction of the population to be strategic
   * Allow a political faction to be more strategic than another
     * Under different methods, how much are strategic voters wrongly rewarded?

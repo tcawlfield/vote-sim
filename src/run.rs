@@ -190,11 +190,12 @@ fn run_batch(
             if let Strategy::Honest = method.method.strat() {
                 prev_rslt = Some(pairing);
             }
+            // Note here that result.winner is the regret-ranked index of the winner, not the candidate number.
             log::debug!(
                 "Method {:?} found winner {} -- regret {}",
                 method.method.name(),
-                result.winner,
-                result.regret
+                pairing.winner.cand,
+                result.regret,
             );
             method_results.insert(method.colname(), result);
         }
@@ -258,7 +259,7 @@ fn experiment_result(
             Issues(issues_sim) => {
                 issues = Some(collect_positions(issues_sim, ordered_final_cands));
             }
-            Factions(factions_sim) => {
+            Electorate(factions_sim) => {
                 let positions = collect_positions(factions_sim, ordered_final_cands);
                 factions = Some(factions_sim.make_faction_info(positions, ordered_final_cands));
             }
@@ -271,7 +272,7 @@ fn experiment_result(
         cand_regret,
         likability,
         issues,
-        factions,
+        electorate: factions,
         cov_matrix: cov,
         num_smith: sim.smith_set_size() as u32,
         in_smith,
@@ -482,7 +483,7 @@ mod tests {
                 "cand_regret",
                 "likability",
                 "issues",
-                "factions",
+                "electorate",
                 "cov_matrix",
                 "num_smith",
                 "in_smith",

@@ -6,12 +6,12 @@ use ndarray::Array2;
 use rand::Rng;
 use std::fmt;
 
-mod factions;
+mod electorate;
 mod irrational;
 mod issues;
 mod likability;
 
-pub use factions::{DistanceFunction, Faction, Factions, FactionsSim};
+pub use electorate::{DistanceFunction, Electorate, ElectorateSim, Faction};
 pub use irrational::{Irrational, IrrationalSim};
 pub use issues::{Issue, IssuesSim, new_issues_sim};
 pub use likability::{Likability, LikabilitySim};
@@ -38,8 +38,8 @@ pub enum Consideration {
     Issues(Vec<Issue>),
     #[serde(alias = "irrational")]
     Irrational(Irrational),
-    #[serde(alias = "factions")]
-    Factions(Factions),
+    #[serde(alias = "electorate")]
+    Electorate(Electorate),
 }
 
 impl Consideration {
@@ -50,7 +50,7 @@ impl Consideration {
                 ConsiderationSimKind::Issues(new_issues_sim(issues.clone(), sim))
             }
             Consideration::Irrational(c) => ConsiderationSimKind::Irrational(c.new_sim(sim)),
-            Consideration::Factions(c) => ConsiderationSimKind::Factions(c.new_sim(sim)),
+            Consideration::Electorate(c) => ConsiderationSimKind::Electorate(c.new_sim(sim)),
         }
     }
 }
@@ -63,7 +63,7 @@ pub enum ConsiderationSimKind {
     Likability(LikabilitySim),
     Issues(IssuesSim),
     Irrational(IrrationalSim),
-    Factions(FactionsSim),
+    Electorate(ElectorateSim),
 }
 
 macro_rules! dispatch {
@@ -72,7 +72,7 @@ macro_rules! dispatch {
             ConsiderationSimKind::Likability($inner) => $call,
             ConsiderationSimKind::Issues($inner) => $call,
             ConsiderationSimKind::Irrational($inner) => $call,
-            ConsiderationSimKind::Factions($inner) => $call,
+            ConsiderationSimKind::Electorate($inner) => $call,
         }
     };
 }
@@ -99,10 +99,10 @@ impl ConsiderationSim for ConsiderationSimKind {
 mod tests {
     use super::*;
     #[test]
-    fn factions_from_json() {
+    fn electorate_from_json() {
         let json = r#"
         {
-            "factions": {
+            "electorate": {
                 "dimensions": 2,
                 "distance_function": {"q_gaussian_2": 1.5},
                 "factions": [
@@ -122,11 +122,11 @@ mod tests {
         "#;
 
         let consid: Consideration = serde_json::from_str(json).unwrap();
-        if let Consideration::Factions(factions) = consid {
-            assert_eq!(factions.factions.len(), 2);
-            assert_eq!(factions.dimensions, 2);
+        if let Consideration::Electorate(electorate) = consid {
+            assert_eq!(electorate.factions.len(), 2);
+            assert_eq!(electorate.dimensions, 2);
             assert_eq!(
-                factions.distance_function,
+                electorate.distance_function,
                 DistanceFunction::QGaussian2(1.5)
             );
         } else {

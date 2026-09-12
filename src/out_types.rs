@@ -30,9 +30,9 @@ pub struct ExperimentResult {
     /// Candidate positions in issue space in the same order, when the config has
     /// an Issues consideration (`ncand` rows of `dim` coordinates).
     pub issues: Option<Vec<Vec<f64>>>,
-    /// Candidate positions in faction space in the same order, when the config
-    /// has a Factions consideration (`ncand` rows of `dim` coordinates).
-    pub factions: Option<FactionInfo>,
+    /// Candidate positions in faction-issue space in the same order, when the config
+    /// has an electorate consideration (`ncand` rows of `dim` coordinates).
+    pub electorate: Option<ElectorateInfo>,
     /// Lower-triangular candidate/candidate utility covariance, reordered by
     /// increasing regret (row `i` has `i + 1` entries).
     pub cov_matrix: Vec<Vec<f64>>,
@@ -56,10 +56,10 @@ pub struct MethodResult {
     pub regret: f64,
 }
 
-/// Faction info for candidates
+/// Electorate info for candidates
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
-pub struct FactionInfo {
+pub struct ElectorateInfo {
     /// The faction to which each candidate belongs.
     pub positions: Vec<Vec<f64>>,
     pub faction: Vec<u32>,
@@ -98,11 +98,11 @@ impl ExperimentResult {
         if let Some(dim) = positions_dim(|r| r.issues.as_ref()) {
             fixed.push(positions_field("issues", ncand, dim));
         }
-        if let Some(dim) = positions_dim(|r| r.factions.as_ref().map(|fact| &fact.positions)) {
-            fixed.push(positions_field("factions.positions", ncand, dim));
-            fixed.push(fixed_list("factions.faction", "U32", ncand, false));
+        if let Some(dim) = positions_dim(|r| r.electorate.as_ref().map(|fact| &fact.positions)) {
+            fixed.push(positions_field("electorate.positions", ncand, dim));
+            fixed.push(fixed_list("electorate.faction", "U32", ncand, false));
             fixed.push(fixed_list(
-                "factions.in_group_likability",
+                "electorate.in_group_likability",
                 "F64",
                 ncand,
                 false,
@@ -161,7 +161,7 @@ fn fixed_list(name: &str, element_type: &str, n: usize, nullable: bool) -> serde
 }
 
 /// `FixedSizeList<FixedSizeList<F64>[dim]>[ncand]`, nullable at the outer level.
-/// Used for spatial consideration columns (`issues`, `factions`).
+/// Used for spatial consideration columns (`issues`, `electorate`).
 fn positions_field(name: &str, ncand: usize, dim: usize) -> serde_json::Value {
     json!({
         "name": name,
@@ -207,7 +207,7 @@ mod tests {
             cand_regret: vec![0.0, 1.0, 2.5],
             likability: Some(vec![0.3, 0.1, 0.2]),
             issues: with_issues.then(|| vec![vec![0.0, 1.0], vec![-1.0, 0.5], vec![2.0, -2.0]]),
-            factions: None,
+            electorate: None,
             cov_matrix: vec![vec![1.0], vec![0.2, 1.5], vec![-0.1, 0.3, 2.0]],
             num_smith,
             in_smith: vec![true, false, false],
@@ -233,7 +233,7 @@ mod tests {
                 "cand_regret",
                 "likability",
                 "issues",
-                "factions",
+                "electorate",
                 "cov_matrix",
                 "num_smith",
                 "in_smith",
