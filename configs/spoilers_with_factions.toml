@@ -11,27 +11,27 @@ distance_function = { "q_gaussian_2" = 1.0 }
 
 [[considerations.factions.factions]]
 popularity = 0.8
-voter_center = [-1.0, 0.4]
-voter_spread = 0.3
-candidate_spread = 0.1
+voter_center = [-2.0, 0.8]
+voter_spread = 0.6
+candidate_spread = 0.2
 
 [[considerations.factions.factions]]
 popularity = 0.85
-voter_center = [1.0, 0.4]
-voter_spread = 0.3
-candidate_spread = 0.1
+voter_center = [2.0, 0.8]
+voter_spread = 0.6
+candidate_spread = 0.2
 
 [[considerations.factions.factions]]
 popularity = 0.2
-voter_center = [-1.0, -0.4]
-voter_spread = 0.3
-candidate_spread = 0.1
+voter_center = [-2.0, -0.8]
+voter_spread = 0.6
+candidate_spread = 0.2
 
 [[considerations.factions.factions]]
 popularity = 0.05
-voter_center = [1.3, -0.4]
-voter_spread = 0.3
-candidate_spread = 0.1
+voter_center = [2.3, -0.8]
+voter_spread = 0.6
+candidate_spread = 0.2
 
 
 [[methods]]
