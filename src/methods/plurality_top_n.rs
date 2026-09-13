@@ -4,7 +4,6 @@
 use serde::{Deserialize, Serialize};
 
 use super::MWMethodSim;
-use super::results::WinnerAndRunnerup;
 use super::tallies::Tallies;
 use crate::methods::ElectResult;
 use crate::sim::Sim;
@@ -33,12 +32,7 @@ impl PluralityTopN {
 }
 
 impl MWMethodSim for PluralityTopNSim {
-    fn multi_elect(
-        &mut self,
-        sim: &Sim,
-        _honest_rslt: Option<WinnerAndRunnerup>,
-        nwinners: usize,
-    ) -> &Vec<ElectResult> {
+    fn multi_elect(&mut self, sim: &Sim, nwinners: usize) -> &Vec<ElectResult> {
         self.tallies.fill(0);
         for &ivtr in sim.ranks.column(0) {
             self.tallies[ivtr] += 1;
@@ -56,6 +50,14 @@ impl MWMethodSim for PluralityTopNSim {
             });
         }
         &self.winners
+    }
+
+    fn name(&self) -> String {
+        "PluralityTopN".to_string()
+    }
+
+    fn colname(&self) -> String {
+        "pltn".to_string()
     }
 }
 
@@ -80,7 +82,7 @@ mod tests {
         ];
         sim.rank_candidates();
         // tallies are: 0, 1, 2, 3
-        let results = ptn.multi_elect(&sim, None, 3);
+        let results = ptn.multi_elect(&sim, 3);
         assert_eq!(results.len(), 3);
 
         assert_eq!(results[0], ElectResult { cand: 3, score: 3. });
