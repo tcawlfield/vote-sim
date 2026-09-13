@@ -3,19 +3,15 @@
 
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::fs;
 use std::sync::mpsc;
 
-use arrow_array::RecordBatch;
-use parquet::{arrow::ArrowWriter, basic::Compression, file::properties::WriterProperties};
 use work_queue::Queue;
 
-use crate::config::{Config, RunMode};
-use crate::considerations::{ConsiderationSim, ConsiderationSimKind};
+use crate::config::Config;
+use crate::considerations::ConsiderationSimKind;
 use crate::cov_matrix::CovMatrix;
-use crate::method_tracker::{CommitteeTracker, MethodTracker, SendableMethodReport};
-use crate::methods::Strategy;
-use crate::out_types::{CommitteeMethodResult, CommitteeResult, ExperimentResult, MethodResult};
+use crate::method_tracker::{CommitteeTracker, SendableMethodReport};
+use crate::out_types::{CommitteeMethodResult, CommitteeResult};
 use crate::run::{collect_positions, get_writer};
 use crate::sim::Sim;
 
@@ -239,6 +235,8 @@ fn committee_result(
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use crate::run_sims;
 
     use super::*;

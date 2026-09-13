@@ -14,9 +14,9 @@ use work_queue::Queue;
 use crate::config::{Config, RunMode};
 use crate::considerations::{ConsiderationSim, ConsiderationSimKind};
 use crate::cov_matrix::CovMatrix;
-use crate::method_tracker::{CommitteeTracker, MethodTracker, SendableMethodReport};
+use crate::method_tracker::{MethodTracker, SendableMethodReport};
 use crate::methods::Strategy;
-use crate::out_types::{CommitteeMethodResult, CommitteeResult, ExperimentResult, MethodResult};
+use crate::out_types::{ExperimentResult, MethodResult};
 use crate::run_multi::run_sims_multi_winner;
 use crate::sim::Sim;
 
