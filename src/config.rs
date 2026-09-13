@@ -9,18 +9,6 @@ use serde::{Deserialize, Serialize};
 use crate::considerations::Consideration;
 use crate::methods::{Method, MultiWinMethod};
 
-/// Which kind of election this config runs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum RunMode {
-    /// One winner per trial: `methods` runs (optionally behind a `primary_method`
-    /// narrowing stage), each producing a single winner.
-    #[default]
-    SingleWinner,
-    /// A fixed-size committee per trial: each of `committee_methods` runs as the
-    /// final answer (no narrowing stage), electing `committee_size` winners.
-    MultiWinner,
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
@@ -41,6 +29,20 @@ pub struct Config {
     /// `mode == MultiWinner`.
     #[serde(default)]
     pub committee_methods: Vec<MultiWinMethod>,
+}
+
+/// Which kind of election this config runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum RunMode {
+    /// One winner per trial: `methods` runs (optionally behind a `primary_method`
+    /// narrowing stage), each producing a single winner.
+    #[default]
+    #[serde(rename = "single_winner")]
+    SingleWinner,
+    /// A fixed-size committee per trial: each of `committee_methods` runs as the
+    /// final answer (no narrowing stage), electing `committee_size` winners.
+    #[serde(rename = "multi_winner")]
+    MultiWinner,
 }
 
 fn default_primary() -> MultiWinMethod {
@@ -129,12 +131,12 @@ mod tests {
 
     #[test]
     fn multi_winner_mode_requires_committee_size_and_methods() {
-        let config: Config = toml::from_str(&base_toml(r#"mode = "MultiWinner""#)).unwrap();
+        let config: Config = toml::from_str(&base_toml(r#"mode = "multi_winner""#)).unwrap();
         assert!(config.validate().is_err());
 
         let toml_str = base_toml(
             r#"
-            mode = "MultiWinner"
+            mode = "multi_winner"
             committee_size = 3
             "#,
         ) + "[[committee_methods]]\nPluralityTopN = {}\n";

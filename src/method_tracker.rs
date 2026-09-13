@@ -7,11 +7,19 @@ use crate::methods::{MWMethodSim, Method, MethodSim, MultiWinMethod, WinnerAndRu
 use crate::out_types::{CommitteeMethodResult, MethodResult};
 use crate::sim::Sim;
 
+/// Tracks one single-winner method across trials, recording the mean and standard deviation
+/// of the regret of the elected winner, and the fraction of trials where the winner
+/// was sub-optimal.
 pub struct MethodTracker {
     pub method: Box<dyn MethodSim>,
+    /// The number of trials run so far.
     ntrials: usize,
+    /// The number of trials where the winner was not the one with highest utility.
     ntrials_subopt: usize,
+    /// The mean and standard deviation of the regret of the winner.
     mean_regret: MeanSD,
+    /// The mean and standard deviation of the regret of the winner
+    /// on trials where the winner was sub-optimal.
     mean_subopt_regret: MeanSD,
 }
 
@@ -163,6 +171,7 @@ impl CommitteeTracker {
     }
 }
 
+/// The multi-winner counterpart to [`SendableMethodReport`].
 pub struct SendableMethodReport {
     pub name: String,
     pub ntrials: usize,

@@ -8,6 +8,7 @@ mod method_tracker;
 pub mod methods;
 pub mod out_types;
 mod run;
+mod run_multi;
 pub mod sim;
 
 pub use config::Config;
