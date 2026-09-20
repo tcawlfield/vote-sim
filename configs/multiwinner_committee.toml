@@ -1,0 +1,39 @@
+voters = 500
+candidates = 12
+mode = "MultiWinner"
+committee_size = 5
+
+[[considerations]]
+Likability = { mean = 0.1 }
+
+[[considerations]]
+[considerations.electorate]
+dimensions = 2
+distance_function = { "q_gaussian_2" = 1.0 }
+
+[[considerations.electorate.factions]]
+popularity = 0.4
+voter_center = [-1.5, 0.5]
+voter_spread = 0.6
+candidate_spread = 0.3
+
+[[considerations.electorate.factions]]
+popularity = 0.35
+voter_center = [1.5, 0.5]
+voter_spread = 0.6
+candidate_spread = 0.3
+
+[[considerations.electorate.factions]]
+popularity = 0.25
+voter_center = [0.0, -1.5]
+voter_spread = 0.6
+candidate_spread = 0.3
+
+[[committee_methods]]
+PluralityTopN = {}
+
+[[committee_methods]]
+[committee_methods.RRV]
+strat = "Honest"
+ranks = 25
+k = 0.5

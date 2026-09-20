@@ -83,10 +83,7 @@ impl MultiWinMethod {
 }
 
 pub trait MWMethodSim {
-    fn multi_elect(
-        &mut self,
-        sim: &Sim,
-        honest_rslt: Option<WinnerAndRunnerup>,
-        nwinners: usize,
-    ) -> &Vec<ElectResult>;
+    fn multi_elect(&mut self, sim: &Sim, nwinners: usize) -> &Vec<ElectResult>;
+    fn name(&self) -> String;
+    fn colname(&self) -> String;
 }

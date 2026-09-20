@@ -68,6 +68,52 @@ pub struct ElectorateInfo {
     pub in_group_likability: Vec<f64>,
 }
 
+/// One row of multi-winner ("committee") election output, one per trial.
+///
+/// The candidate-level fields mirror [`ExperimentResult`] (regret order,
+/// consideration positions, covariance, Smith set) -- none of that depends on
+/// how many winners get chosen. There's no `ideal_cand` here: the reference
+/// committee used to judge a method's `regret` is implicitly
+/// `cand_regret[0..committee_size]`, the individually-lowest-regret
+/// candidates.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
+pub struct CommitteeResult {
+    /// Per-candidate regret, in increasing-regret order (length `ncand`).
+    pub cand_regret: Vec<f64>,
+    /// Candidate likability scores in the same order, when the config has a
+    /// Likability consideration (length `ncand`).
+    pub likability: Option<Vec<f64>>,
+    /// Candidate positions in issue space in the same order, when the config has
+    /// an Issues consideration (`ncand` rows of `dim` coordinates).
+    pub issues: Option<Vec<Vec<f64>>>,
+    /// Candidate positions in faction-issue space in the same order, when the
+    /// config has an Electorate consideration (`ncand` rows of `dim`
+    /// coordinates).
+    pub electorate: Option<ElectorateInfo>,
+    /// Lower-triangular candidate/candidate utility covariance, reordered by
+    /// increasing regret (row `i` has `i + 1` entries).
+    pub cov_matrix: Vec<Vec<f64>>,
+    /// Number of candidates in the Smith set.
+    pub num_smith: u32,
+    /// Whether each candidate (increasing-regret order) is in the Smith set.
+    pub in_smith: Vec<bool>,
+    /// One entry per committee method, keyed by the method's column name.
+    pub methods: BTreeMap<String, CommitteeMethodResult>,
+}
+
+/// One multi-winner method's elected committee for a trial.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
+pub struct CommitteeMethodResult {
+    /// Regret-ranks of the elected committee (length `committee_size`), in the
+    /// order the method returned them.
+    pub winners: Vec<u32>,
+    /// Mean regret of the committee's members. See [`CommitteeResult`]'s docs
+    /// for the reference committee this is naturally compared against.
+    pub regret: f64,
+}
+
 impl ExperimentResult {
     /// The Arrow fields for the output columns, inferred from a batch of results.
     ///
@@ -111,18 +157,7 @@ impl ExperimentResult {
             ));
         }
 
-        let mut opts = tracing_options();
-        for mut field in fixed {
-            let name = field["name"]
-                .as_str()
-                .expect("overwrite has a name")
-                .to_owned();
-            let name_final = name.split('.').next_back().unwrap();
-            if name_final != name {
-                *field.get_mut("name").unwrap() = json!(name_final);
-            }
-            opts = opts.overwrite(name, field).expect("valid schema overwrite");
-        }
+        let opts = apply_overwrites(tracing_options(), fixed);
 
         Vec::<FieldRef>::from_samples(results, opts)
             .expect("ExperimentResult maps to an Arrow schema")
@@ -135,6 +170,92 @@ impl ExperimentResult {
             serde_arrow::to_arrow(&fields, results).expect("trial results serialize to Arrow");
         RecordBatch::try_new(Arc::new(Schema::new(fields)), columns).unwrap()
     }
+}
+
+impl CommitteeResult {
+    /// The Arrow fields for the output columns, inferred from a batch of
+    /// results. See [`ExperimentResult::arrow_fields`] -- the candidate-level
+    /// columns work identically here; the difference is `methods`, where each
+    /// method's `winners` list is pinned to a `FixedSizeList` of that method's
+    /// committee size.
+    pub fn arrow_fields(results: &[CommitteeResult]) -> Vec<FieldRef> {
+        assert!(
+            !results.is_empty(),
+            "cannot derive a schema from zero results"
+        );
+        let ncand = results[0].cand_regret.len();
+        let positions_dim = |pick: fn(&CommitteeResult) -> Option<&Vec<Vec<f64>>>| {
+            results
+                .iter()
+                .find_map(pick)
+                .map(|rows| rows.first().map_or(0, Vec::len))
+        };
+
+        let mut fixed = vec![
+            fixed_list("cand_regret", "F64", ncand, false),
+            fixed_list("in_smith", "Bool", ncand, false),
+            cov_matrix_field("cov_matrix", ncand),
+        ];
+        if results[0].likability.is_some() {
+            fixed.push(fixed_list("likability", "F64", ncand, true));
+        }
+        if let Some(dim) = positions_dim(|r| r.issues.as_ref()) {
+            fixed.push(positions_field("issues", ncand, dim));
+        }
+        if let Some(dim) = positions_dim(|r| r.electorate.as_ref().map(|e| &e.positions)) {
+            fixed.push(positions_field("electorate.positions", ncand, dim));
+            fixed.push(fixed_list("electorate.faction", "U32", ncand, false));
+            fixed.push(fixed_list(
+                "electorate.in_group_likability",
+                "F64",
+                ncand,
+                false,
+            ));
+        }
+        // Each committee method's `winners` list is fixed at its committee size.
+        for (colname, result) in &results[0].methods {
+            fixed.push(fixed_list(
+                &format!("methods.{colname}.winners"),
+                "U32",
+                result.winners.len(),
+                false,
+            ));
+        }
+
+        let opts = apply_overwrites(tracing_options(), fixed);
+
+        Vec::<FieldRef>::from_samples(results, opts)
+            .expect("CommitteeResult maps to an Arrow schema")
+    }
+
+    /// Serialize a slice of trial results into one Arrow `RecordBatch`.
+    pub fn to_record_batch(results: &[CommitteeResult]) -> RecordBatch {
+        let fields = Self::arrow_fields(results);
+        let columns =
+            serde_arrow::to_arrow(&fields, results).expect("trial results serialize to Arrow");
+        RecordBatch::try_new(Arc::new(Schema::new(fields)), columns).unwrap()
+    }
+}
+
+/// Register each entry's schema `overwrite`, using its `name` (a possibly
+/// dotted path into nested structs/maps, e.g. `"electorate.positions"`) as the
+/// overwrite path, and the path's final segment as the field's own name (what
+/// the parent structure actually calls it).
+fn apply_overwrites(mut opts: TracingOptions, fixed: Vec<serde_json::Value>) -> TracingOptions {
+    for mut field in fixed {
+        let path = field["name"]
+            .as_str()
+            .expect("overwrite has a name")
+            .to_owned();
+        let name = path.split('.').next_back().unwrap();
+        if name != path {
+            *field.get_mut("name").unwrap() = json!(name);
+        }
+        opts = opts
+            .overwrite(&path, field)
+            .expect("valid schema overwrite");
+    }
+    opts
 }
 
 fn tracing_options() -> TracingOptions {
@@ -389,5 +510,88 @@ mod tests {
                 .values(),
             &[-0.3, 0.4]
         );
+    }
+
+    fn committee_sample(regret: f64) -> CommitteeResult {
+        CommitteeResult {
+            cand_regret: vec![0.0, 1.0, 2.5],
+            likability: None,
+            issues: None,
+            electorate: None,
+            cov_matrix: vec![vec![1.0], vec![0.2, 1.5], vec![-0.1, 0.3, 2.0]],
+            num_smith: 1,
+            in_smith: vec![true, false, false],
+            methods: BTreeMap::from([
+                (
+                    "rrv_25_h".to_string(),
+                    CommitteeMethodResult {
+                        winners: vec![0, 2],
+                        regret,
+                    },
+                ),
+                (
+                    "pltn".to_string(),
+                    CommitteeMethodResult {
+                        winners: vec![1, 0],
+                        regret: regret + 1.0,
+                    },
+                ),
+            ]),
+        }
+    }
+
+    #[test]
+    fn committee_result_has_a_fixed_size_winners_list_per_method() {
+        use arrow_schema::DataType;
+
+        let batch =
+            CommitteeResult::to_record_batch(&[committee_sample(0.1), committee_sample(0.2)]);
+        assert_eq!(batch.num_rows(), 2);
+
+        let schema = batch.schema();
+        let names: Vec<&str> = schema.fields().iter().map(|f| f.name().as_str()).collect();
+        assert_eq!(
+            names,
+            [
+                "cand_regret",
+                "likability",
+                "issues",
+                "electorate",
+                "cov_matrix",
+                "num_smith",
+                "in_smith",
+                "methods",
+            ]
+        );
+
+        let methods = batch.column_by_name("methods").unwrap().as_struct();
+        let method_names: Vec<&str> = methods.fields().iter().map(|f| f.name().as_str()).collect();
+        assert_eq!(method_names, ["pltn", "rrv_25_h"]); // BTreeMap key order
+
+        // Each method's committee size can differ; each is still a FixedSizeList.
+        let rrv = methods.column_by_name("rrv_25_h").unwrap().as_struct();
+        assert!(matches!(
+            rrv.column_by_name("winners").unwrap().data_type(),
+            DataType::FixedSizeList(_, 2)
+        ));
+
+        // The data reads back correctly through the fixed layout.
+        let winners = rrv
+            .column_by_name("winners")
+            .unwrap()
+            .as_fixed_size_list()
+            .value(0);
+        assert_eq!(
+            winners
+                .as_primitive::<arrow_array::types::UInt32Type>()
+                .values(),
+            &[0, 2]
+        );
+
+        let regret = rrv
+            .column_by_name("regret")
+            .unwrap()
+            .as_primitive::<arrow_array::types::Float64Type>();
+        assert_eq!(regret.values(), &[0.1, 0.2]);
     }
 }

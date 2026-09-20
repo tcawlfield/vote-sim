@@ -11,12 +11,13 @@ use parquet::file::metadata::KeyValue;
 use parquet::{arrow::ArrowWriter, basic::Compression, file::properties::WriterProperties};
 use work_queue::Queue;
 
-use crate::config::Config;
+use crate::config::{Config, RunMode};
 use crate::considerations::{ConsiderationSim, ConsiderationSimKind};
 use crate::cov_matrix::CovMatrix;
 use crate::method_tracker::{MethodTracker, SendableMethodReport};
 use crate::methods::Strategy;
 use crate::out_types::{ExperimentResult, MethodResult};
+use crate::run_multi::run_sims_multi_winner;
 use crate::sim::Sim;
 
 static MAX_TRIALS_PER_JOB: usize = 10000;
@@ -33,6 +34,18 @@ struct TaskResult {
 }
 
 pub fn run_sims(
+    config: &Config,
+    trials: usize,
+    outfile: &Option<std::ffi::OsString>,
+) -> Result<(), Box<dyn Error>> {
+    config.validate()?;
+    match config.mode {
+        RunMode::SingleWinner => run_sims_single_winner(config, trials, outfile),
+        RunMode::MultiWinner => run_sims_multi_winner(config, trials, outfile),
+    }
+}
+
+fn run_sims_single_winner(
     config: &Config,
     trials: usize,
     outfile: &Option<std::ffi::OsString>,
@@ -165,7 +178,7 @@ fn run_batch(
         if let Some(rrv) = &mut mwms {
             let sim_primary: &mut Sim = sim_primary.as_mut().unwrap();
             sim_primary.election(&mut axes, &mut rng);
-            let final_candidates = rrv.multi_elect(sim_primary, None, sim.ncand);
+            let final_candidates = rrv.multi_elect(sim_primary, sim.ncand);
             log::debug!("primary election winners: {:?}", final_candidates);
             sim.take_from_primary(sim_primary, final_candidates);
 
@@ -283,7 +296,7 @@ fn experiment_result(
 /// Collect a consideration's candidate positions as `ncand` rows of `dim`
 /// coordinates, in `order`. NaN sentinels (used by considerations without a
 /// spatial position) are passed through unchanged.
-fn collect_positions<CST: ConsiderationSim>(consid: &CST, order: &[usize]) -> Vec<Vec<f64>> {
+pub fn collect_positions<CST: ConsiderationSim>(consid: &CST, order: &[usize]) -> Vec<Vec<f64>> {
     let mut rows: Vec<Vec<f64>> = Vec::with_capacity(order.len());
     let mut current: Vec<f64> = Vec::new();
     consid.push_posn_elements(
@@ -300,7 +313,7 @@ fn collect_positions<CST: ConsiderationSim>(consid: &CST, order: &[usize]) -> Ve
     rows
 }
 
-fn get_writer(
+pub fn get_writer(
     config: &Config,
     filename: &std::ffi::OsStr,
     sample_batch: &RecordBatch,

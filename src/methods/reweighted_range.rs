@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::MWMethodSim;
 use super::rangevoting::fill_range_ballot;
-use super::results::{Strategy, WinnerAndRunnerup};
+use super::results::Strategy;
 use crate::methods::ElectResult;
 use crate::sim::Sim;
 
@@ -43,12 +43,7 @@ impl RRV {
 }
 
 impl MWMethodSim for RRVSim {
-    fn multi_elect(
-        &mut self,
-        sim: &Sim,
-        _honest_rslt: Option<WinnerAndRunnerup>,
-        nwinners: usize,
-    ) -> &Vec<ElectResult> {
+    fn multi_elect(&mut self, sim: &Sim, nwinners: usize) -> &Vec<ElectResult> {
         self.ballots.fill(0);
         for ivtr in 0..sim.nvtr {
             fill_range_ballot(
@@ -97,6 +92,17 @@ impl MWMethodSim for RRVSim {
         }
         &self.winners
     }
+
+    fn name(&self) -> String {
+        format!(
+            "RRV ranks={}, k={}, {:?}",
+            self.p.ranks, self.p.k, self.p.strat
+        )
+    }
+
+    fn colname(&self) -> String {
+        format!("rrv_{}_{}", self.p.ranks, self.p.strat.as_letter())
+    }
 }
 
 #[cfg(test)]
@@ -134,7 +140,7 @@ mod tests {
             sim.scores[(ivtr, 4)] = 10.; // B2
         }
 
-        let results = rrv.multi_elect(&sim, None, 3);
+        let results = rrv.multi_elect(&sim, 3);
         assert_eq!(results.len(), 3);
 
         // First round, full weights, cand A1 wins with 600 pts (60 * 10 + 40 * 0)
