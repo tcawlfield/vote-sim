@@ -1,6 +1,6 @@
 voters = 500
 candidates = 12
-mode = "MultiWinner"
+mode = "multi_winner"
 committee_size = 5
 
 [[considerations]]
