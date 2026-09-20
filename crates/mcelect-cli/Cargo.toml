@@ -1,0 +1,20 @@
+[package]
+name = "mcelect-cli"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+default-run = "mcelect"
+
+[dependencies]
+mcelect = { path = "../mcelect" }
+clap = { version = "4", features = ["derive", "string"] }
+pretty_env_logger = "0.5.0"
+
+# The executable is still called `mcelect`; only the package name differs,
+# because two packages in one workspace can't share a name.
+[[bin]]
+name = "mcelect"
+path = "src/main.rs"
+bench = false
+# The lib crate is also named `mcelect`; don't let `cargo doc` collide on it.
+doc = false
