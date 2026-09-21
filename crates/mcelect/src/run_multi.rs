@@ -1,19 +1,16 @@
 // © Copyright 2026 Topher Cawlfield
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::BTreeMap;
 use std::error::Error;
 use std::sync::mpsc;
 
 use work_queue::Queue;
 
 use crate::config::Config;
-use crate::considerations::ConsiderationSimKind;
-use crate::cov_matrix::CovMatrix;
-use crate::method_tracker::{CommitteeTracker, SendableMethodReport};
-use crate::out_types::{CommitteeMethodResult, CommitteeResult};
-use crate::run::{collect_positions, get_writer};
-use crate::sim::Sim;
+use crate::method_tracker::SendableMethodReport;
+use crate::out_types::CommitteeResult;
+use crate::run::get_writer;
+use crate::runner::TrialRunner;
 
 static MAX_TRIALS_PER_JOB: usize = 10000;
 
@@ -117,54 +114,12 @@ fn run_batch_multi_winner(
     trials: usize,
     task_result_tx: &mpsc::Sender<CommitteeTaskResult>,
 ) -> Result<(), Box<dyn Error>> {
-    let mut rng = rand::rng();
+    let mut runner = TrialRunner::new(config, rand::rng());
+    let results: Vec<CommitteeResult> = (0..trials).map(|_| runner.do_committee_trial()).collect();
 
-    let ncand = config.candidates;
-    let nvtr = config.voters;
-    let committee_size = config
-        .committee_size
-        .expect("Config::validate ensures committee_size is set in MultiWinner mode");
-
-    let mut sim = Sim::new(ncand, nvtr);
-    let mut axes: Vec<ConsiderationSimKind> = config
-        .considerations
-        .iter()
-        .map(|c| c.new_sim(&sim))
-        .collect();
-
-    let mut committees: Vec<CommitteeTracker> = config
-        .committee_methods
-        .iter()
-        .map(|m| CommitteeTracker::new(m, &sim, committee_size))
-        .collect();
-
-    let mut cov_matrix = CovMatrix::new(sim.ncand);
-    let mut results: Vec<CommitteeResult> = Vec::with_capacity(trials);
-
-    for itrial in 0..trials {
-        log::debug!("Committee election {}", itrial + 1);
-        sim.election(&mut axes, &mut rng);
-        cov_matrix.compute(&sim.scores);
-
-        let mut method_results: BTreeMap<String, CommitteeMethodResult> = BTreeMap::new();
-        for committee in committees.iter_mut() {
-            let result = committee.elect(&sim);
-            log::debug!(
-                "Method {:?} elected winners (regret ranks) {:?} -- mean regret {}",
-                committee.method.name(),
-                result.winners,
-                result.regret,
-            );
-            method_results.insert(committee.colname(), result);
-        }
-
-        results.push(committee_result(&sim, &axes, &cov_matrix, method_results));
-    }
-
-    let method_stats = committees.iter().map(|c| c.sendable_report()).collect();
     task_result_tx
         .send(CommitteeTaskResult {
-            method_stats,
+            method_stats: runner.method_stats(),
             results,
         })
         .expect("Could not send batch results");
@@ -172,104 +127,15 @@ fn run_batch_multi_winner(
     Ok(())
 }
 
-/// Assemble one trial's [`CommitteeResult`] from the just-run `sim`. There's no
-/// primary-narrowing stage in multi-winner mode, so (unlike
-/// [`experiment_result`]) `sim.cand_by_regret` alone is the right order for
-/// both reindexing and indexing into `axes`' candidate positions.
-fn committee_result(
-    sim: &Sim,
-    axes: &[ConsiderationSimKind],
-    cov_matrix: &CovMatrix,
-    methods: BTreeMap<String, CommitteeMethodResult>,
-) -> CommitteeResult {
-    use ConsiderationSimKind::*;
-    let by_regret = &sim.cand_by_regret;
-
-    let cand_regret = by_regret.iter().map(|&ic| sim.regrets[ic]).collect();
-    let in_smith = by_regret.iter().map(|&ic| sim.in_smith_set[ic]).collect();
-
-    // Lower-triangular covariance, reindexed into increasing-regret order.
-    let cov = (0..sim.ncand)
-        .map(|ix| {
-            (0..=ix)
-                .map(|iy| cov_matrix.elements[(by_regret[ix], by_regret[iy])])
-                .collect()
-        })
-        .collect();
-
-    let mut likability = None;
-    let mut issues = None;
-    let mut electorate = None;
-    for consid in axes {
-        match consid {
-            Likability(likability_sim) => {
-                likability = Some(
-                    collect_positions(likability_sim, by_regret)
-                        .into_iter()
-                        .map(|coords| coords[0])
-                        .collect(),
-                );
-            }
-            Issues(issues_sim) => {
-                issues = Some(collect_positions(issues_sim, by_regret));
-            }
-            Electorate(electorate_sim) => {
-                let positions = collect_positions(electorate_sim, by_regret);
-                electorate = Some(electorate_sim.make_faction_info(positions, by_regret));
-            }
-            _ => {}
-        }
-    }
-
-    CommitteeResult {
-        cand_regret,
-        likability,
-        issues,
-        electorate,
-        cov_matrix: cov,
-        num_smith: sim.smith_set_size() as u32,
-        in_smith,
-        methods,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::fs;
 
     use crate::run_sims;
+    use crate::runner::tests::multi_winner_config;
 
     use super::*;
     use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
-
-    /// A 5-candidate MultiWinner config (committee size 2), Likability + Issues
-    /// considerations, PluralityTopN and RRV as the committee methods.
-    fn test_committee_config() -> Config {
-        let toml_str = r#"
-            voters = 24
-            candidates = 5
-            mode = "multi_winner"
-            committee_size = 2
-
-            [[considerations]]
-            Likability = { mean = 0.5 }
-
-            [[considerations]]
-            [[considerations.Issues]]
-            sigma = 1.0
-            halfcsep = 0.0
-
-            [[committee_methods]]
-            PluralityTopN = {}
-
-            [[committee_methods]]
-            [committee_methods.RRV]
-            strat = "Honest"
-            ranks = 11
-            k = 1.0
-        "#;
-        toml::from_str(toml_str).expect("valid committee test config")
-    }
 
     fn run_one_committee_batch(config: &Config, trials: usize) -> CommitteeTaskResult {
         let (tx, rx) = mpsc::channel();
@@ -279,44 +145,8 @@ mod tests {
     }
 
     #[test]
-    fn committee_result_reindexes_sim_state_into_increasing_regret_order() {
-        let mut sim = Sim::new(3, 2);
-        sim.regrets = vec![2.0, 0.0, 1.0];
-        sim.cand_by_regret = vec![1, 2, 0];
-        sim.regret_rank = vec![2, 0, 1];
-        sim.in_smith_set = vec![true, true, false];
-
-        let mut cov = CovMatrix::new(3);
-        for i in 0..3 {
-            for j in 0..3 {
-                cov.elements[(i, j)] = (10 * i + j) as f64;
-            }
-        }
-
-        let methods = BTreeMap::from([(
-            "pltn".to_string(),
-            CommitteeMethodResult {
-                winners: vec![0, 2],
-                regret: 0.5,
-            },
-        )]);
-        let cr = committee_result(&sim, &[], &cov, methods);
-
-        assert_eq!(cr.cand_regret, vec![0.0, 1.0, 2.0]);
-        assert_eq!(cr.in_smith, vec![true, false, true]);
-        assert_eq!(cr.num_smith, 2);
-        assert!(cr.likability.is_none());
-        // cov[ix][iy] == elements[(by_regret[ix], by_regret[iy])], by_regret = [1, 2, 0].
-        assert_eq!(
-            cr.cov_matrix,
-            vec![vec![11.0], vec![21.0, 22.0], vec![1.0, 2.0, 0.0]]
-        );
-        assert_eq!(cr.methods["pltn"].winners, vec![0, 2]);
-    }
-
-    #[test]
     fn run_batch_multi_winner_emits_one_well_formed_committee_per_trial() {
-        let config = test_committee_config();
+        let config = multi_winner_config();
         let result = run_one_committee_batch(&config, 9);
 
         assert_eq!(result.results.len(), 9);
@@ -338,7 +168,7 @@ mod tests {
 
     #[test]
     fn run_sims_dispatches_to_multi_winner_mode_and_writes_a_readable_parquet() {
-        let config = test_committee_config();
+        let config = multi_winner_config();
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("committees.parquet");
 
@@ -376,7 +206,7 @@ mod tests {
 
     #[test]
     fn run_sims_rejects_an_invalid_config_instead_of_panicking() {
-        let mut config = test_committee_config();
+        let mut config = multi_winner_config();
         config.committee_size = None;
         assert!(run_sims(&config, 5, &None).is_err());
     }
