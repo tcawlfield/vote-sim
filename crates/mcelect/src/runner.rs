@@ -27,7 +27,7 @@ use crate::sim::Sim;
 /// one of them is non-empty: the other mode's trackers are simply never built.
 /// The primary-narrowing stage (`sim_primary` / `primary_method`) likewise
 /// exists only in [`RunMode::SingleWinner`].
-pub(crate) struct Runner<R: Rng> {
+pub(crate) struct TrialRunner<R: Rng> {
     mode: RunMode,
     rng: R,
     sim: Sim,
@@ -51,8 +51,8 @@ pub(crate) struct Runner<R: Rng> {
     itrial: usize,
 }
 
-impl<R: Rng> Runner<R> {
-    pub(crate) fn new(config: &Config, rng: R) -> Runner<R> {
+impl<R: Rng> TrialRunner<R> {
+    pub(crate) fn new(config: &Config, rng: R) -> TrialRunner<R> {
         let nvtr = config.voters;
         let sim = Sim::new(config.candidates, nvtr);
 
@@ -104,7 +104,7 @@ impl<R: Rng> Runner<R> {
 
         let ordered_final_cands = vec![0; sim.ncand];
 
-        Runner {
+        TrialRunner {
             mode: config.mode,
             rng,
             sim,
@@ -547,7 +547,7 @@ pub(crate) mod tests {
     fn runner_do_trial_replays_with_a_seeded_rng() {
         let config = single_winner_config(None);
         let trials = |seed: u64| {
-            let mut runner = Runner::new(&config, StdRng::seed_from_u64(seed));
+            let mut runner = TrialRunner::new(&config, StdRng::seed_from_u64(seed));
             (0..4).map(|_| runner.do_trial()).collect::<Vec<_>>()
         };
 
@@ -568,7 +568,7 @@ pub(crate) mod tests {
     fn runner_do_committee_trial_replays_with_a_seeded_rng() {
         let config = multi_winner_config();
         let trials = |seed: u64| {
-            let mut runner = Runner::new(&config, StdRng::seed_from_u64(seed));
+            let mut runner = TrialRunner::new(&config, StdRng::seed_from_u64(seed));
             (0..4)
                 .map(|_| runner.do_committee_trial())
                 .collect::<Vec<_>>()
@@ -588,7 +588,7 @@ pub(crate) mod tests {
     #[test]
     fn a_primary_narrows_the_field_before_the_single_winner_round() {
         let config = single_winner_config(Some(6));
-        let mut runner = Runner::new(&config, StdRng::seed_from_u64(1));
+        let mut runner = TrialRunner::new(&config, StdRng::seed_from_u64(1));
         let er = runner.do_trial();
 
         // 3 finalists reported, drawn from the 6-candidate primary field.
@@ -604,7 +604,7 @@ pub(crate) mod tests {
     #[should_panic(expected = "only valid in single-winner mode")]
     fn do_trial_rejects_a_multi_winner_runner() {
         let config = multi_winner_config();
-        Runner::new(&config, StdRng::seed_from_u64(1)).do_trial();
+        TrialRunner::new(&config, StdRng::seed_from_u64(1)).do_trial();
     }
 
     /// A multi-winner config never builds the primary stage, even when
@@ -613,7 +613,7 @@ pub(crate) mod tests {
     fn multi_winner_mode_ignores_primary_candidates() {
         let mut config = multi_winner_config();
         config.primary_candidates = Some(9);
-        let runner = Runner::new(&config, StdRng::seed_from_u64(1));
+        let runner = TrialRunner::new(&config, StdRng::seed_from_u64(1));
 
         assert!(runner.sim_primary.is_none());
         assert!(runner.primary_method.is_none());

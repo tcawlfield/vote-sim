@@ -10,7 +10,7 @@ use crate::config::Config;
 use crate::method_tracker::SendableMethodReport;
 use crate::out_types::CommitteeResult;
 use crate::run::get_writer;
-use crate::runner::Runner;
+use crate::runner::TrialRunner;
 
 static MAX_TRIALS_PER_JOB: usize = 10000;
 
@@ -114,7 +114,7 @@ fn run_batch_multi_winner(
     trials: usize,
     task_result_tx: &mpsc::Sender<CommitteeTaskResult>,
 ) -> Result<(), Box<dyn Error>> {
-    let mut runner = Runner::new(config, rand::rng());
+    let mut runner = TrialRunner::new(config, rand::rng());
     let results: Vec<CommitteeResult> = (0..trials).map(|_| runner.do_committee_trial()).collect();
 
     task_result_tx

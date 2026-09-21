@@ -14,7 +14,7 @@ use crate::config::{Config, RunMode};
 use crate::method_tracker::SendableMethodReport;
 use crate::out_types::ExperimentResult;
 use crate::run_multi::run_sims_multi_winner;
-use crate::runner::Runner;
+use crate::runner::TrialRunner;
 
 static MAX_TRIALS_PER_JOB: usize = 10000;
 
@@ -132,7 +132,7 @@ fn run_batch(
     trials: usize,
     task_result_tx: &mpsc::Sender<TaskResult>,
 ) -> Result<(), Box<dyn Error>> {
-    let mut runner = Runner::new(config, rand::rng());
+    let mut runner = TrialRunner::new(config, rand::rng());
     let results: Vec<ExperimentResult> = (0..trials).map(|_| runner.do_trial()).collect();
 
     task_result_tx
