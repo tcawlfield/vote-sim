@@ -30,6 +30,34 @@ pub fn run_sims_multi_winner(
     trials: usize,
     outfile: &Option<std::ffi::OsString>,
 ) -> Result<(), Box<dyn Error>> {
+    let (all_results, summaries) = collect_multi_winner(config, trials);
+
+    if let Some(filename) = outfile
+        && !all_results.is_empty()
+    {
+        let batch = CommitteeResult::to_record_batch(&all_results);
+        let mut writer = get_writer(config, filename, &batch);
+        writer.write(&batch)?;
+        writer.close()?; // writer must be closed to write the footer
+        println!("Wrote {}", filename.to_str().unwrap());
+    }
+
+    if let Some(summaries) = summaries {
+        for method_report in summaries {
+            method_report.report();
+        }
+    }
+
+    Ok(())
+}
+
+/// The multi-winner counterpart of `run::collect_single_winner`: spawn the
+/// worker pool, run every committee election, and fold the per-batch output
+/// back into one `Vec` of rows plus the combined per-method statistics.
+pub(crate) fn collect_multi_winner(
+    config: &Config,
+    trials: usize,
+) -> (Vec<CommitteeResult>, Option<Vec<SendableMethodReport>>) {
     let num_workers = std::thread::available_parallelism().unwrap().get();
     let min_chunks = num_workers.max(trials.div_ceil(MAX_TRIALS_PER_JOB));
     let chunks_per_worker = min_chunks.div_ceil(num_workers);
@@ -90,23 +118,7 @@ pub fn run_sims_multi_winner(
         }
     }
 
-    if let Some(filename) = outfile
-        && !all_results.is_empty()
-    {
-        let batch = CommitteeResult::to_record_batch(&all_results);
-        let mut writer = get_writer(config, filename, &batch);
-        writer.write(&batch)?;
-        writer.close()?; // writer must be closed to write the footer
-        println!("Wrote {}", filename.to_str().unwrap());
-    }
-
-    if let Some(summaries) = summaries {
-        for method_report in summaries {
-            method_report.report();
-        }
-    }
-
-    Ok(())
+    (all_results, summaries)
 }
 
 fn run_batch_multi_winner(

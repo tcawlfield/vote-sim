@@ -56,14 +56,22 @@ fn default_primary() -> MultiWinMethod {
 impl Config {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Config, Box<dyn Error>> {
         let config_str = std::fs::read_to_string(path)?;
-        // let file = File::open(path)?;
-        // let reader = BufReader::new(file);
+        Ok(Self::from_toml_str(&config_str)?)
+    }
 
-        // Read the TOML contents of the file as an instance of `Config`.
-        let config = toml::from_str(&config_str)?;
+    /// Parse a config from a TOML document, as [`Config::from_file`] reads from disk.
+    pub fn from_toml_str(config_str: &str) -> Result<Config, toml::de::Error> {
+        toml::from_str(config_str)
+    }
 
-        // Return the `User`.
-        Ok(config)
+    /// Parse a config from a JSON document.
+    ///
+    /// The same shape as the TOML form -- both go through the same `serde`
+    /// derives -- so this reads back what `run_sims` stores in the
+    /// `voting_config` parquet metadata key, and is the convenient form for
+    /// callers assembling a config programmatically (the Python bindings).
+    pub fn from_json_str(config_str: &str) -> Result<Config, serde_json::Error> {
+        serde_json::from_str(config_str)
     }
 
     /// Check that the fields relevant to `mode` are actually populated.

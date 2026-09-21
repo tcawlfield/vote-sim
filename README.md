@@ -4,13 +4,26 @@ Here is (yet another) voting simulation.
 
 ## Design
 
-This simulation is driven by a config file, in either YAML or TOML. (JSON
-support should be trival to add and might provide easier interop. So that's a
-TO-DO.) It outputs a rich set of information to a Parquet file.
+This simulation is driven by a config file, in either YAML or TOML (and JSON,
+via the Python bindings). It outputs a rich set of information to a Parquet file.
 
 This is written in Rust because Rust can be fast, has rich library support, a
 great unit test framework builtin, and I needed an excuse to practice Rust at
 the time I started it.
+
+## Python bindings
+
+`crates/mcelect-py` exposes the simulation to Python, returning a
+`pyarrow.Table` directly instead of going through a parquet file:
+
+```python
+import mcelect
+
+table = mcelect.simulate(mcelect.load_config("configs/default.toml"), 100_000)
+```
+
+The GIL is released while the simulation runs. See
+[crates/mcelect-py/README.md](crates/mcelect-py/README.md) for how to build it.
 
 ## Analysis
 

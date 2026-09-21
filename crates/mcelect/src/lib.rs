@@ -13,4 +13,4 @@ mod runner;
 pub mod sim;
 
 pub use config::Config;
-pub use run::run_sims;
+pub use run::{run_sims, simulate};

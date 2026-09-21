@@ -1,6 +1,9 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
+# `mcelect-py` is a cdylib that links against libpython; it is built through
+# maturin, not by a bare `cargo test` at the workspace root.
+default-members = ["crates/mcelect", "crates/mcelect-cli"]
 
 [workspace.package]
 version = "0.3.1"
