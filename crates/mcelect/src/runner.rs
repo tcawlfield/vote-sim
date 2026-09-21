@@ -3,11 +3,10 @@
 
 //! One worker's state for a batch of trials, shared by both election modes.
 //!
-//! [`Runner::new`] allocates everything a batch needs once. Each call to
-//! [`Runner::do_trial`] (single-winner) or [`Runner::do_committee_trial`]
-//! (multi-winner) then runs one election and returns that trial's output row,
-//! reusing all of it. Batch orchestration -- the worker pool, channels and
-//! parquet writing -- lives in [`crate::run`] and [`crate::run_multi`].
+//! [`TrialRunner::new`] allocates everything a batch needs once. Each call to
+//! [`TrialRunner::do_trial`] (single-winner) or
+//! [`TrialRunner::do_committee_trial`] (multi-winner) then runs one election
+//! and returns that trial's output row, reusing all of it.
 
 use std::collections::BTreeMap;
 
