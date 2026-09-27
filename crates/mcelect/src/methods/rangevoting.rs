@@ -29,6 +29,30 @@ pub struct RangeVotingSim {
 }
 
 impl RangeVoting {
+    /// The output column name for this method's results.
+    pub fn colname(&self) -> String {
+        if self.nranks == 2 {
+            match self.strat {
+                Strategy::Honest => "aprv_h".to_string(),
+                Strategy::Strategic => "aprv_s".to_string(),
+            }
+        } else {
+            match self.strat {
+                Strategy::Honest => format!("range_{}_h", self.nranks),
+                Strategy::Strategic => format!("range_{}_s", self.nranks),
+            }
+        }
+    }
+
+    /// When strategic, the honest `RangeVoting` whose result serves as this
+    /// method's pre-election poll.
+    pub fn honest_poll(&self) -> Option<Self> {
+        matches!(self.strat, Strategy::Strategic).then(|| Self {
+            strat: Strategy::Honest,
+            ..self.clone()
+        })
+    }
+
     pub fn new_sim(&self, sim: &Sim) -> RangeVotingSim {
         RangeVotingSim {
             params: self.clone(),
@@ -47,7 +71,7 @@ impl MethodSim for RangeVotingSim {
                     fill_range_ballot(&vscores, self.params.nranks, &mut self.ballot);
                 }
                 Strategy::Strategic => {
-                    let pre_election = honest_rslt.unwrap();
+                    let pre_election = honest_rslt.expect("strategic Range needs an honest poll");
                     let score_break = (vscores[pre_election.winner.cand]
                         + vscores[pre_election.runnerup.cand])
                         / 2.0;
@@ -77,21 +101,7 @@ impl MethodSim for RangeVotingSim {
     }
 
     fn colname(&self) -> String {
-        if self.params.nranks == 2 {
-            match self.params.strat {
-                Strategy::Honest => "aprv_h".to_string(),
-                Strategy::Strategic => "aprv_s".to_string(),
-            }
-        } else {
-            match self.params.strat {
-                Strategy::Honest => format!("range_{}_h", self.params.nranks),
-                Strategy::Strategic => format!("range_{}_s", self.params.nranks),
-            }
-        }
-    }
-
-    fn strat(&self) -> Strategy {
-        self.params.strat
+        self.params.colname()
     }
 }
 

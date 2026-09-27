@@ -53,6 +53,23 @@ pub struct BordaSim {
 }
 
 impl Borda {
+    /// The output column name for this method's results.
+    pub fn colname(&self) -> String {
+        match self.rank_top_n {
+            Some(n) => format!("Borda_{}_{}", self.strat.as_letter(), n),
+            None => format!("Borda_{}", self.strat.as_letter()),
+        }
+    }
+
+    /// When strategic, the honest `Borda` whose result serves as this
+    /// method's pre-election poll.
+    pub fn honest_poll(&self) -> Option<Self> {
+        matches!(self.strat, Strategy::Strategic).then(|| Self {
+            strat: Strategy::Honest,
+            ..self.clone()
+        })
+    }
+
     pub fn new_sim(&self, sim: &Sim) -> BordaSim {
         BordaSim {
             p: self.clone(),
@@ -79,8 +96,8 @@ impl MethodSim for BordaSim {
             }
             Strategy::Strategic => {
                 // Note strategic scoring is reduced by 1 so that threat == 0 always.
+                let pre_elect = honest_rslt.expect("strategic Borda needs an honest poll");
                 for (ivtr, cand_fav_list) in sim.ranks.lanes(Axis(1)).into_iter().enumerate() {
-                    let pre_elect = honest_rslt.unwrap();
                     let (preferred, threat) = if sim.scores[(ivtr, pre_elect.winner.cand)]
                         >= sim.scores[(ivtr, pre_elect.runnerup.cand)]
                     {
@@ -114,15 +131,7 @@ impl MethodSim for BordaSim {
     }
 
     fn colname(&self) -> String {
-        match self.p.rank_top_n {
-            Some(n) => format!("Borda_{}_{}", self.p.strat.as_letter(), n),
-            None => format!("Borda_{}", self.p.strat.as_letter()),
-        }
-    }
-
-    fn strat(&self) -> Strategy {
-        // self.p.strat
-        Strategy::Honest
+        self.p.colname()
     }
 }
 

@@ -36,6 +36,23 @@ pub struct STARSim {
 }
 
 impl STAR {
+    /// The output column name for this method's results.
+    pub fn colname(&self) -> String {
+        match self.strat {
+            Strategy::Honest => format!("star_{}_h", self.nranks),
+            Strategy::Strategic => format!("star_{}_s", self.nranks),
+        }
+    }
+
+    /// When strategic, the honest `STAR` whose result serves as this
+    /// method's pre-election poll.
+    pub fn honest_poll(&self) -> Option<Self> {
+        matches!(self.strat, Strategy::Strategic).then(|| Self {
+            strat: Strategy::Honest,
+            ..self.clone()
+        })
+    }
+
     pub fn new_sim(&self, sim: &Sim) -> STARSim {
         STARSim {
             params: self.clone(),
@@ -56,7 +73,7 @@ impl MethodSim for STARSim {
                     fill_range_ballot(&vscores, self.params.nranks, &mut self.ballot);
                 }
                 Strategy::Strategic => {
-                    let pre_election = honest_rslt.unwrap();
+                    let pre_election = honest_rslt.expect("strategic STAR needs an honest poll");
                     let score_break = (vscores[pre_election.winner.cand]
                         + vscores[pre_election.runnerup.cand])
                         / 2.0;
@@ -116,14 +133,7 @@ impl MethodSim for STARSim {
     }
 
     fn colname(&self) -> String {
-        match self.params.strat {
-            Strategy::Honest => format!("star_{}_h", self.params.nranks),
-            Strategy::Strategic => format!("star_{}_s", self.params.nranks),
-        }
-    }
-
-    fn strat(&self) -> Strategy {
-        self.params.strat
+        self.params.colname()
     }
 }
 

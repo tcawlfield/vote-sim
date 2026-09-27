@@ -47,6 +47,22 @@ pub struct PluralitySim {
 }
 
 impl Plurality {
+    /// The output column name for this method's results.
+    pub fn colname(&self) -> String {
+        match self.strat {
+            Strategy::Honest => "pl_h".to_string(),
+            Strategy::Strategic => "pl_s".to_string(),
+        }
+    }
+
+    /// When strategic, the honest `Plurality` whose result serves as this
+    /// method's pre-election poll.
+    pub fn honest_poll(&self) -> Option<Self> {
+        matches!(self.strat, Strategy::Strategic).then_some(Self {
+            strat: Strategy::Honest,
+        })
+    }
+
     pub fn new_sim(&self, sim: &Sim) -> PluralitySim {
         PluralitySim {
             params: self.clone(),
@@ -65,14 +81,7 @@ impl MethodSim for PluralitySim {
                 }
             }
             Strategy::Strategic => {
-                let pre_poll = if let Some(prev) = honest_rslt {
-                    prev
-                } else {
-                    self.params.strat = Strategy::Honest;
-                    let prev = self.elect(sim, None);
-                    self.params.strat = Strategy::Strategic;
-                    prev
-                };
+                let pre_poll = honest_rslt.expect("strategic Plurality needs an honest poll");
                 self.tallies.fill(0);
                 for vtr_ranks in sim.ranks.rows() {
                     for &icand in vtr_ranks {
@@ -97,14 +106,7 @@ impl MethodSim for PluralitySim {
     }
 
     fn colname(&self) -> String {
-        match self.params.strat {
-            Strategy::Honest => "pl_h".to_string(),
-            Strategy::Strategic => "pl_s".to_string(),
-        }
-    }
-
-    fn strat(&self) -> Strategy {
-        self.params.strat
+        self.params.colname()
     }
 }
 
@@ -210,18 +212,25 @@ mod tests {
     }
 
     #[test]
-    fn strategic_plurality_runs_its_own_pre_poll_when_none_is_given() {
+    #[should_panic(expected = "needs an honest poll")]
+    fn strategic_plurality_requires_an_honest_poll() {
+        // The runner always supplies one (see `Method::honest_poll`).
         let mut sim =
             sim_from_scores(&[(&[3., 2., 0.], 4), (&[0., 3., 1.], 3), (&[0., 2., 3.], 2)]);
         sim.rank_candidates();
+        strategic(&sim).elect(&sim, None);
+    }
 
-        let mut method = strategic(&sim);
-        let result = method.elect(&sim, None);
-
-        assert_eq!(method.tallies, vec![4, 5, 0]);
-        assert_eq!(result.winner.cand, 1);
-        // The temporary switch to Honest for the pre-poll is reverted.
-        assert!(matches!(method.strat(), Strategy::Strategic));
+    #[test]
+    fn only_strategic_plurality_has_an_honest_poll() {
+        let honest = Plurality {
+            strat: Strategy::Honest,
+        };
+        let strategic = Plurality {
+            strat: Strategy::Strategic,
+        };
+        assert!(honest.honest_poll().is_none());
+        assert_eq!(strategic.honest_poll().unwrap().colname(), "pl_h");
     }
 
     #[test]
@@ -231,11 +240,9 @@ mod tests {
         let h = honest(&sim);
         assert_eq!(h.colname(), "pl_h");
         assert_eq!(h.name(), "Plurality, Honest");
-        assert!(matches!(h.strat(), Strategy::Honest));
 
         let s = strategic(&sim);
         assert_eq!(s.colname(), "pl_s");
         assert_eq!(s.name(), "Plurality, Strategic");
-        assert!(matches!(s.strat(), Strategy::Strategic));
     }
 }

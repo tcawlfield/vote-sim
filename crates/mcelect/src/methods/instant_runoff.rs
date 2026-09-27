@@ -6,7 +6,7 @@ use ndarray::Axis;
 use serde::{Deserialize, Serialize};
 
 use super::MethodSim;
-use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
+use super::results::{ElectResult, WinnerAndRunnerup};
 use super::tallies::Tallies;
 use crate::sim::Sim;
 
@@ -23,6 +23,16 @@ pub struct IRVSim {
 }
 
 impl InstantRunoff {
+    /// The output column name for this method's results.
+    pub fn colname(&self) -> String {
+        "IRV_h".to_string()
+        // TODO: Implement strategic variant
+        // match self.p.strat {
+        //     Strategy::Honest => "IRV_h".to_string(),
+        //     Strategy::Strategic => "IRV_s".to_string(),
+        // }
+    }
+
     pub fn new_sim(&self, sim: &Sim) -> IRVSim {
         IRVSim {
             _p: self.clone(),
@@ -102,16 +112,7 @@ impl MethodSim for IRVSim {
     }
 
     fn colname(&self) -> String {
-        "IRV_h".to_string()
-        // match self.p.strat {
-        //     Strategy::Honest => "IRV_h".to_string(),
-        //     Strategy::Strategic => "IRV_s".to_string(),
-        // }
-    }
-
-    fn strat(&self) -> Strategy {
-        // self.p.strat
-        Strategy::Honest
+        self._p.colname()
     }
 }
 

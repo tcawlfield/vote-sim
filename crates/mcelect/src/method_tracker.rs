@@ -12,6 +12,13 @@ use crate::sim::Sim;
 /// was sub-optimal.
 pub struct MethodTracker {
     pub method: Box<dyn MethodSim>,
+    /// False for an honest method that isn't in the config, and runs only to
+    /// supply the pre-election poll for a strategic one. Such a method gets no
+    /// output column and no summary report.
+    pub reported: bool,
+    /// Index, in the runner's list of trackers, of the method whose result this
+    /// one takes as its pre-election poll. Always an earlier entry.
+    pub poll: Option<usize>,
     /// The number of trials run so far.
     ntrials: usize,
     /// The number of trials where the winner was not the one with highest utility.
@@ -24,9 +31,11 @@ pub struct MethodTracker {
 }
 
 impl MethodTracker {
-    pub fn new(method: &Method, sim: &Sim) -> MethodTracker {
+    pub fn new(method: &Method, sim: &Sim, reported: bool, poll: Option<usize>) -> MethodTracker {
         MethodTracker {
             method: method.new_sim(sim),
+            reported,
+            poll,
             ntrials: 0,
             ntrials_subopt: 0,
             mean_regret: MeanSD::default(),

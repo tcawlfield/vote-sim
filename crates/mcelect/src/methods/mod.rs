@@ -58,13 +58,48 @@ impl Method {
             Method::MM(m) => Box::new(m.new_sim(sim)),
         }
     }
+
+    /// The output column name for this method's results. Also serves as the
+    /// method's identity: two configured methods with the same column name
+    /// would overwrite each other in the output.
+    pub fn colname(&self) -> String {
+        match self {
+            Method::Plurality(m) => m.colname(),
+            Method::Range(m) => m.colname(),
+            Method::InstantRunoff(m) => m.colname(),
+            Method::Borda(m) => m.colname(),
+            Method::Multivote(m) => m.colname(),
+            Method::STAR(m) => m.colname(),
+            Method::RP(m) => m.colname(),
+            Method::BtrIrv(m) => m.colname(),
+            Method::MM(m) => m.colname(),
+        }
+    }
+
+    /// The honest method whose result this one takes as its pre-election poll,
+    /// for strategic methods whose voters react to the front-runners. `None`
+    /// for honest methods and for strategic methods that don't use a poll.
+    pub fn honest_poll(&self) -> Option<Method> {
+        match self {
+            Method::Plurality(m) => m.honest_poll().map(Method::Plurality),
+            Method::Range(m) => m.honest_poll().map(Method::Range),
+            Method::Borda(m) => m.honest_poll().map(Method::Borda),
+            Method::STAR(m) => m.honest_poll().map(Method::STAR),
+            Method::InstantRunoff(_)
+            | Method::Multivote(_)
+            | Method::RP(_)
+            | Method::BtrIrv(_)
+            | Method::MM(_) => None,
+        }
+    }
 }
 
 pub trait MethodSim {
+    /// Run this trial's election. `honest_rslt` is the result of the method's
+    /// [`Method::honest_poll`] this trial, and is `Some` exactly when that is.
     fn elect(&mut self, sim: &Sim, honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup;
     fn name(&self) -> String;
     fn colname(&self) -> String;
-    fn strat(&self) -> Strategy;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
