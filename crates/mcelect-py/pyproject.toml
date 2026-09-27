@@ -1,0 +1,20 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "mcelect"
+description = "Monte-Carlo voting-method simulation, returning results as Arrow"
+requires-python = ">=3.12"
+authors = [{ name = "Topher Cawlfield", email = "tcawlfield@gmail.com" }]
+license = "Apache-2.0"
+dynamic = ["version"]
+dependencies = ["pyarrow>=14"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.maturin]
+module-name = "mcelect._mcelect"
+python-source = "python"
+features = ["pyo3/extension-module"]

@@ -12,8 +12,8 @@ use work_queue::Queue;
 
 use crate::config::{Config, RunMode};
 use crate::method_tracker::SendableMethodReport;
-use crate::out_types::ExperimentResult;
-use crate::run_multi::run_sims_multi_winner;
+use crate::out_types::{CommitteeResult, ExperimentResult};
+use crate::run_multi::{collect_multi_winner, run_sims_multi_winner};
 use crate::runner::TrialRunner;
 
 static MAX_TRIALS_PER_JOB: usize = 10000;
@@ -41,13 +41,70 @@ pub fn run_sims(
     }
 }
 
+/// Run `trials` elections and hand back the results as a single Arrow
+/// [`RecordBatch`], without touching the filesystem or printing anything.
+///
+/// The column set depends on `config.mode`: [`ExperimentResult`]'s for
+/// `SingleWinner`, [`CommitteeResult`](crate::out_types::CommitteeResult)'s for
+/// `MultiWinner`. Returns `None` when `trials` is zero, since there are no rows
+/// to infer a schema from.
+///
+/// This is the entry point for embedders (the Python bindings, notably);
+/// [`run_sims`] is the file-writing, stats-reporting command-line path. Worker
+/// threads are spawned internally, so callers holding a lock -- such as the
+/// Python GIL -- should release it around this call.
+pub fn simulate(
+    config: &Config,
+    trials: usize,
+) -> Result<Option<RecordBatch>, Box<dyn Error + Send + Sync>> {
+    config.validate()?;
+    Ok(match config.mode {
+        RunMode::SingleWinner => {
+            let (results, _) = collect_single_winner(config, trials);
+            (!results.is_empty()).then(|| ExperimentResult::to_record_batch(&results))
+        }
+        RunMode::MultiWinner => {
+            let (results, _) = collect_multi_winner(config, trials);
+            (!results.is_empty()).then(|| CommitteeResult::to_record_batch(&results))
+        }
+    })
+}
+
 fn run_sims_single_winner(
     config: &Config,
     trials: usize,
     outfile: &Option<std::ffi::OsString>,
 ) -> Result<(), Box<dyn Error>> {
+    let (all_results, summaries) = collect_single_winner(config, trials);
+
+    if let Some(filename) = outfile
+        && !all_results.is_empty()
+    {
+        let batch = ExperimentResult::to_record_batch(&all_results);
+        let mut writer = get_writer(config, filename, &batch);
+        writer.write(&batch)?;
+        writer.close()?; // writer must be closed to write the footer
+        println!("Wrote {}", filename.to_str().unwrap());
+    }
+
+    if let Some(summaries) = summaries {
+        for method_report in summaries {
+            method_report.report();
+        }
+    }
+
+    Ok(())
+}
+
+/// Spawn the worker pool, run every trial, and fold the per-batch output back
+/// together into one `Vec` of rows plus the combined per-method statistics.
+fn collect_single_winner(
+    config: &Config,
+    trials: usize,
+) -> (Vec<ExperimentResult>, Option<Vec<SendableMethodReport>>) {
     let num_workers = std::thread::available_parallelism().unwrap().get();
-    let min_chunks = num_workers.max(trials.div_ceil(MAX_TRIALS_PER_JOB));
+    let min_chunks = (num_workers * 8).max(trials.div_ceil(MAX_TRIALS_PER_JOB));
+    // let min_chunks = num_workers.max(trials.div_ceil(MAX_TRIALS_PER_JOB));
     let chunks_per_worker = min_chunks.div_ceil(num_workers);
     let chunks = chunks_per_worker * num_workers;
     let trials_per_chunk = (trials + 1) / chunks;
@@ -108,23 +165,7 @@ fn run_sims_single_winner(
         }
     }
 
-    if let Some(filename) = outfile
-        && !all_results.is_empty()
-    {
-        let batch = ExperimentResult::to_record_batch(&all_results);
-        let mut writer = get_writer(config, filename, &batch);
-        writer.write(&batch)?;
-        writer.close()?; // writer must be closed to write the footer
-        println!("Wrote {}", filename.to_str().unwrap());
-    }
-
-    if let Some(summaries) = summaries {
-        for method_report in summaries {
-            method_report.report();
-        }
-    }
-
-    Ok(())
+    (all_results, summaries)
 }
 
 fn run_batch(
@@ -209,6 +250,30 @@ mod tests {
     #[test]
     fn run_sims_without_an_outfile_completes() {
         run_sims(&single_winner_config(None), 20, &None).unwrap();
+    }
+
+    #[test]
+    fn simulate_returns_a_batch_with_one_row_per_trial() {
+        let batch = simulate(&single_winner_config(None), 12).unwrap().unwrap();
+
+        assert_eq!(batch.num_rows(), 12);
+        let schema = batch.schema();
+        let column_names: Vec<&str> = schema.fields().iter().map(|f| f.name().as_str()).collect();
+        assert!(column_names.contains(&"cand_regret"));
+        assert!(column_names.contains(&"methods"));
+    }
+
+    #[test]
+    fn simulate_returns_none_for_zero_trials_rather_than_an_empty_batch() {
+        // There are no rows to trace a schema from, so there is no batch to build.
+        assert!(simulate(&single_winner_config(None), 0).unwrap().is_none());
+    }
+
+    #[test]
+    fn simulate_rejects_an_invalid_config() {
+        let mut config = single_winner_config(None);
+        config.methods.clear();
+        assert!(simulate(&config, 5).is_err());
     }
 
     #[test]

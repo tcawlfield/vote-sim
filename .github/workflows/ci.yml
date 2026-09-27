@@ -23,3 +23,21 @@ jobs:
       - run: cargo doc --no-deps --all-features
         env:
           RUSTDOCFLAGS: -D warnings
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      # mcelect-py is outside the workspace's default members, so the `check`
+      # job above never sees it.
+      - run: cargo clippy -p mcelect-py --all-targets --features pyo3/extension-module -- -D warnings
+      - run: pip install maturin pytest
+      - run: pip install crates/mcelect-py
+      - run: pytest crates/mcelect-py/tests -q
