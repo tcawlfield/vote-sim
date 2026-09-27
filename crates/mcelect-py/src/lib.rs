@@ -16,8 +16,7 @@ use pyo3::prelude::*;
 /// Run `trials` elections described by `config_json` and return the per-trial
 /// results as a `pyarrow.Table`.
 ///
-/// The simulation spawns its own worker threads, so the GIL is released for the
-/// whole run.
+/// The simulation spawns its own worker threads.
 #[pyfunction]
 #[pyo3(signature = (config_json, trials))]
 fn simulate(py: Python<'_>, config_json: &str, trials: usize) -> PyResult<PyArrowType<Table>> {

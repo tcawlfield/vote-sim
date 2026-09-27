@@ -7,8 +7,7 @@ description = "Python bindings for the mcelect election simulator"
 publish = false
 
 # The module Python imports is `mcelect._mcelect`, re-exported by the pure-Python
-# wrapper in `python/mcelect`. A third crate called `mcelect` would collide with
-# the library crate and with the CLI's binary.
+# wrapper in `python/mcelect`.
 [lib]
 name = "_mcelect"
 crate-type = ["cdylib"]

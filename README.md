@@ -22,8 +22,9 @@ import mcelect
 table = mcelect.simulate(mcelect.load_config("configs/default.toml"), 100_000)
 ```
 
-The GIL is released while the simulation runs. See
-[crates/mcelect-py/README.md](crates/mcelect-py/README.md) for how to build it.
+The GIL is released while the simulation runs, so a UI that handles simulation with a worker
+thread will remain responsive.
+See [crates/mcelect-py/README.md](crates/mcelect-py/README.md) for how to build it.
 
 ## Analysis
 

@@ -19,8 +19,8 @@ depend on the config's `mode`: `ExperimentResult`'s fields for `single_winner`,
 The simulation spawns one worker thread per core and releases the GIL for the
 whole run, so other Python threads keep going while it works.
 
-Awkward Array reads the result directly, which is convenient given the nested
-columns:
+Awkward Array and Polars can read the result directly, which is convenient for
+the structured data:
 
 ```python
 import awkward as ak
