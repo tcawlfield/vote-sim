@@ -245,7 +245,7 @@ impl<R: Rng> TrialRunner<R> {
 /// Methods are matched by `Method` equality. A poll the config also lists is
 /// pulled forward if need be and reported as usual; one it doesn't list is
 /// added unreported, purely as input to the strategic method. A method listed
-/// twice is kept once, since both would write the same output column anyway.
+/// twice fails [`Config::validate`]; if one gets here anyway, it runs once.
 fn method_trackers(methods: &[Method], sim: &Sim) -> Vec<MethodTracker> {
     let mut trackers: Vec<MethodTracker> = Vec::with_capacity(methods.len());
     // The method behind each tracker, in the same order.
@@ -740,6 +740,8 @@ pub(crate) mod tests {
         );
     }
 
+    /// `Config::validate` rejects this config; `method_trackers` just doesn't
+    /// build a second copy.
     #[test]
     fn a_method_listed_twice_runs_once() {
         assert_eq!(

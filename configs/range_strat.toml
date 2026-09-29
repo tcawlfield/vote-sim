@@ -46,24 +46,27 @@ strat = "Strategic"
 nranks = 10
 strategic_stretch_factor = 1.0
 
-[[methods]]
-[methods.Range]
-strat = "Strategic"
-nranks = 10
-strategic_stretch_factor = 1.5
+# Output from this would go into the same column as above.
+# Only pick one of these to be active at a time.
 
-# This one does the best with less siloed politics:
-[[methods]]
-[methods.Range]
-strat = "Strategic"
-nranks = 10
-strategic_stretch_factor = 2.0
-
-[[methods]]
-[methods.Range]
-strat = "Strategic"
-nranks = 10
-strategic_stretch_factor = 100.0
+# [[methods]]
+# [methods.Range]
+# strat = "Strategic"
+# nranks = 10
+# strategic_stretch_factor = 1.5
+# 
+# # This one does the best with less siloed politics:
+# [[methods]]
+# [methods.Range]
+# strat = "Strategic"
+# nranks = 10
+# strategic_stretch_factor = 2.0
+# 
+# [[methods]]
+# [methods.Range]
+# strat = "Strategic"
+# nranks = 10
+# strategic_stretch_factor = 100.0
 
 [[methods]] # Approval voting, honest
 [methods.Range]
@@ -76,21 +79,23 @@ strat = "Strategic"
 nranks = 2
 strategic_stretch_factor = 1.0
 
-[[methods]]
-[methods.Range]
-strat = "Strategic"
-nranks = 2
-strategic_stretch_factor = 1.5
+# Same limitation applies here
 
-# This one does the best with more siloed politics
-[[methods]]
-[methods.Range]
-strat = "Strategic"
-nranks = 2
-strategic_stretch_factor = 2.0
-
-[[methods]]
-[methods.Range]
-strat = "Strategic"
-nranks = 2
-strategic_stretch_factor = 100.0
+# [[methods]]
+# [methods.Range]
+# strat = "Strategic"
+# nranks = 2
+# strategic_stretch_factor = 1.5
+# 
+# # This one does the best with more siloed politics
+# [[methods]]
+# [methods.Range]
+# strat = "Strategic"
+# nranks = 2
+# strategic_stretch_factor = 2.0
+# 
+# [[methods]]
+# [methods.Range]
+# strat = "Strategic"
+# nranks = 2
+# strategic_stretch_factor = 100.0
