@@ -31,6 +31,11 @@ I'm using this purely as a method of spreading out candidates across the positio
 */
 
 impl RRV {
+    /// The output column name for this method's results.
+    pub fn colname(&self) -> String {
+        format!("rrv_{}_{}", self.ranks, self.strat.as_letter())
+    }
+
     pub fn new_sim(&self, sim: &Sim) -> RRVSim {
         RRVSim {
             p: self.clone(),
@@ -101,7 +106,7 @@ impl MWMethodSim for RRVSim {
     }
 
     fn colname(&self) -> String {
-        format!("rrv_{}_{}", self.p.ranks, self.p.strat.as_letter())
+        self.p.colname()
     }
 }
 

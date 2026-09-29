@@ -21,6 +21,11 @@ pub struct PluralityTopNSim {
 }
 
 impl PluralityTopN {
+    /// The output column name for this method's results.
+    pub fn colname(&self) -> String {
+        "pltn".to_string()
+    }
+
     pub fn new_sim(&self, sim: &Sim) -> PluralityTopNSim {
         PluralityTopNSim {
             _p: self.clone(),
@@ -57,7 +62,7 @@ impl MWMethodSim for PluralityTopNSim {
     }
 
     fn colname(&self) -> String {
-        "pltn".to_string()
+        self._p.colname()
     }
 }
 

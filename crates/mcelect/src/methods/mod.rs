@@ -119,6 +119,14 @@ impl MultiWinMethod {
             MultiWinMethod::PluralityTopN(m) => Box::new(m.new_sim(sim)),
         }
     }
+
+    /// The output column name for this method's results.
+    pub fn colname(&self) -> String {
+        match self {
+            MultiWinMethod::RRV(m) => m.colname(),
+            MultiWinMethod::PluralityTopN(m) => m.colname(),
+        }
+    }
 }
 
 pub trait MWMethodSim {

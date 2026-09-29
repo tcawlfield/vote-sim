@@ -84,20 +84,7 @@ impl Config {
                         "mode = SingleWinner requires at least one entry in `methods`".to_string(),
                     );
                 }
-                // Each method's results go in the output column named by
-                // `Method::colname`; two methods sharing one would silently
-                // overwrite each other.
-                let mut first_entry: BTreeMap<String, usize> = BTreeMap::new();
-                for (i, method) in self.methods.iter().enumerate() {
-                    if let Some(j) = first_entry.insert(method.colname(), i) {
-                        return Err(format!(
-                            "`methods` entries {} and {} would both write output column `{}`",
-                            j + 1,
-                            i + 1,
-                            method.colname()
-                        ));
-                    }
-                }
+                check_unique_colnames("methods", self.methods.iter().map(Method::colname))?;
             }
             RunMode::MultiWinner => {
                 if self.committee_size.is_none() {
@@ -109,10 +96,32 @@ impl Config {
                             .to_string(),
                     );
                 }
+                check_unique_colnames(
+                    "committee_methods",
+                    self.committee_methods.iter().map(MultiWinMethod::colname),
+                )?;
             }
         }
         Ok(())
     }
+}
+
+/// Each method's results go in the output column its `colname` names; two
+/// methods sharing one would silently overwrite each other. `list` names the
+/// config key the column names came from, for the error message.
+fn check_unique_colnames(list: &str, colnames: impl Iterator<Item = String>) -> Result<(), String> {
+    let mut first_entry: BTreeMap<String, usize> = BTreeMap::new();
+    for (i, colname) in colnames.enumerate() {
+        if let Some(j) = first_entry.get(&colname) {
+            return Err(format!(
+                "`{list}` entries {} and {} would both write output column `{colname}`",
+                j + 1,
+                i + 1,
+            ));
+        }
+        first_entry.insert(colname, i);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -211,5 +220,38 @@ mod tests {
         ]);
         let err = config.validate().unwrap_err();
         assert!(err.contains("`star_6_s`"), "{err}");
+    }
+
+    fn multi_winner_with_committee_methods(entries: &[&str]) -> Config {
+        let mut toml_str = base_toml("mode = \"multi_winner\"\ncommittee_size = 2");
+        for entry in entries {
+            toml_str += &format!("\n[[committee_methods]]\n{entry}\n");
+        }
+        toml::from_str(&toml_str).unwrap()
+    }
+
+    #[test]
+    fn distinct_committee_column_names_validate() {
+        let config = multi_winner_with_committee_methods(&[
+            "PluralityTopN = {}",
+            r#"RRV = { strat = "Honest", ranks = 10, k = 0.5 }"#,
+            r#"RRV = { strat = "Honest", ranks = 25, k = 0.5 }"#,
+        ]);
+        assert!(config.validate().is_ok());
+    }
+
+    /// `k` isn't part of RRV's column name, so these two would overwrite each
+    /// other's results.
+    #[test]
+    fn committee_methods_sharing_a_column_name_fail_validation() {
+        let config = multi_winner_with_committee_methods(&[
+            "PluralityTopN = {}",
+            r#"RRV = { strat = "Honest", ranks = 25, k = 0.5 }"#,
+            r#"RRV = { strat = "Honest", ranks = 25, k = 1.0 }"#,
+        ]);
+        assert_eq!(
+            config.validate().unwrap_err(),
+            "`committee_methods` entries 2 and 3 would both write output column `rrv_25_h`"
+        );
     }
 }
