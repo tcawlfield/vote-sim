@@ -5,11 +5,11 @@ use ndarray::Axis;
 use serde::{Deserialize, Serialize};
 
 use super::MethodSim;
-use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
+use super::results::{ElectResult, WinnerAndRunnerup};
 use super::tallies::Tallies;
 use crate::sim::Sim;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct BtrIrv {
     // pub strat: Strategy,
 }
@@ -23,6 +23,11 @@ pub struct BtrIrvSim {
 }
 
 impl BtrIrv {
+    /// The output column name for this method's results.
+    pub fn colname(&self) -> String {
+        "BTR-IRV_h".to_string()
+    }
+
     pub fn new_sim(&self, sim: &Sim) -> BtrIrvSim {
         BtrIrvSim {
             _p: self.clone(),
@@ -96,16 +101,7 @@ impl MethodSim for BtrIrvSim {
     }
 
     fn colname(&self) -> String {
-        "BTR-IRV_h".to_string()
-        // match self.p.strat {
-        //     Strategy::Honest => "IRV_h".to_string(),
-        //     Strategy::Strategic => "IRV_s".to_string(),
-        // }
-    }
-
-    fn strat(&self) -> Strategy {
-        // self.p.strat
-        Strategy::Honest
+        self._p.colname()
     }
 }
 

@@ -10,7 +10,7 @@ use super::condorcet_util::{CandPair, find_candidate_pairoffs, find_locked_in_wi
 use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
 use crate::sim::Sim;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct RP {
     pub strat: Strategy,
 }
@@ -23,6 +23,14 @@ pub struct RPSim {
 }
 
 impl RP {
+    /// The output column name for this method's results.
+    pub fn colname(&self) -> String {
+        match self.strat {
+            Strategy::Honest => "rp_h".to_string(),
+            Strategy::Strategic => "rp_s".to_string(),
+        }
+    }
+
     pub fn new_sim(&self, sim: &Sim) -> RPSim {
         RPSim {
             params: self.clone(),
@@ -63,14 +71,7 @@ impl MethodSim for RPSim {
     }
 
     fn colname(&self) -> String {
-        match self.params.strat {
-            Strategy::Honest => "rp_h".to_string(),
-            Strategy::Strategic => "rp_s".to_string(),
-        }
-    }
-
-    fn strat(&self) -> Strategy {
-        self.params.strat
+        self.params.colname()
     }
 }
 

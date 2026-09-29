@@ -9,7 +9,7 @@ use super::results::{Strategy, WinnerAndRunnerup};
 use super::tallies::{Tallies, tally_votes};
 use crate::sim::Sim;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Multivote {
     pub strat: Strategy,
     pub votes: i32,
@@ -24,6 +24,14 @@ pub struct MultivoteSim {
 }
 
 impl Multivote {
+    /// The output column name for this method's results.
+    pub fn colname(&self) -> String {
+        match self.strat {
+            Strategy::Honest => format!("multi_h_{}v", self.votes),
+            Strategy::Strategic => format!("multi_s_{}v", self.votes),
+        }
+    }
+
     pub fn new_sim(&self, sim: &Sim) -> MultivoteSim {
         MultivoteSim {
             p: self.clone(),
@@ -81,14 +89,7 @@ impl MethodSim for MultivoteSim {
     }
 
     fn colname(&self) -> String {
-        match self.p.strat {
-            Strategy::Honest => format!("multi_h_{}v", self.p.votes),
-            Strategy::Strategic => format!("multi_s_{}v", self.p.votes),
-        }
-    }
-
-    fn strat(&self) -> Strategy {
-        self.p.strat
+        self.p.colname()
     }
 }
 

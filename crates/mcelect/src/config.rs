@@ -1,6 +1,7 @@
 // © Copyright 2026 Topher Cawlfield
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::path::Path;
 
@@ -83,6 +84,7 @@ impl Config {
                         "mode = SingleWinner requires at least one entry in `methods`".to_string(),
                     );
                 }
+                check_unique_colnames("methods", self.methods.iter().map(Method::colname))?;
             }
             RunMode::MultiWinner => {
                 if self.committee_size.is_none() {
@@ -94,10 +96,32 @@ impl Config {
                             .to_string(),
                     );
                 }
+                check_unique_colnames(
+                    "committee_methods",
+                    self.committee_methods.iter().map(MultiWinMethod::colname),
+                )?;
             }
         }
         Ok(())
     }
+}
+
+/// Each method's results go in the output column its `colname` names; two
+/// methods sharing one would silently overwrite each other. `list` names the
+/// config key the column names came from, for the error message.
+fn check_unique_colnames(list: &str, colnames: impl Iterator<Item = String>) -> Result<(), String> {
+    let mut first_entry: BTreeMap<String, usize> = BTreeMap::new();
+    for (i, colname) in colnames.enumerate() {
+        if let Some(j) = first_entry.get(&colname) {
+            return Err(format!(
+                "`{list}` entries {} and {} would both write output column `{colname}`",
+                j + 1,
+                i + 1,
+            ));
+        }
+        first_entry.insert(colname, i);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -152,5 +176,82 @@ mod tests {
         assert_eq!(config.mode, RunMode::MultiWinner);
         assert_eq!(config.committee_size, Some(3));
         assert!(config.validate().is_ok());
+    }
+
+    fn single_winner_with_methods(entries: &[&str]) -> Config {
+        let mut toml_str = base_toml("");
+        for entry in entries {
+            toml_str += &format!("\n[[methods]]\n{entry}\n");
+        }
+        toml::from_str(&toml_str).unwrap()
+    }
+
+    #[test]
+    fn distinct_column_names_validate() {
+        let config = single_winner_with_methods(&[
+            r#"Plurality = { strat = "Honest" }"#,
+            r#"Plurality = { strat = "Strategic" }"#,
+            r#"Range = { strat = "Honest", nranks = 10 }"#,
+            r#"Range = { strat = "Honest", nranks = 2 }"#,
+        ]);
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn a_method_listed_twice_fails_validation() {
+        let config = single_winner_with_methods(&[
+            r#"Plurality = { strat = "Honest" }"#,
+            r#"Borda = {}"#,
+            r#"Plurality = { strat = "Honest" }"#,
+        ]);
+        assert_eq!(
+            config.validate().unwrap_err(),
+            "`methods` entries 1 and 3 would both write output column `pl_h`"
+        );
+    }
+
+    /// Different methods can share a column name too: the stretch factor isn't
+    /// part of STAR's, so these two would overwrite each other's results.
+    #[test]
+    fn different_methods_sharing_a_column_name_fail_validation() {
+        let config = single_winner_with_methods(&[
+            r#"STAR = { strat = "Strategic", strategic_stretch_factor = 2.0 }"#,
+            r#"STAR = { strat = "Strategic", strategic_stretch_factor = 4.0 }"#,
+        ]);
+        let err = config.validate().unwrap_err();
+        assert!(err.contains("`star_6_s`"), "{err}");
+    }
+
+    fn multi_winner_with_committee_methods(entries: &[&str]) -> Config {
+        let mut toml_str = base_toml("mode = \"multi_winner\"\ncommittee_size = 2");
+        for entry in entries {
+            toml_str += &format!("\n[[committee_methods]]\n{entry}\n");
+        }
+        toml::from_str(&toml_str).unwrap()
+    }
+
+    #[test]
+    fn distinct_committee_column_names_validate() {
+        let config = multi_winner_with_committee_methods(&[
+            "PluralityTopN = {}",
+            r#"RRV = { strat = "Honest", ranks = 10, k = 0.5 }"#,
+            r#"RRV = { strat = "Honest", ranks = 25, k = 0.5 }"#,
+        ]);
+        assert!(config.validate().is_ok());
+    }
+
+    /// `k` isn't part of RRV's column name, so these two would overwrite each
+    /// other's results.
+    #[test]
+    fn committee_methods_sharing_a_column_name_fail_validation() {
+        let config = multi_winner_with_committee_methods(&[
+            "PluralityTopN = {}",
+            r#"RRV = { strat = "Honest", ranks = 25, k = 0.5 }"#,
+            r#"RRV = { strat = "Honest", ranks = 25, k = 1.0 }"#,
+        ]);
+        assert_eq!(
+            config.validate().unwrap_err(),
+            "`committee_methods` entries 2 and 3 would both write output column `rrv_25_h`"
+        );
     }
 }

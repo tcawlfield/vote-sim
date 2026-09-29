@@ -4,10 +4,10 @@
 use serde::{Deserialize, Serialize};
 
 use super::MethodSim;
-use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
+use super::results::{ElectResult, WinnerAndRunnerup};
 use crate::sim::Sim;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Minimax {
     // pub strat: Strategy,
 }
@@ -20,6 +20,11 @@ pub struct MinimaxSim {
 }
 
 impl Minimax {
+    /// The output column name for this method's results.
+    pub fn colname(&self) -> String {
+        "MM_h".to_string()
+    }
+
     pub fn new_sim(&self, sim: &Sim) -> MinimaxSim {
         MinimaxSim {
             _p: self.clone(),
@@ -65,11 +70,7 @@ impl MethodSim for MinimaxSim {
     }
 
     fn colname(&self) -> String {
-        "MM_h".to_string()
-    }
-
-    fn strat(&self) -> Strategy {
-        Strategy::Honest
+        self._p.colname()
     }
 }
 

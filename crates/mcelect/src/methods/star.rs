@@ -10,7 +10,7 @@ use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
 use super::tallies::{Tallies, tally_votes};
 use crate::sim::Sim;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct STAR {
     pub strat: Strategy,
     #[serde(default = "default_ranks")]
@@ -36,6 +36,26 @@ pub struct STARSim {
 }
 
 impl STAR {
+    /// The output column name for this method's results.
+    pub fn colname(&self) -> String {
+        match self.strat {
+            Strategy::Honest => format!("star_{}_h", self.nranks),
+            Strategy::Strategic => format!("star_{}_s", self.nranks),
+        }
+    }
+
+    /// When strategic, the honest `STAR` whose result serves as this
+    /// method's pre-election poll. `strategic_stretch_factor` doesn't affect
+    /// honest ballots, so it's reset to its default: the poll then compares
+    /// equal to an honest `STAR` configured the ordinary way.
+    pub fn honest_poll(&self) -> Option<Self> {
+        matches!(self.strat, Strategy::Strategic).then(|| Self {
+            strat: Strategy::Honest,
+            strategic_stretch_factor: default_stretch(),
+            ..self.clone()
+        })
+    }
+
     pub fn new_sim(&self, sim: &Sim) -> STARSim {
         STARSim {
             params: self.clone(),
@@ -56,7 +76,7 @@ impl MethodSim for STARSim {
                     fill_range_ballot(&vscores, self.params.nranks, &mut self.ballot);
                 }
                 Strategy::Strategic => {
-                    let pre_election = honest_rslt.unwrap();
+                    let pre_election = honest_rslt.expect("strategic STAR needs an honest poll");
                     let score_break = (vscores[pre_election.winner.cand]
                         + vscores[pre_election.runnerup.cand])
                         / 2.0;
@@ -116,14 +136,7 @@ impl MethodSim for STARSim {
     }
 
     fn colname(&self) -> String {
-        match self.params.strat {
-            Strategy::Honest => format!("star_{}_h", self.params.nranks),
-            Strategy::Strategic => format!("star_{}_s", self.params.nranks),
-        }
-    }
-
-    fn strat(&self) -> Strategy {
-        self.params.strat
+        self.params.colname()
     }
 }
 

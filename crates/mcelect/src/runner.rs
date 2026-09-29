@@ -16,7 +16,7 @@ use crate::config::{Config, RunMode};
 use crate::considerations::{ConsiderationSim, ConsiderationSimKind};
 use crate::cov_matrix::CovMatrix;
 use crate::method_tracker::{CommitteeTracker, MethodTracker, SendableMethodReport};
-use crate::methods::{MWMethodSim, Strategy};
+use crate::methods::{MWMethodSim, Method, WinnerAndRunnerup};
 use crate::out_types::{CommitteeMethodResult, CommitteeResult, ExperimentResult, MethodResult};
 use crate::sim::Sim;
 
@@ -34,7 +34,8 @@ pub(crate) struct TrialRunner<R: Rng> {
     /// a primary stage, which is single-winner mode only.
     sim_primary: Option<Sim>,
     axes: Vec<ConsiderationSimKind>,
-    /// Single-winner methods. Non-empty only in [`RunMode::SingleWinner`].
+    /// Single-winner methods, as laid out by [`method_trackers`]. Non-empty
+    /// only in [`RunMode::SingleWinner`].
     methods: Vec<MethodTracker>,
     /// Multi-winner methods. Non-empty only in [`RunMode::MultiWinner`].
     committees: Vec<CommitteeTracker>,
@@ -48,6 +49,8 @@ pub(crate) struct TrialRunner<R: Rng> {
     ordered_final_cands: Vec<usize>,
     /// Trials run so far, for logging.
     itrial: usize,
+    /// Saved results for strategic methods' pre-election polls.
+    method_poll_pairings: Vec<WinnerAndRunnerup>,
 }
 
 impl<R: Rng> TrialRunner<R> {
@@ -72,14 +75,7 @@ impl<R: Rng> TrialRunner<R> {
         };
 
         let (methods, committees): (Vec<MethodTracker>, Vec<CommitteeTracker>) = match config.mode {
-            RunMode::SingleWinner => (
-                config
-                    .methods
-                    .iter()
-                    .map(|m| MethodTracker::new(m, &sim))
-                    .collect(),
-                Vec::new(),
-            ),
+            RunMode::SingleWinner => (method_trackers(&config.methods, &sim), Vec::new()),
             RunMode::MultiWinner => {
                 let committee_size = config
                     .committee_size
@@ -102,6 +98,7 @@ impl<R: Rng> TrialRunner<R> {
             .map(|sim_primary| config.primary_method.new_sim(sim_primary));
 
         let ordered_final_cands = vec![0; sim.ncand];
+        let method_poll_pairings = Vec::with_capacity(methods.len());
 
         TrialRunner {
             mode: config.mode,
@@ -115,6 +112,7 @@ impl<R: Rng> TrialRunner<R> {
             primary_method,
             ordered_final_cands,
             itrial: 0,
+            method_poll_pairings,
         }
     }
 
@@ -167,11 +165,15 @@ impl<R: Rng> TrialRunner<R> {
         self.run_election();
 
         let mut method_results: BTreeMap<String, MethodResult> = BTreeMap::new();
-        let mut prev_rslt = None;
+        // This trial's winner/runner-up for each tracker so far, which later
+        // strategic methods look up by index as their pre-election poll.
+        self.method_poll_pairings.clear();
         for method in self.methods.iter_mut() {
-            let (pairing, result) = method.elect(&self.sim, prev_rslt);
-            if let Strategy::Honest = method.method.strat() {
-                prev_rslt = Some(pairing);
+            let poll = method.poll.map(|i| self.method_poll_pairings[i]);
+            let (pairing, result) = method.elect(&self.sim, poll);
+            self.method_poll_pairings.push(pairing);
+            if !method.reported {
+                continue;
             }
             // Note here that result.winner is the regret-ranked index of the winner, not the candidate number.
             log::debug!(
@@ -221,7 +223,12 @@ impl<R: Rng> TrialRunner<R> {
     /// taken from whichever set of trackers this mode populated.
     pub(crate) fn method_stats(&self) -> Vec<SendableMethodReport> {
         match self.mode {
-            RunMode::SingleWinner => self.methods.iter().map(|m| m.sendable_report()).collect(),
+            RunMode::SingleWinner => self
+                .methods
+                .iter()
+                .filter(|m| m.reported)
+                .map(|m| m.sendable_report())
+                .collect(),
             RunMode::MultiWinner => self
                 .committees
                 .iter()
@@ -229,6 +236,36 @@ impl<R: Rng> TrialRunner<R> {
                 .collect(),
         }
     }
+}
+
+/// Build the single-winner trackers for the configured `methods`, keeping config
+/// order but making sure every strategic method's honest poll (see
+/// [`Method::honest_poll`]) runs somewhere before it.
+///
+/// Methods are matched by `Method` equality. A poll the config also lists is
+/// pulled forward if need be and reported as usual; one it doesn't list is
+/// added unreported, purely as input to the strategic method. A method listed
+/// twice fails [`Config::validate`]; if one gets here anyway, it runs once.
+fn method_trackers(methods: &[Method], sim: &Sim) -> Vec<MethodTracker> {
+    let mut trackers: Vec<MethodTracker> = Vec::with_capacity(methods.len());
+    // The method behind each tracker, in the same order.
+    let mut built: Vec<Method> = Vec::with_capacity(methods.len());
+    for method in methods {
+        if built.contains(method) {
+            continue; // pulled forward as an earlier method's poll, or listed twice
+        }
+        let poll = method.honest_poll().map(|poll| {
+            built.iter().position(|m| *m == poll).unwrap_or_else(|| {
+                let configured = methods.contains(&poll);
+                trackers.push(MethodTracker::new(&poll, sim, configured, None));
+                built.push(poll);
+                trackers.len() - 1
+            })
+        });
+        trackers.push(MethodTracker::new(method, sim, true, poll));
+        built.push(method.clone());
+    }
+    trackers
 }
 
 /// Assemble one trial's [`ExperimentResult`] from the just-run `sim`.
@@ -617,5 +654,123 @@ pub(crate) mod tests {
         assert!(runner.sim_primary.is_none());
         assert!(runner.primary_method.is_none());
         assert_eq!(runner.sim.ncand, 5);
+    }
+
+    fn method(json: &str) -> Method {
+        serde_json::from_str(json).expect("valid Method JSON")
+    }
+
+    /// `(colname, reported, poll)` for each tracker, in run order.
+    fn layout(methods: &[Method]) -> Vec<(String, bool, Option<usize>)> {
+        method_trackers(methods, &Sim::new(3, 5))
+            .iter()
+            .map(|t| (t.colname(), t.reported, t.poll))
+            .collect()
+    }
+
+    fn row(colname: &str, reported: bool, poll: Option<usize>) -> (String, bool, Option<usize>) {
+        (colname.to_string(), reported, poll)
+    }
+
+    const PL_H: &str = r#"{"Plurality": {"strat": "Honest"}}"#;
+    const PL_S: &str = r#"{"Plurality": {"strat": "Strategic"}}"#;
+    const RANGE_H: &str = r#"{"Range": {"strat": "Honest", "nranks": 10}}"#;
+    const RANGE_S: &str = r#"{"Range": {"strat": "Strategic", "nranks": 10}}"#;
+
+    #[test]
+    fn a_lone_strategic_method_gets_a_hidden_honest_poll() {
+        assert_eq!(
+            layout(&[method(PL_S)]),
+            [row("pl_h", false, None), row("pl_s", true, Some(0))]
+        );
+    }
+
+    #[test]
+    fn an_honest_poll_listed_later_is_pulled_forward_and_still_reported() {
+        assert_eq!(
+            layout(&[method(PL_S), method(PL_H)]),
+            [row("pl_h", true, None), row("pl_s", true, Some(0))]
+        );
+    }
+
+    #[test]
+    fn an_honest_poll_listed_earlier_is_reused_in_place() {
+        assert_eq!(
+            layout(&[method(RANGE_H), method(PL_H), method(RANGE_S)]),
+            [
+                row("range_10_h", true, None),
+                row("pl_h", true, None),
+                row("range_10_s", true, Some(0)),
+            ]
+        );
+    }
+
+    /// The old rule polled from whichever honest method ran last, so this
+    /// strategic Range used to take honest Plurality's result as its poll.
+    #[test]
+    fn a_strategic_method_polls_its_own_honest_twin_not_the_nearest_honest_one() {
+        assert_eq!(
+            layout(&[method(PL_H), method(RANGE_S)]),
+            [
+                row("pl_h", true, None),
+                row("range_10_h", false, None),
+                row("range_10_s", true, Some(1)),
+            ]
+        );
+    }
+
+    #[test]
+    fn strategic_methods_that_take_no_poll_get_none() {
+        let multivote = r#"{"Multivote": {"strat": "Strategic", "votes": 3, "spread_fact": 1.0}}"#;
+        assert_eq!(
+            layout(&[method(multivote)]),
+            [row("multi_s_3v", true, None)]
+        );
+    }
+
+    /// The honest poll drops strategic STAR's non-default stretch factor, so
+    /// it matches the plainly-configured honest STAR instead of duplicating it.
+    #[test]
+    fn strategy_only_parameters_dont_prevent_a_poll_match() {
+        let star_h = r#"{"STAR": {"strat": "Honest"}}"#;
+        let star_s = r#"{"STAR": {"strat": "Strategic", "strategic_stretch_factor": 2.0}}"#;
+        assert_eq!(
+            layout(&[method(star_h), method(star_s)]),
+            [row("star_6_h", true, None), row("star_6_s", true, Some(0))]
+        );
+    }
+
+    /// `Config::validate` rejects this config; `method_trackers` just doesn't
+    /// build a second copy.
+    #[test]
+    fn a_method_listed_twice_runs_once() {
+        assert_eq!(
+            layout(&[method(PL_H), method(PL_H)]),
+            [row("pl_h", true, None)]
+        );
+    }
+
+    /// Strategic Range used to `unwrap()` a missing poll and panic. Now it runs,
+    /// and only the configured methods reach the output and the summary.
+    #[test]
+    fn do_trial_reports_only_configured_methods_when_polls_are_hidden() {
+        let mut config = single_winner_config(None);
+        config.methods = vec![method(PL_S), method(RANGE_S)];
+        let mut runner = TrialRunner::new(&config, StdRng::seed_from_u64(3));
+        assert_eq!(runner.methods.len(), 4);
+
+        for _ in 0..5 {
+            let er = runner.do_trial();
+            assert_eq!(
+                er.methods.keys().collect::<Vec<_>>(),
+                ["pl_s", "range_10_s"]
+            );
+        }
+        let stats: Vec<String> = runner
+            .method_stats()
+            .iter()
+            .map(|r| r.name.clone())
+            .collect();
+        assert_eq!(stats, ["Plurality, Strategic", "Range 1-10, Strategic"]);
     }
 }
