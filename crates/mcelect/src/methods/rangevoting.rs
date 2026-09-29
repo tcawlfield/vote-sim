@@ -9,7 +9,7 @@ use super::results::{Strategy, WinnerAndRunnerup};
 use super::tallies::{Tallies, tally_votes};
 use crate::sim::Sim;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct RangeVoting {
     pub strat: Strategy,
     pub nranks: i32,
@@ -45,10 +45,13 @@ impl RangeVoting {
     }
 
     /// When strategic, the honest `RangeVoting` whose result serves as this
-    /// method's pre-election poll.
+    /// method's pre-election poll. `strategic_stretch_factor` doesn't affect
+    /// honest ballots, so it's reset to its default: the poll then compares
+    /// equal to an honest `RangeVoting` configured the ordinary way.
     pub fn honest_poll(&self) -> Option<Self> {
         matches!(self.strat, Strategy::Strategic).then(|| Self {
             strat: Strategy::Honest,
+            strategic_stretch_factor: default_stretch(),
             ..self.clone()
         })
     }

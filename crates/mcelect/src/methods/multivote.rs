@@ -9,7 +9,7 @@ use super::results::{Strategy, WinnerAndRunnerup};
 use super::tallies::{Tallies, tally_votes};
 use crate::sim::Sim;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Multivote {
     pub strat: Strategy,
     pub votes: i32,

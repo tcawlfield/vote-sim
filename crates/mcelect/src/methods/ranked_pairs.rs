@@ -10,7 +10,7 @@ use super::condorcet_util::{CandPair, find_candidate_pairoffs, find_locked_in_wi
 use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
 use crate::sim::Sim;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct RP {
     pub strat: Strategy,
 }

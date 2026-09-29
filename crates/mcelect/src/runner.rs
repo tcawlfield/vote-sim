@@ -242,29 +242,28 @@ impl<R: Rng> TrialRunner<R> {
 /// order but making sure every strategic method's honest poll (see
 /// [`Method::honest_poll`]) runs somewhere before it.
 ///
-/// Methods are identified by column name. A poll the config also lists is
+/// Methods are matched by `Method` equality. A poll the config also lists is
 /// pulled forward if need be and reported as usual; one it doesn't list is
 /// added unreported, purely as input to the strategic method. A method listed
 /// twice is kept once, since both would write the same output column anyway.
 fn method_trackers(methods: &[Method], sim: &Sim) -> Vec<MethodTracker> {
-    fn position(trackers: &[MethodTracker], colname: &str) -> Option<usize> {
-        trackers.iter().position(|t| t.colname() == colname)
-    }
-
     let mut trackers: Vec<MethodTracker> = Vec::with_capacity(methods.len());
+    // The method behind each tracker, in the same order.
+    let mut built: Vec<Method> = Vec::with_capacity(methods.len());
     for method in methods {
-        if position(&trackers, &method.colname()).is_some() {
-            continue;
+        if built.contains(method) {
+            continue; // pulled forward as an earlier method's poll, or listed twice
         }
         let poll = method.honest_poll().map(|poll| {
-            let poll_colname = poll.colname();
-            position(&trackers, &poll_colname).unwrap_or_else(|| {
-                let configured = methods.iter().any(|m| m.colname() == poll_colname);
+            built.iter().position(|m| *m == poll).unwrap_or_else(|| {
+                let configured = methods.contains(&poll);
                 trackers.push(MethodTracker::new(&poll, sim, configured, None));
+                built.push(poll);
                 trackers.len() - 1
             })
         });
         trackers.push(MethodTracker::new(method, sim, true, poll));
+        built.push(method.clone());
     }
     trackers
 }
@@ -726,6 +725,18 @@ pub(crate) mod tests {
         assert_eq!(
             layout(&[method(multivote)]),
             [row("multi_s_3v", true, None)]
+        );
+    }
+
+    /// The honest poll drops strategic STAR's non-default stretch factor, so
+    /// it matches the plainly-configured honest STAR instead of duplicating it.
+    #[test]
+    fn strategy_only_parameters_dont_prevent_a_poll_match() {
+        let star_h = r#"{"STAR": {"strat": "Honest"}}"#;
+        let star_s = r#"{"STAR": {"strat": "Strategic", "strategic_stretch_factor": 2.0}}"#;
+        assert_eq!(
+            layout(&[method(star_h), method(star_s)]),
+            [row("star_6_h", true, None), row("star_6_s", true, Some(0))]
         );
     }
 

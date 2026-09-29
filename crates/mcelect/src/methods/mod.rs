@@ -31,7 +31,11 @@ pub use star::STAR;
 use crate::sim::Sim;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// A single-winner voting method and its parameters, as configured.
+///
+/// `PartialEq` means "elects the same way": it's how the runner finds a
+/// strategic method's honest poll among the configured methods.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Method {
     Plurality(Plurality),
     Range(RangeVoting),

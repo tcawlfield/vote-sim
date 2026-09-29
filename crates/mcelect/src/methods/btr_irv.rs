@@ -9,7 +9,7 @@ use super::results::{ElectResult, WinnerAndRunnerup};
 use super::tallies::Tallies;
 use crate::sim::Sim;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct BtrIrv {
     // pub strat: Strategy,
 }

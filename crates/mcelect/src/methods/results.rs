@@ -18,7 +18,7 @@ pub struct WinnerAndRunnerup {
     pub runnerup: ElectResult,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display)]
 pub enum Strategy {
     Honest,
     Strategic,

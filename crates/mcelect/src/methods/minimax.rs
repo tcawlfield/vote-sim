@@ -7,7 +7,7 @@ use super::MethodSim;
 use super::results::{ElectResult, WinnerAndRunnerup};
 use crate::sim::Sim;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Minimax {
     // pub strat: Strategy,
 }

@@ -32,7 +32,7 @@ use serde::{Deserialize, Serialize};
 ///    with the number of candidates, which makes open primary elections likely to
 ///    favor outlying candidates, or extremists.
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Plurality {
     /// Honest voters will vote for the candidate with the highest score, or
     /// perceived utility. Strategic voters will instead limit their choice to

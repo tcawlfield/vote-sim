@@ -27,7 +27,7 @@ use crate::sim::Sim;
 /// study, very simple, and in some informal settings it could
 /// be worth considering or at least comparing with.
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Borda {
     /// Strategic or Honest (defaults to Honest).
     /// Strategic ballots rank the top two pre-election (honest) candidates
