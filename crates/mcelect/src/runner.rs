@@ -799,5 +799,11 @@ pub(crate) mod tests {
             .map(|r| r.name.clone())
             .collect();
         assert_eq!(stats, ["Plurality, Strategic", "Range 1-10, Strategic"]);
+        let colnames: Vec<String> = runner
+            .method_stats()
+            .into_iter()
+            .map(|r| r.colname)
+            .collect();
+        assert_eq!(colnames, ["pl_s", "range_10_s"]);
     }
 }
