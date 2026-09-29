@@ -256,8 +256,13 @@ fn method_trackers(methods: &[Method], sim: &Sim) -> Vec<MethodTracker> {
         }
         let poll = method.honest_poll().map(|poll| {
             built.iter().position(|m| *m == poll).unwrap_or_else(|| {
-                let configured = methods.contains(&poll);
-                trackers.push(MethodTracker::new(&poll, sim, configured, None));
+                // Build a configured poll from its own entry, which carries its
+                // `colname`; the twin compares equal but has the default name.
+                let (poll, reported) = match methods.iter().find(|m| **m == poll) {
+                    Some(configured) => (configured.clone(), true),
+                    None => (poll, false),
+                };
+                trackers.push(MethodTracker::new(&poll, sim, reported, None));
                 built.push(poll);
                 trackers.len() - 1
             })
@@ -737,6 +742,28 @@ pub(crate) mod tests {
         assert_eq!(
             layout(&[method(star_h), method(star_s)]),
             [row("star_6_h", true, None), row("star_6_s", true, Some(0))]
+        );
+    }
+
+    /// Polls are matched by `Method` equality, which ignores `colname`: a
+    /// renamed honest method still serves as the poll, under its own name.
+    #[test]
+    fn a_renamed_honest_method_still_serves_as_the_poll() {
+        let pl_h_renamed = r#"{"Plurality": {"strat": "Honest", "colname": "first_choice"}}"#;
+        assert_eq!(
+            layout(&[method(PL_S), method(pl_h_renamed)]),
+            [row("first_choice", true, None), row("pl_s", true, Some(0))]
+        );
+    }
+
+    /// A hidden poll is built from the strategic method's parameters, but not
+    /// its name: that belongs to the strategic method's own column.
+    #[test]
+    fn a_hidden_poll_takes_the_default_name_not_the_strategic_ones() {
+        let pl_s_renamed = r#"{"Plurality": {"strat": "Strategic", "colname": "pl_tactical"}}"#;
+        assert_eq!(
+            layout(&[method(pl_s_renamed)]),
+            [row("pl_h", false, None), row("pl_tactical", true, Some(0))]
         );
     }
 

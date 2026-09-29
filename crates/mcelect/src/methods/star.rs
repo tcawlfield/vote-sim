@@ -4,6 +4,7 @@
 use ndarray::Array2;
 use serde::{Deserialize, Serialize};
 
+use super::ColName;
 use super::MethodSim;
 use super::rangevoting::{fill_range_ballot, fill_range_ballot_strat};
 use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
@@ -18,6 +19,9 @@ pub struct STAR {
     pub nranks: i32,
     #[serde(default = "default_stretch")]
     strategic_stretch_factor: f64,
+    /// Replaces the default output column name; see [`ColName`].
+    #[serde(default, skip_serializing_if = "ColName::is_default")]
+    pub colname: ColName,
 }
 
 fn default_ranks() -> i32 {
@@ -37,12 +41,13 @@ pub struct STARSim {
 }
 
 impl STAR {
-    /// The output column name for this method's results.
+    /// The output column name for this method's results: the configured
+    /// `colname`, or else the method's default.
     pub fn colname(&self) -> String {
-        match self.strat {
+        self.colname.or_else(|| match self.strat {
             Strategy::Honest => format!("star_{}_h", self.nranks),
             Strategy::Strategic => format!("star_{}_s", self.nranks),
-        }
+        })
     }
 
     /// When strategic, the honest `STAR` whose result serves as this
@@ -53,6 +58,7 @@ impl STAR {
         matches!(self.strat, Strategy::Strategic).then(|| Self {
             strat: Strategy::Honest,
             strategic_stretch_factor: default_stretch(),
+            colname: ColName::default(),
             ..self.clone()
         })
     }
@@ -163,6 +169,7 @@ mod tests {
             strat: Strategy::Honest,
             nranks: 6,
             strategic_stretch_factor: 1.0,
+            colname: ColName::default(),
         }
         .new_sim(&sim);
         // cand's 1 and 2 go to runoff.

@@ -4,6 +4,7 @@
 use ndarray::{Array2, Axis};
 use serde::{Deserialize, Serialize};
 
+use super::ColName;
 use super::MWMethodSim;
 use super::rangevoting::fill_range_ballot;
 use super::results::Strategy;
@@ -16,6 +17,9 @@ pub struct RRV {
     pub strat: Strategy,
     pub ranks: i32,
     pub k: f64,
+    /// Replaces the default output column name; see [`ColName`].
+    #[serde(default, skip_serializing_if = "ColName::is_default")]
+    pub colname: ColName,
 }
 
 pub struct RRVSim {
@@ -32,9 +36,11 @@ I'm using this purely as a method of spreading out candidates across the positio
 */
 
 impl RRV {
-    /// The output column name for this method's results.
+    /// The output column name for this method's results: the configured
+    /// `colname`, or else the method's default.
     pub fn colname(&self) -> String {
-        format!("rrv_{}_{}", self.ranks, self.strat.as_letter())
+        self.colname
+            .or_else(|| format!("rrv_{}_{}", self.ranks, self.strat.as_letter()))
     }
 
     pub fn new_sim(&self, sim: &Sim) -> RRVSim {
@@ -127,6 +133,7 @@ mod tests {
             strat: Strategy::Honest,
             ranks: 11,
             k: 1.0,
+            colname: ColName::default(),
         }
         .new_sim(&sim);
         for ivtr in 0..60 {
