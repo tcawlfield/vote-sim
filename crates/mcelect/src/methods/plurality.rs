@@ -7,6 +7,7 @@ use super::tallies::{Tallies, tally_votes};
 use crate::sim::Sim;
 use serde::{Deserialize, Serialize};
 
+use super::ColName;
 /// In Plurality voting, a.k.a First Past the Post, voters mark exactly one candidate on
 /// their ballots to indicate that candidate as their top preference. The candidate
 /// with the must number of "votes" wins the election.
@@ -33,11 +34,15 @@ use serde::{Deserialize, Serialize};
 ///    favor outlying candidates, or extremists.
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct Plurality {
     /// Honest voters will vote for the candidate with the highest score, or
     /// perceived utility. Strategic voters will instead limit their choice to
     /// one of the two front-runners in a pre-election poll.
     pub strat: Strategy,
+    /// Replaces the default output column name; see [`ColName`].
+    #[serde(default, skip_serializing_if = "ColName::is_default")]
+    pub colname: ColName,
 }
 
 #[derive(Debug)]
@@ -47,12 +52,13 @@ pub struct PluralitySim {
 }
 
 impl Plurality {
-    /// The output column name for this method's results.
+    /// The output column name for this method's results: the configured
+    /// `colname`, or else the method's default.
     pub fn colname(&self) -> String {
-        match self.strat {
+        self.colname.or_else(|| match self.strat {
             Strategy::Honest => "pl_h".to_string(),
             Strategy::Strategic => "pl_s".to_string(),
-        }
+        })
     }
 
     /// When strategic, the honest `Plurality` whose result serves as this
@@ -60,6 +66,7 @@ impl Plurality {
     pub fn honest_poll(&self) -> Option<Self> {
         matches!(self.strat, Strategy::Strategic).then_some(Self {
             strat: Strategy::Honest,
+            colname: ColName::default(),
         })
     }
 
@@ -120,6 +127,7 @@ mod tests {
     fn honest(sim: &Sim) -> PluralitySim {
         Plurality {
             strat: Strategy::Honest,
+            colname: ColName::default(),
         }
         .new_sim(sim)
     }
@@ -127,6 +135,7 @@ mod tests {
     fn strategic(sim: &Sim) -> PluralitySim {
         Plurality {
             strat: Strategy::Strategic,
+            colname: ColName::default(),
         }
         .new_sim(sim)
     }
@@ -225,9 +234,11 @@ mod tests {
     fn only_strategic_plurality_has_an_honest_poll() {
         let honest = Plurality {
             strat: Strategy::Honest,
+            colname: ColName::default(),
         };
         let strategic = Plurality {
             strat: Strategy::Strategic,
+            colname: ColName::default(),
         };
         assert!(honest.honest_poll().is_none());
         assert_eq!(strategic.honest_poll().unwrap().colname(), "pl_h");

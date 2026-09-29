@@ -5,14 +5,19 @@ use log::debug;
 use ndarray::Axis;
 use serde::{Deserialize, Serialize};
 
+use super::ColName;
 use super::MethodSim;
 use super::results::{ElectResult, WinnerAndRunnerup};
 use super::tallies::Tallies;
 use crate::sim::Sim;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[serde(deny_unknown_fields)]
 pub struct InstantRunoff {
     // pub strat: Strategy,
+    /// Replaces the default output column name; see [`ColName`].
+    #[serde(default, skip_serializing_if = "ColName::is_default")]
+    pub colname: ColName,
 }
 
 #[derive(Debug)]
@@ -23,9 +28,10 @@ pub struct IRVSim {
 }
 
 impl InstantRunoff {
-    /// The output column name for this method's results.
+    /// The output column name for this method's results: the configured
+    /// `colname`, or else the method's default.
     pub fn colname(&self) -> String {
-        "IRV_h".to_string()
+        self.colname.or_else(|| "IRV_h".to_string())
         // TODO: Implement strategic variant
         // match self.p.strat {
         //     Strategy::Honest => "IRV_h".to_string(),
@@ -135,7 +141,7 @@ mod tests {
          * Round 2 tallies: 2, 2, -, 1 -- eliminate cand 3
          * Round 3 tallies: 3, 2, -, - -- winner is 0, runnerup is 1
          */
-        let mut method = InstantRunoff {}.new_sim(&sim);
+        let mut method = InstantRunoff::default().new_sim(&sim);
         sim.rank_candidates();
         let honest_results = method.elect(&sim, None);
         assert_eq!(honest_results.winner.cand, 0);

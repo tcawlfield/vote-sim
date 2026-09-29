@@ -4,17 +4,22 @@
 use ndarray::{ArrayView, Ix1};
 use serde::{Deserialize, Serialize};
 
+use super::ColName;
 use super::MethodSim;
 use super::results::{Strategy, WinnerAndRunnerup};
 use super::tallies::{Tallies, tally_votes};
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct RangeVoting {
     pub strat: Strategy,
     pub nranks: i32,
     #[serde(default = "default_stretch")]
     strategic_stretch_factor: f64,
+    /// Replaces the default output column name; see [`ColName`].
+    #[serde(default, skip_serializing_if = "ColName::is_default")]
+    pub colname: ColName,
 }
 
 fn default_stretch() -> f64 {
@@ -29,19 +34,22 @@ pub struct RangeVotingSim {
 }
 
 impl RangeVoting {
-    /// The output column name for this method's results.
+    /// The output column name for this method's results: the configured
+    /// `colname`, or else the method's default.
     pub fn colname(&self) -> String {
-        if self.nranks == 2 {
-            match self.strat {
-                Strategy::Honest => "aprv_h".to_string(),
-                Strategy::Strategic => "aprv_s".to_string(),
+        self.colname.or_else(|| {
+            if self.nranks == 2 {
+                match self.strat {
+                    Strategy::Honest => "aprv_h".to_string(),
+                    Strategy::Strategic => "aprv_s".to_string(),
+                }
+            } else {
+                match self.strat {
+                    Strategy::Honest => format!("range_{}_h", self.nranks),
+                    Strategy::Strategic => format!("range_{}_s", self.nranks),
+                }
             }
-        } else {
-            match self.strat {
-                Strategy::Honest => format!("range_{}_h", self.nranks),
-                Strategy::Strategic => format!("range_{}_s", self.nranks),
-            }
-        }
+        })
     }
 
     /// When strategic, the honest `RangeVoting` whose result serves as this
@@ -52,6 +60,7 @@ impl RangeVoting {
         matches!(self.strat, Strategy::Strategic).then(|| Self {
             strat: Strategy::Honest,
             strategic_stretch_factor: default_stretch(),
+            colname: ColName::default(),
             ..self.clone()
         })
     }
@@ -181,6 +190,7 @@ mod tests {
             strat: Strategy::Honest,
             nranks: 10,
             strategic_stretch_factor: 2.0,
+            colname: ColName::default(),
         }
         .new_sim(&sim);
         let honest_results = method.elect(&sim, None);
@@ -191,6 +201,7 @@ mod tests {
             strat: Strategy::Strategic,
             nranks: 10,
             strategic_stretch_factor: 1000., // votes become 0's and 10's
+            colname: ColName::default(),
         }
         .new_sim(&sim);
         let strat_results = method2.elect(&sim, Some(honest_results));

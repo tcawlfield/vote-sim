@@ -51,6 +51,7 @@ fn default_primary() -> MultiWinMethod {
         strat: crate::methods::Strategy::Honest,
         ranks: 25,
         k: 0.5,
+        colname: crate::methods::ColName::default(),
     })
 }
 
@@ -112,6 +113,9 @@ impl Config {
 fn check_unique_colnames(list: &str, colnames: impl Iterator<Item = String>) -> Result<(), String> {
     let mut first_entry: BTreeMap<String, usize> = BTreeMap::new();
     for (i, colname) in colnames.enumerate() {
+        if colname.is_empty() {
+            return Err(format!("`{list}` entry {} has an empty `colname`", i + 1));
+        }
         if let Some(j) = first_entry.get(&colname) {
             return Err(format!(
                 "`{list}` entries {} and {} would both write output column `{colname}`",
@@ -253,5 +257,105 @@ mod tests {
             config.validate().unwrap_err(),
             "`committee_methods` entries 2 and 3 would both write output column `rrv_25_h`"
         );
+    }
+
+    /// A misspelled parameter used to be dropped silently, leaving its default
+    /// in place. Every config struct now rejects fields it doesn't know.
+    #[test]
+    fn a_misspelled_method_parameter_is_an_error() {
+        let toml_str = base_toml("")
+            + "[[methods]]\nRange = { strat = \"Strategic\", nranks = 10, strategic_strech_factor = 2.0 }\n";
+        let err = toml::from_str::<Config>(&toml_str).unwrap_err();
+        assert!(
+            err.message()
+                .contains("unknown field `strategic_strech_factor`"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn a_misspelled_consideration_parameter_is_an_error() {
+        let toml_str =
+            "voters = 10\ncandidates = 4\n[[considerations]]\nLikability = { maen = 0.5 }\n";
+        let err = toml::from_str::<Config>(toml_str).unwrap_err();
+        assert!(err.message().contains("unknown field `maen`"), "{err}");
+    }
+
+    #[test]
+    fn colname_replaces_the_default_column_name() {
+        let config = single_winner_with_methods(&[
+            r#"Plurality = { strat = "Honest", colname = "first_choice" }"#,
+            // The table form, as in configs/range_strat.toml.
+            "[methods.Range]\nstrat = \"Honest\"\nnranks = 10\ncolname = \"score_10\"",
+            r#"Borda = {}"#,
+        ]);
+        let colnames: Vec<String> = config.methods.iter().map(Method::colname).collect();
+        assert_eq!(colnames, ["first_choice", "score_10", "Borda_h"]);
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn a_misspelled_colname_is_an_error() {
+        let toml_str =
+            base_toml("") + "[[methods]]\nPlurality = { strat = \"Honest\", colnmae = \"x\" }\n";
+        let err = toml::from_str::<Config>(&toml_str).unwrap_err();
+        assert!(err.message().contains("unknown field `colnmae`"), "{err}");
+    }
+
+    /// The motivating case: a sweep over a parameter that isn't part of the
+    /// default column name, told apart by giving each its own.
+    #[test]
+    fn distinct_colnames_resolve_a_default_name_collision() {
+        let config = single_winner_with_methods(&[
+            r#"STAR = { strat = "Strategic", strategic_stretch_factor = 2.0, colname = "star_s_2x" }"#,
+            r#"STAR = { strat = "Strategic", strategic_stretch_factor = 4.0, colname = "star_s_4x" }"#,
+        ]);
+        assert!(config.validate().is_ok());
+
+        let committees = multi_winner_with_committee_methods(&[
+            r#"RRV = { strat = "Honest", ranks = 25, k = 0.5, colname = "rrv_k05" }"#,
+            r#"RRV = { strat = "Honest", ranks = 25, k = 1.0, colname = "rrv_k10" }"#,
+        ]);
+        assert!(committees.validate().is_ok());
+    }
+
+    #[test]
+    fn a_colname_colliding_with_another_methods_default_fails_validation() {
+        let config = single_winner_with_methods(&[
+            r#"Plurality = { strat = "Honest" }"#,
+            r#"Borda = { colname = "pl_h" }"#,
+        ]);
+        assert_eq!(
+            config.validate().unwrap_err(),
+            "`methods` entries 1 and 2 would both write output column `pl_h`"
+        );
+    }
+
+    #[test]
+    fn an_empty_colname_fails_validation() {
+        let config =
+            single_winner_with_methods(&[r#"Plurality = { strat = "Honest", colname = "" }"#]);
+        assert_eq!(
+            config.validate().unwrap_err(),
+            "`methods` entry 1 has an empty `colname`"
+        );
+    }
+
+    /// The config is stored as JSON in the parquet metadata: a colname must
+    /// survive the trip, and an unset one must not appear at all.
+    #[test]
+    fn colname_round_trips_through_json_and_is_omitted_when_unset() {
+        let config = single_winner_with_methods(&[
+            r#"Plurality = { strat = "Honest" }"#,
+            r#"Plurality = { strat = "Strategic", colname = "pl_tactical" }"#,
+        ]);
+        let json = serde_json::to_string(&config).unwrap();
+        assert!(
+            json.contains(r#"{"Plurality":{"strat":"Honest"}}"#),
+            "{json}"
+        );
+        let back = Config::from_json_str(&json).unwrap();
+        let colnames: Vec<String> = back.methods.iter().map(Method::colname).collect();
+        assert_eq!(colnames, ["pl_h", "pl_tactical"]);
     }
 }

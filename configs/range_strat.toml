@@ -44,29 +44,30 @@ nranks = 10
 [methods.Range]
 strat = "Strategic"
 nranks = 10
-strategic_stretch_factor = 1.0
+colname = "range_10_s_1x"
+strategic_stretch_factor = 1.0 # identical to honest
 
-# Output from this would go into the same column as above.
-# Only pick one of these to be active at a time.
+[[methods]]
+[methods.Range]
+strat = "Strategic"
+nranks = 10
+strategic_stretch_factor = 1.5
+colname = "range_10_s_1p5x"
 
-# [[methods]]
-# [methods.Range]
-# strat = "Strategic"
-# nranks = 10
-# strategic_stretch_factor = 1.5
-# 
-# # This one does the best with less siloed politics:
-# [[methods]]
-# [methods.Range]
-# strat = "Strategic"
-# nranks = 10
-# strategic_stretch_factor = 2.0
-# 
-# [[methods]]
-# [methods.Range]
-# strat = "Strategic"
-# nranks = 10
-# strategic_stretch_factor = 100.0
+# This one does the best with less siloed politics:
+[[methods]]
+[methods.Range]
+strat = "Strategic"
+nranks = 10
+strategic_stretch_factor = 2.0
+colname = "range_10_s_2x"
+
+[[methods]]
+[methods.Range]
+strat = "Strategic"
+nranks = 10
+strategic_stretch_factor = 100.0
+colname = "range_10_s_100x"
 
 [[methods]] # Approval voting, honest
 [methods.Range]
@@ -77,25 +78,27 @@ nranks = 2
 [methods.Range]
 strat = "Strategic"
 nranks = 2
-strategic_stretch_factor = 1.0
+strategic_stretch_factor = 1.0 # identical to honest
+colname = "aprv_s_1x"
 
-# Same limitation applies here
+[[methods]]
+[methods.Range]
+strat = "Strategic"
+nranks = 2
+strategic_stretch_factor = 1.5
+colname = "aprv_s_1p5x"
 
-# [[methods]]
-# [methods.Range]
-# strat = "Strategic"
-# nranks = 2
-# strategic_stretch_factor = 1.5
-# 
-# # This one does the best with more siloed politics
-# [[methods]]
-# [methods.Range]
-# strat = "Strategic"
-# nranks = 2
-# strategic_stretch_factor = 2.0
-# 
-# [[methods]]
-# [methods.Range]
-# strat = "Strategic"
-# nranks = 2
-# strategic_stretch_factor = 100.0
+# This one does the best with more siloed politics
+[[methods]]
+[methods.Range]
+strat = "Strategic"
+nranks = 2
+strategic_stretch_factor = 2.0
+colname = "aprv_s_2x"
+
+[[methods]]
+[methods.Range]
+strat = "Strategic"
+nranks = 2
+strategic_stretch_factor = 100.0
+colname = "aprv_s_100x"

@@ -3,13 +3,18 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::ColName;
 use super::MethodSim;
 use super::results::{ElectResult, WinnerAndRunnerup};
 use crate::sim::Sim;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[serde(deny_unknown_fields)]
 pub struct Minimax {
     // pub strat: Strategy,
+    /// Replaces the default output column name; see [`ColName`].
+    #[serde(default, skip_serializing_if = "ColName::is_default")]
+    pub colname: ColName,
 }
 
 #[derive(Debug)]
@@ -20,9 +25,10 @@ pub struct MinimaxSim {
 }
 
 impl Minimax {
-    /// The output column name for this method's results.
+    /// The output column name for this method's results: the configured
+    /// `colname`, or else the method's default.
     pub fn colname(&self) -> String {
-        "MM_h".to_string()
+        self.colname.or_else(|| "MM_h".to_string())
     }
 
     pub fn new_sim(&self, sim: &Sim) -> MinimaxSim {
@@ -98,7 +104,7 @@ mod tests {
                 [16, -36, -66, 0],
             ]
         );
-        let mut method = Minimax {}.new_sim(&sim);
+        let mut method = Minimax::default().new_sim(&sim);
         let honest_results = method.elect(&sim, None);
         assert_eq!(method.min_victory_margin, vec![-16, 16, -36, -66]);
         assert_eq!(honest_results.winner.cand, 1);

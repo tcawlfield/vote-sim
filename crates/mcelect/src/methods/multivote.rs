@@ -4,16 +4,21 @@
 use ndarray::Axis;
 use serde::{Deserialize, Serialize};
 
+use super::ColName;
 use super::MethodSim;
 use super::results::{Strategy, WinnerAndRunnerup};
 use super::tallies::{Tallies, tally_votes};
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct Multivote {
     pub strat: Strategy,
     pub votes: i32,
     pub spread_fact: f64,
+    /// Replaces the default output column name; see [`ColName`].
+    #[serde(default, skip_serializing_if = "ColName::is_default")]
+    pub colname: ColName,
 }
 
 #[derive(Debug)]
@@ -24,12 +29,13 @@ pub struct MultivoteSim {
 }
 
 impl Multivote {
-    /// The output column name for this method's results.
+    /// The output column name for this method's results: the configured
+    /// `colname`, or else the method's default.
     pub fn colname(&self) -> String {
-        match self.strat {
+        self.colname.or_else(|| match self.strat {
             Strategy::Honest => format!("multi_h_{}v", self.votes),
             Strategy::Strategic => format!("multi_s_{}v", self.votes),
-        }
+        })
     }
 
     pub fn new_sim(&self, sim: &Sim) -> MultivoteSim {
@@ -114,6 +120,7 @@ mod tests {
             strat: Strategy::Honest,
             votes: 4,
             spread_fact: 1.1,
+            colname: ColName::default(),
         }
         .new_sim(&sim);
         // For initial scores of 1., 2., 4.,   7.   -- reduction = 10/4 * 1.1 = 2.75. First vote to 3
@@ -132,6 +139,7 @@ mod tests {
             strat: Strategy::Strategic,
             votes: 4,
             spread_fact: 1.1,
+            colname: ColName::default(),
         }
         .new_sim(&sim);
         // tallies: 4, 4, 4, 8

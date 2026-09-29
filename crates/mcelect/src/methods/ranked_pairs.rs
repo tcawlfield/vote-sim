@@ -5,14 +5,19 @@ use log::*;
 use ndarray::Array2;
 use serde::{Deserialize, Serialize};
 
+use super::ColName;
 use super::MethodSim;
 use super::condorcet_util::{CandPair, find_candidate_pairoffs, find_locked_in_winner, lock_in};
 use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct RP {
     pub strat: Strategy,
+    /// Replaces the default output column name; see [`ColName`].
+    #[serde(default, skip_serializing_if = "ColName::is_default")]
+    pub colname: ColName,
 }
 
 #[derive(Debug)]
@@ -23,12 +28,13 @@ pub struct RPSim {
 }
 
 impl RP {
-    /// The output column name for this method's results.
+    /// The output column name for this method's results: the configured
+    /// `colname`, or else the method's default.
     pub fn colname(&self) -> String {
-        match self.strat {
+        self.colname.or_else(|| match self.strat {
             Strategy::Honest => "rp_h".to_string(),
             Strategy::Strategic => "rp_s".to_string(),
-        }
+        })
     }
 
     pub fn new_sim(&self, sim: &Sim) -> RPSim {
@@ -134,6 +140,7 @@ mod tests {
         ];
         let mut method = RP {
             strat: Strategy::Honest,
+            colname: ColName::default(),
         }
         .new_sim(&sim);
         sim.rank_candidates(); // Creates the i_beats_j matrix in sim

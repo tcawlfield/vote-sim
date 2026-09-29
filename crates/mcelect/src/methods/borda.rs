@@ -4,6 +4,7 @@
 use ndarray::Axis;
 use serde::{Deserialize, Serialize};
 
+use super::ColName;
 use super::MethodSim;
 use super::results::{Strategy, WinnerAndRunnerup, default_honest};
 use super::tallies::{Tallies, tally_votes};
@@ -28,6 +29,7 @@ use crate::sim::Sim;
 /// be worth considering or at least comparing with.
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct Borda {
     /// Strategic or Honest (defaults to Honest).
     /// Strategic ballots rank the top two pre-election (honest) candidates
@@ -40,6 +42,9 @@ pub struct Borda {
     /// can be considered for small groups wanting a simplified voting method.
     #[serde(default = "default_none")]
     pub rank_top_n: Option<usize>,
+    /// Replaces the default output column name; see [`ColName`].
+    #[serde(default, skip_serializing_if = "ColName::is_default")]
+    pub colname: ColName,
 }
 
 fn default_none() -> Option<usize> {
@@ -53,12 +58,13 @@ pub struct BordaSim {
 }
 
 impl Borda {
-    /// The output column name for this method's results.
+    /// The output column name for this method's results: the configured
+    /// `colname`, or else the method's default.
     pub fn colname(&self) -> String {
-        match self.rank_top_n {
+        self.colname.or_else(|| match self.rank_top_n {
             Some(n) => format!("Borda_{}_{}", self.strat.as_letter(), n),
             None => format!("Borda_{}", self.strat.as_letter()),
-        }
+        })
     }
 
     /// When strategic, the honest `Borda` whose result serves as this
@@ -66,6 +72,7 @@ impl Borda {
     pub fn honest_poll(&self) -> Option<Self> {
         matches!(self.strat, Strategy::Strategic).then(|| Self {
             strat: Strategy::Honest,
+            colname: ColName::default(),
             ..self.clone()
         })
     }
@@ -154,6 +161,7 @@ mod tests {
         let mut method = Borda {
             strat: Strategy::Honest,
             rank_top_n: None,
+            colname: ColName::default(),
         }
         .new_sim(&sim);
         sim.rank_candidates();
@@ -166,6 +174,7 @@ mod tests {
         let mut method = Borda {
             strat: Strategy::Strategic,
             rank_top_n: None,
+            colname: ColName::default(),
         }
         .new_sim(&sim);
         let strat_results = method.elect(&sim, Some(honest_results));
@@ -193,6 +202,7 @@ mod tests {
         let mut method = Borda {
             strat: Strategy::Honest,
             rank_top_n: Some(2),
+            colname: ColName::default(),
         }
         .new_sim(&sim);
         sim.rank_candidates();
@@ -204,6 +214,7 @@ mod tests {
         let mut method = Borda {
             strat: Strategy::Strategic,
             rank_top_n: Some(3),
+            colname: ColName::default(),
         }
         .new_sim(&sim);
         let strat_results = method.elect(&sim, Some(honest_results));

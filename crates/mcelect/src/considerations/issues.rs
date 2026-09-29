@@ -17,6 +17,7 @@ const SQRT_3: f64 = 1.732050807568877293527446341505872367_f64; // borrowed from
 /// Scores, or voters' perceived utilities for each choice, are penalized
 /// by the distance between the voter and choice in (Euclidean) issue space.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Issue {
     /// The scale of the issue
     pub sigma: f64,

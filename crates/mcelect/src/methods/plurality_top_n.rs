@@ -3,6 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::ColName;
 use super::MWMethodSim;
 use super::tallies::Tallies;
 use crate::methods::ElectResult;
@@ -10,8 +11,13 @@ use crate::sim::Sim;
 
 /// PluralityTopN is a (bad) multi-winner method based on a plurality
 /// ballot. The top N vote-getters are elected.
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct PluralityTopN {}
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(deny_unknown_fields)]
+pub struct PluralityTopN {
+    /// Replaces the default output column name; see [`ColName`].
+    #[serde(default, skip_serializing_if = "ColName::is_default")]
+    pub colname: ColName,
+}
 
 pub struct PluralityTopNSim {
     _p: PluralityTopN,
@@ -21,9 +27,10 @@ pub struct PluralityTopNSim {
 }
 
 impl PluralityTopN {
-    /// The output column name for this method's results.
+    /// The output column name for this method's results: the configured
+    /// `colname`, or else the method's default.
     pub fn colname(&self) -> String {
-        "pltn".to_string()
+        self.colname.or_else(|| "pltn".to_string())
     }
 
     pub fn new_sim(&self, sim: &Sim) -> PluralityTopNSim {
@@ -76,7 +83,7 @@ mod tests {
     fn test_plurality_top_n() {
         // Using a situation described here: https://rangevoting.org/RRVr.html
         let mut sim = Sim::new(4, 6);
-        let mut ptn = PluralityTopN {}.new_sim(&sim);
+        let mut ptn = PluralityTopN::default().new_sim(&sim);
         sim.scores = ndarray::array![
             [0., 1., 0., 0.],
             [0., 0., 1., 0.],

@@ -3,6 +3,7 @@
 
 mod borda;
 mod btr_irv;
+mod colname;
 pub mod condorcet_util;
 mod instant_runoff;
 mod minimax;
@@ -18,6 +19,7 @@ mod tallies;
 mod test_utils;
 
 pub use borda::Borda;
+pub use colname::ColName;
 pub use instant_runoff::InstantRunoff;
 pub use multivote::Multivote;
 pub use plurality::Plurality;

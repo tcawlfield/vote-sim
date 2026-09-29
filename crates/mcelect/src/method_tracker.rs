@@ -80,8 +80,9 @@ impl MethodTracker {
     pub fn report(&self) {
         let frac_suboptimal = self.ntrials_subopt as f64 / self.ntrials as f64;
         println!(
-            "Method {}: Avg Regret: {}, σ: {}, Frac suboptimal winner: {}, avg subopt regret: {}",
+            "Method {} [{}]: Avg Regret: {}, σ: {}, Frac suboptimal winner: {}, avg subopt regret: {}",
             self.method.name(),
+            self.colname(),
             self.mean_regret.mean(),
             self.mean_regret.sstdev(),
             frac_suboptimal,
@@ -92,6 +93,7 @@ impl MethodTracker {
     pub fn sendable_report(&self) -> SendableMethodReport {
         SendableMethodReport {
             name: self.method.name(),
+            colname: self.colname(),
             ntrials: self.ntrials,
             ntrials_subopt: self.ntrials_subopt,
             mean_regret: self.mean_regret,
@@ -160,8 +162,9 @@ impl CommitteeTracker {
     pub fn report(&self) {
         let frac_suboptimal = self.ntrials_subopt as f64 / self.ntrials as f64;
         println!(
-            "Committee {}: Avg Regret: {}, σ: {}, Frac suboptimal winner: {}, avg subopt regret: {}",
+            "Committee {} [{}]: Avg Regret: {}, σ: {}, Frac suboptimal winner: {}, avg subopt regret: {}",
             self.method.name(),
+            self.colname(),
             self.mean_regret.mean(),
             self.mean_regret.sstdev(),
             frac_suboptimal,
@@ -172,6 +175,7 @@ impl CommitteeTracker {
     pub fn sendable_report(&self) -> SendableMethodReport {
         SendableMethodReport {
             name: self.method.name(),
+            colname: self.colname(),
             ntrials: self.ntrials,
             ntrials_subopt: self.ntrials_subopt,
             mean_regret: self.mean_regret,
@@ -183,6 +187,9 @@ impl CommitteeTracker {
 /// The multi-winner counterpart to [`SendableMethodReport`].
 pub struct SendableMethodReport {
     pub name: String,
+    /// The method's output column name, which tells apart methods whose
+    /// `name` is the same (a parameter sweep, say).
+    pub colname: String,
     pub ntrials: usize,
     pub ntrials_subopt: usize,
     pub mean_regret: MeanSD,
@@ -191,7 +198,7 @@ pub struct SendableMethodReport {
 
 impl SendableMethodReport {
     pub fn combine(&mut self, other: &Self) {
-        assert!(self.name == other.name);
+        assert!(self.name == other.name && self.colname == other.colname);
         self.ntrials += other.ntrials;
         self.ntrials_subopt += other.ntrials_subopt;
         self.mean_regret += other.mean_regret;
@@ -201,8 +208,9 @@ impl SendableMethodReport {
     pub fn report(&self) {
         let frac_suboptimal = self.ntrials_subopt as f64 / self.ntrials as f64;
         println!(
-            "Method {}: Avg Regret: {}, σ: {}, Frac suboptimal winner: {}, avg subopt regret: {}, {} elections",
+            "Method {} [{}]: Avg Regret: {}, σ: {}, Frac suboptimal winner: {}, avg subopt regret: {}, {} elections",
             self.name,
+            self.colname,
             self.mean_regret.mean(),
             self.mean_regret.sstdev(),
             frac_suboptimal,
