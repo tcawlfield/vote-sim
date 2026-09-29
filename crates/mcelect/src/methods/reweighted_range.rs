@@ -11,6 +11,7 @@ use crate::methods::ElectResult;
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct RRV {
     pub strat: Strategy,
     pub ranks: i32,

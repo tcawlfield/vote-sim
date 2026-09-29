@@ -11,6 +11,7 @@ use super::tallies::{Tallies, tally_votes};
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct STAR {
     pub strat: Strategy,
     #[serde(default = "default_ranks")]

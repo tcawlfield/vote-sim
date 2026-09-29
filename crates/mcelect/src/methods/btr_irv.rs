@@ -10,6 +10,7 @@ use super::tallies::Tallies;
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct BtrIrv {
     // pub strat: Strategy,
 }

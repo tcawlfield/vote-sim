@@ -254,4 +254,26 @@ mod tests {
             "`committee_methods` entries 2 and 3 would both write output column `rrv_25_h`"
         );
     }
+
+    /// A misspelled parameter used to be dropped silently, leaving its default
+    /// in place. Every config struct now rejects fields it doesn't know.
+    #[test]
+    fn a_misspelled_method_parameter_is_an_error() {
+        let toml_str = base_toml("")
+            + "[[methods]]\nRange = { strat = \"Strategic\", nranks = 10, strategic_strech_factor = 2.0 }\n";
+        let err = toml::from_str::<Config>(&toml_str).unwrap_err();
+        assert!(
+            err.message()
+                .contains("unknown field `strategic_strech_factor`"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn a_misspelled_consideration_parameter_is_an_error() {
+        let toml_str =
+            "voters = 10\ncandidates = 4\n[[considerations]]\nLikability = { maen = 0.5 }\n";
+        let err = toml::from_str::<Config>(toml_str).unwrap_err();
+        assert!(err.message().contains("unknown field `maen`"), "{err}");
+    }
 }

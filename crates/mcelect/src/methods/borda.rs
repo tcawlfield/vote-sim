@@ -28,6 +28,7 @@ use crate::sim::Sim;
 /// be worth considering or at least comparing with.
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct Borda {
     /// Strategic or Honest (defaults to Honest).
     /// Strategic ballots rank the top two pre-election (honest) candidates

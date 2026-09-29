@@ -8,6 +8,7 @@ use super::results::{ElectResult, WinnerAndRunnerup};
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct Minimax {
     // pub strat: Strategy,
 }

@@ -15,6 +15,7 @@ use rand_distr::StandardNormal;
 /// and candidate in the issue space, optionally with a special in-group likability bonus for
 /// candidates in the voter's own faction.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Electorate {
     /// Dimensionality of the issue space. Every `*_center` must be this long.
     pub dimensions: usize,
@@ -26,6 +27,7 @@ pub struct Electorate {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Faction {
     /// Relative weight for assigning voters to this faction (need not sum to 1
     /// across factions). Candidates are assigned round-robin regardless.

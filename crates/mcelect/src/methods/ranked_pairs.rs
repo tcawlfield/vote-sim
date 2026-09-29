@@ -11,6 +11,7 @@ use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct RP {
     pub strat: Strategy,
 }

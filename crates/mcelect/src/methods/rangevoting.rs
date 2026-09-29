@@ -10,6 +10,7 @@ use super::tallies::{Tallies, tally_votes};
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct RangeVoting {
     pub strat: Strategy,
     pub nranks: i32,

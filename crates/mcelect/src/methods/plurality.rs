@@ -33,6 +33,7 @@ use serde::{Deserialize, Serialize};
 ///    favor outlying candidates, or extremists.
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct Plurality {
     /// Honest voters will vote for the candidate with the highest score, or
     /// perceived utility. Strategic voters will instead limit their choice to

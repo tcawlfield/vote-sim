@@ -22,6 +22,7 @@ use super::ConsiderationSim;
 
 /// A consideration factor that is random for each voter, for each candidate.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Irrational {
     /// Scores are uniform distributions, and sigma is the standard deviation.
     /// Uniform variates range from 0 to sqrt(12) * sigma.

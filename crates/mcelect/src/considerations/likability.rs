@@ -26,6 +26,7 @@ use super::ConsiderationSim;
 /// all methods will tend to produce ideal results.
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Likability {
     /// The scale of the Likability scores
     pub mean: f64,
