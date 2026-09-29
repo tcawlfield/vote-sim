@@ -14,19 +14,11 @@ a little strained in the context of this code.
 
 ## To-Do
 
-* Re-order methods so that honest ones precede strategic
-  * Methods can be non-reporting now, and may be inserted out of necessity
 * Strategic voting improvements
   * Should I expand the runner-up concept? How?
   * Allow a fraction of the population to be strategic
   * Allow a political faction to be more strategic than another
     * Under different methods, how much are strategic voters wrongly rewarded?
-  * Each voting method needs a new method, strategic_prereq to return
-    Option<Method>.
-    * We can use this to ensure that each strategic method is preceded by its
-      honest "pre-election poll" method. If not, they can be inserted.
-    * At the same time, this suggests another property of MethodSim: is_visible.
-      is_visible() returns false if the method was inserted as a pre-poll.
 * Add a Virtues (described above) consideration
 * Multi-winner methods
   * Iterative rewreighted range voting ---- loop through winners, removing them
@@ -34,6 +26,8 @@ a little strained in the context of this code.
     the winner list becomes stable (needs better definition) or a maximum cycle
     count is reached. Research prior art here, and consider repeating stability
     patterns.
+    * This needs to be measured against a computationally-expensive method that
+      picks the best set out of all combinations of winning committee.
   * How should we best characterize the effectiveness of the winning set?
     * For each candidate, score utility by winners in preference order. Most
       preferred gets 100%, next-most gets ... 50% maybe? Etc. What is natural
