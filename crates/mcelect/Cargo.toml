@@ -8,9 +8,9 @@ edition.workspace = true
 rand = "0.10"
 ndarray = "0.17"
 rand_distr = "0.6"
-parquet = "59"
-arrow-array = "59"
-arrow-schema = "59"
+parquet = "60"
+arrow-array = "60"
+arrow-schema = "60"
 meansd = { git = "https://gitlab.com/lephto/meansd.git", branch = "main" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
