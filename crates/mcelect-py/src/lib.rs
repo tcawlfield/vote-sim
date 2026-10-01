@@ -40,9 +40,22 @@ fn simulate(py: Python<'_>, config_json: &str, trials: usize) -> PyResult<PyArro
         .map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
+/// Parse `config_json` with the Rust config definitions and serialize it back,
+/// with every defaulted field filled in -- the config exactly as a simulation
+/// would see it. Raises `ValueError` if Rust rejects it, including the checks
+/// in `Config::validate`.
+#[pyfunction]
+fn normalize_config(config_json: &str) -> PyResult<String> {
+    let config = Config::from_json_str(config_json)
+        .map_err(|e| PyValueError::new_err(format!("invalid config: {e}")))?;
+    config.validate().map_err(PyValueError::new_err)?;
+    serde_json::to_string(&config).map_err(|e| PyValueError::new_err(e.to_string()))
+}
+
 #[pymodule]
 fn _mcelect(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     m.add_function(wrap_pyfunction!(simulate, m)?)?;
+    m.add_function(wrap_pyfunction!(normalize_config, m)?)?;
     Ok(())
 }

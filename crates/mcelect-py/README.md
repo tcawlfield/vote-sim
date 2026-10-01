@@ -11,10 +11,41 @@ table = mcelect.simulate(config, 100_000)
 ```
 
 `config` is a plain dict (or a JSON string) with the same shape as the TOML
-config files the `mcelect` command-line tool reads, so `load_config` on a `.toml`
-file and passing the result straight through is the usual path. The columns
-depend on the config's `mode`: `ExperimentResult`'s fields for `single_winner`,
-`CommitteeResult`'s for `multi_winner`.
+config files the `mcelect` command-line tool reads, so `load_config` on a
+`.toml` file and passing the result straight through is the usual path. The
+columns depend on the config's `mode`: `ExperimentResult`'s fields for
+`single_winner`, `CommitteeResult`'s for `multi_winner`.
+
+## Building a config in Python
+
+`mcelect.config` has pydantic models mirroring the Rust config structs, for
+building or editing configs with validation and editor completion:
+
+```python
+from mcelect.config import Config, Issue, Issues, Likability, Plurality, RangeVoting
+
+config = Config(
+    voters=1000,
+    candidates=5,
+    considerations=[Likability(mean=0.5), Issues([Issue(sigma=1.0, halfcsep=0.5)])],
+    methods=[
+        Plurality(strat="Honest"),
+        RangeVoting(strat="Strategic", nranks=10, strategic_stretch_factor=2.0, colname="range_s_2x"),
+    ],
+)
+table = mcelect.simulate(config, 10_000)
+```
+
+- `Config.from_file(path)` loads an existing TOML or JSON config into the
+  models.
+- `config.to_json()` gives the JSON the Rust side reads. Unset (`None`) fields
+  are left out, so Rust applies its own defaults, which are noted in the field
+  docs.
+- `config.normalized()` shows the config as Rust sees it, with every default
+  filled in, and runs the Rust checks that span several fields (a mode's
+  required fields, unique column names).
+
+## Threads
 
 The simulation spawns one worker thread per core and releases the GIL for the
 whole run, so other Python threads keep going while it works.

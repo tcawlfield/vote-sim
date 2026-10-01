@@ -905,6 +905,7 @@ dependencies = [
  "arrow-schema",
  "mcelect",
  "pyo3",
+ "serde_json",
 ]
 
 [[package]]

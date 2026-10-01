@@ -19,6 +19,7 @@ mcelect = { path = "../mcelect" }
 arrow-array = "59"
 arrow-pyarrow = "59"
 arrow-schema = "59"
+serde_json = "1.0"
 # `extension-module` is deliberately absent: it is turned on by maturin (see
 # `features` in pyproject.toml) so that a plain `cargo build --all-features`
 # still links a testable library.
