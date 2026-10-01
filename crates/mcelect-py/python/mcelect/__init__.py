@@ -21,11 +21,12 @@ from typing import TYPE_CHECKING, Any
 
 from ._mcelect import __version__
 from ._mcelect import simulate as _simulate
+from .config import Config
 
 if TYPE_CHECKING:
     import pyarrow
 
-__all__ = ["__version__", "load_config", "simulate"]
+__all__ = ["Config", "__version__", "load_config", "simulate"]
 
 
 def load_config(path: str | os.PathLike[str]) -> dict[str, Any]:
@@ -41,13 +42,16 @@ def load_config(path: str | os.PathLike[str]) -> dict[str, Any]:
         return json.load(f)
 
 
-def simulate(config: Mapping[str, Any] | str, trials: int) -> pyarrow.Table:
+def simulate(config: Config | Mapping[str, Any] | str, trials: int) -> pyarrow.Table:
     """Run `trials` elections and return the results as a `pyarrow.Table`.
 
-    `config` is either a mapping (as `load_config` returns) or a JSON string.
+    `config` is a `Config` (see `mcelect.config`), a dict-like mapping (as `load_config`
+    returns), or a JSON string.
     The resulting columns depend on the config's `mode`; see the crate docs for
     `ExperimentResult` (single-winner) and `CommitteeResult` (multi-winner).
     """
-    if not isinstance(config, str):
+    if isinstance(config, Config):
+        config = config.to_json()
+    elif not isinstance(config, str):
         config = json.dumps(config)
     return _simulate(config, trials)
