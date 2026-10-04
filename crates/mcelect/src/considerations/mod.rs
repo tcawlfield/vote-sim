@@ -30,6 +30,7 @@ pub trait ConsiderationSim: fmt::Debug {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub enum Consideration {
     #[serde(alias = "likability")]
@@ -43,6 +44,16 @@ pub enum Consideration {
 }
 
 impl Consideration {
+    /// Check the consideration's parameters; `Config::validate` reports any
+    /// error before a simulation starts.
+    pub fn validate(&self) -> Result<(), String> {
+        match self {
+            Consideration::Electorate(c) => c.validate(),
+            Consideration::Irrational(c) => c.validate(),
+            Consideration::Likability(_) | Consideration::Issues(_) => Ok(()),
+        }
+    }
+
     pub fn new_sim(&self, sim: &Sim) -> ConsiderationSimKind {
         match self {
             Consideration::Likability(c) => ConsiderationSimKind::Likability(c.new_sim(sim)),

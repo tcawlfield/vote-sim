@@ -15,6 +15,7 @@ use rand_distr::StandardNormal;
 /// and candidate in the issue space, optionally with a special in-group likability bonus for
 /// candidates in the voter's own faction.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Electorate {
     /// Dimensionality of the issue space. Every `*_center` must be this long.
@@ -27,6 +28,7 @@ pub struct Electorate {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Faction {
     /// Relative weight for assigning voters to this faction (need not sum to 1
@@ -62,6 +64,7 @@ impl Faction {
 
 /// Scaling function for the distance between a voter and candidate in the issue space.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default, PartialEq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DistanceFunction {
     /// Perceived utility is the negative of the Euclidean distance between the voter and
     /// candidate in the issue space.
@@ -103,29 +106,49 @@ pub struct ElectorateSim {
 }
 
 impl Electorate {
-    pub fn new_sim(&self, sim: &Sim) -> ElectorateSim {
-        assert!(
-            !self.factions.is_empty(),
-            "Factions consideration needs at least one faction"
-        );
-        assert!(self.dimensions > 0, "Factions needs dimensions > 0");
+    /// Check that every faction fits the issue space and that voters can be
+    /// assigned to factions at all.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.dimensions == 0 {
+            return Err("Electorate needs dimensions > 0".to_string());
+        }
+        if self.factions.is_empty() {
+            return Err("Electorate needs at least one faction".to_string());
+        }
         for (i, faction) in self.factions.iter().enumerate() {
-            assert_eq!(
-                faction.voter_center.len(),
-                self.dimensions,
-                "faction {i}: voter_center has the wrong length"
-            );
-            if let Some(center) = &faction.candidate_center {
-                assert_eq!(
-                    center.len(),
-                    self.dimensions,
-                    "faction {i}: candidate_center has the wrong length"
-                );
+            let n = i + 1;
+            if faction.voter_center.len() != self.dimensions {
+                return Err(format!(
+                    "Electorate faction {n}: voter_center has length {}, but dimensions = {}",
+                    faction.voter_center.len(),
+                    self.dimensions
+                ));
             }
-            assert!(
-                faction.popularity >= 0.0,
-                "faction {i}: popularity must be non-negative"
-            );
+            if let Some(center) = &faction.candidate_center
+                && center.len() != self.dimensions
+            {
+                return Err(format!(
+                    "Electorate faction {n}: candidate_center has length {}, but dimensions = {}",
+                    center.len(),
+                    self.dimensions
+                ));
+            }
+            if faction.popularity < 0.0 {
+                return Err(format!(
+                    "Electorate faction {n}: popularity must be non-negative"
+                ));
+            }
+        }
+        if self.factions.iter().map(|f| f.popularity).sum::<f64>() <= 0.0 {
+            return Err("Electorate needs positive total popularity".to_string());
+        }
+        Ok(())
+    }
+
+    pub fn new_sim(&self, sim: &Sim) -> ElectorateSim {
+        // `Config::validate` reports these as errors; this guards direct callers.
+        if let Err(e) = self.validate() {
+            panic!("{e}");
         }
 
         let popularity_cdf: Vec<f64> = self
@@ -137,10 +160,6 @@ impl Electorate {
             })
             .collect();
         let ttl_popularity = *popularity_cdf.last().unwrap();
-        assert!(
-            ttl_popularity > 0.0,
-            "Factions needs positive total popularity"
-        );
 
         ElectorateSim {
             dims: self.dimensions,
@@ -296,37 +315,75 @@ mod tests {
         assert_eq!(f.candidate_spread(), 0.1);
     }
 
-    #[test]
-    #[should_panic(expected = "at least one faction")]
-    fn new_sim_rejects_no_factions() {
+    fn electorate(dimensions: usize, factions: Vec<Faction>) -> Electorate {
         Electorate {
-            dimensions: 2,
+            dimensions,
             distance_function: DistanceFunction::NegativeEuclidean,
-            factions: vec![],
+            factions,
         }
-        .new_sim(&Sim::new(3, 5));
     }
 
     #[test]
-    #[should_panic(expected = "wrong length")]
-    fn new_sim_rejects_mismatched_center_length() {
-        Electorate {
-            dimensions: 3,
-            distance_function: DistanceFunction::NegativeEuclidean,
-            factions: vec![faction([0.0, 0.0], 1.0)], // 2 coords, dimensions = 3
-        }
-        .new_sim(&Sim::new(3, 5));
+    fn validate_accepts_a_well_formed_electorate() {
+        let e = electorate(2, vec![faction([0.0, 0.0], 1.0), faction([1.0, 1.0], 0.0)]);
+        assert!(e.validate().is_ok());
     }
 
     #[test]
-    #[should_panic(expected = "positive total popularity")]
-    fn new_sim_rejects_zero_total_popularity() {
-        Electorate {
-            dimensions: 2,
-            distance_function: DistanceFunction::NegativeEuclidean,
-            factions: vec![faction([0.0, 0.0], 0.0), faction([1.0, 1.0], 0.0)],
-        }
-        .new_sim(&Sim::new(3, 5));
+    fn validate_rejects_zero_dimensions() {
+        let e = electorate(0, vec![]);
+        assert_eq!(e.validate().unwrap_err(), "Electorate needs dimensions > 0");
+    }
+
+    #[test]
+    fn validate_rejects_no_factions() {
+        let e = electorate(2, vec![]);
+        assert_eq!(
+            e.validate().unwrap_err(),
+            "Electorate needs at least one faction"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_mismatched_center_lengths() {
+        // 2 coords, dimensions = 3
+        let e = electorate(3, vec![faction([0.0, 0.0], 1.0)]);
+        assert_eq!(
+            e.validate().unwrap_err(),
+            "Electorate faction 1: voter_center has length 2, but dimensions = 3"
+        );
+
+        let mut f = faction([0.0, 0.0], 1.0);
+        f.candidate_center = Some(vec![0.0]);
+        let e = electorate(2, vec![faction([0.0, 0.0], 1.0), f]);
+        assert_eq!(
+            e.validate().unwrap_err(),
+            "Electorate faction 2: candidate_center has length 1, but dimensions = 2"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_negative_popularity() {
+        let e = electorate(2, vec![faction([0.0, 0.0], 2.0), faction([1.0, 1.0], -1.0)]);
+        assert_eq!(
+            e.validate().unwrap_err(),
+            "Electorate faction 2: popularity must be non-negative"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_zero_total_popularity() {
+        let e = electorate(2, vec![faction([0.0, 0.0], 0.0), faction([1.0, 1.0], 0.0)]);
+        assert_eq!(
+            e.validate().unwrap_err(),
+            "Electorate needs positive total popularity"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "voter_center has length 2, but dimensions = 3")]
+    fn new_sim_panics_on_an_invalid_electorate() {
+        electorate(3, vec![faction([0.0, 0.0], 1.0)]).new_sim(&Sim::new(3, 5));
     }
 
     #[test]

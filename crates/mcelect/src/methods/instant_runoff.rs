@@ -12,6 +12,7 @@ use super::tallies::Tallies;
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct InstantRunoff {
     // pub strat: Strategy,

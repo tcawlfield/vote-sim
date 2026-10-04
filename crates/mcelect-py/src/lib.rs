@@ -52,10 +52,19 @@ fn normalize_config(config_json: &str) -> PyResult<String> {
     serde_json::to_string(&config).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
+/// The JSON Schema of the Rust `Config`, as serde reads it. The tests check
+/// the pydantic models in `mcelect.config` against it.
+#[pyfunction]
+fn config_schema() -> PyResult<String> {
+    serde_json::to_string(&schemars::schema_for!(Config))
+        .map_err(|e| PyValueError::new_err(e.to_string()))
+}
+
 #[pymodule]
 fn _mcelect(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     m.add_function(wrap_pyfunction!(simulate, m)?)?;
     m.add_function(wrap_pyfunction!(normalize_config, m)?)?;
+    m.add_function(wrap_pyfunction!(config_schema, m)?)?;
     Ok(())
 }

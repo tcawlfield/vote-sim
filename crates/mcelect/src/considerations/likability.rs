@@ -26,6 +26,7 @@ use super::ConsiderationSim;
 /// all methods will tend to produce ideal results.
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Likability {
     /// The scale of the Likability scores
