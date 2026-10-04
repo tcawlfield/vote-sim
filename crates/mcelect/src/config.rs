@@ -87,6 +87,15 @@ impl Config {
                         "mode = SingleWinner requires at least one entry in `methods`".to_string(),
                     );
                 }
+                // The primary elects `candidates` finalists out of `primary_candidates`.
+                if let Some(primary_candidates) = self.primary_candidates
+                    && primary_candidates <= self.candidates
+                {
+                    return Err(
+                        "primary_candidates must be greater than the number of candidates"
+                            .to_string(),
+                    );
+                }
                 check_unique_colnames("methods", self.methods.iter().map(Method::colname))?;
             }
             RunMode::MultiWinner => {
@@ -210,6 +219,57 @@ mod tests {
                 "committee_size = {committee_size}"
             );
         }
+    }
+
+    /// A single-winner config with a primary narrowing `primary_candidates`
+    /// down to base_toml's 4 candidates. `extra` goes after the methods, so it
+    /// can hold a `[primary_method]` table.
+    fn single_winner_with_primary(primary_candidates: usize, extra: &str) -> Config {
+        let toml_str = base_toml(&format!("primary_candidates = {primary_candidates}"))
+            + "[[methods]]\nPlurality = { strat = \"Honest\" }\n"
+            + extra;
+        toml::from_str(&toml_str).unwrap()
+    }
+
+    #[test]
+    fn a_single_winner_primary_validates() {
+        let config = single_winner_with_primary(8, "");
+        assert_eq!(config.primary_candidates, Some(8));
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn a_single_winner_primary_can_name_its_method() {
+        let config = single_winner_with_primary(8, "[primary_method]\nPluralityTopN = {}\n");
+        assert!(matches!(
+            config.primary_method,
+            MultiWinMethod::PluralityTopN(_)
+        ));
+        assert!(config.validate().is_ok());
+    }
+
+    /// The primary elects `candidates` finalists, so it needs more than that to
+    /// choose from. Fewer used to panic inside RRV.
+    #[test]
+    fn primary_candidates_must_be_more_than_candidates() {
+        for primary_candidates in [3, 4] {
+            assert_eq!(
+                single_winner_with_primary(primary_candidates, "")
+                    .validate()
+                    .unwrap_err(),
+                "primary_candidates must be greater than the number of candidates",
+                "primary_candidates = {primary_candidates}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_primary_still_requires_methods() {
+        let config: Config = toml::from_str(&base_toml("primary_candidates = 8")).unwrap();
+        assert_eq!(
+            config.validate().unwrap_err(),
+            "mode = SingleWinner requires at least one entry in `methods`"
+        );
     }
 
     fn single_winner_with_methods(entries: &[&str]) -> Config {
