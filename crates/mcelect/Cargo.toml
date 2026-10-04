@@ -4,7 +4,12 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
+[features]
+# JSON Schema for `Config`, used by the Python bindings to check their models.
+schema = ["dep:schemars"]
+
 [dependencies]
+schemars = { version = "1", optional = true }
 rand = "0.10"
 ndarray = "0.17"
 rand_distr = "0.6"

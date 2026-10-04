@@ -11,6 +11,7 @@ use crate::considerations::Consideration;
 use crate::methods::{Method, MultiWinMethod};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Config {
     pub voters: usize,
@@ -34,6 +35,7 @@ pub struct Config {
 
 /// Which kind of election this config runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum RunMode {
     /// One winner per trial: `methods` runs (optionally behind a `primary_method`
     /// narrowing stage), each producing a single winner.

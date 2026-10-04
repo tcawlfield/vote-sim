@@ -15,7 +15,8 @@ bench = false
 doc = false
 
 [dependencies]
-mcelect = { path = "../mcelect" }
+mcelect = { path = "../mcelect", features = ["schema"] }
+schemars = "1"
 arrow-array = "59"
 arrow-pyarrow = "59"
 arrow-schema = "59"

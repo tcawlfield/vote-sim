@@ -30,6 +30,7 @@ pub trait ConsiderationSim: fmt::Debug {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub enum Consideration {
     #[serde(alias = "likability")]

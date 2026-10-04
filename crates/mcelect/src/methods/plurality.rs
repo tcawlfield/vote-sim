@@ -34,6 +34,7 @@ use super::ColName;
 ///    favor outlying candidates, or extremists.
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Plurality {
     /// Honest voters will vote for the candidate with the highest score, or

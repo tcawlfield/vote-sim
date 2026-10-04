@@ -15,6 +15,7 @@ use rand_distr::StandardNormal;
 /// and candidate in the issue space, optionally with a special in-group likability bonus for
 /// candidates in the voter's own faction.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Electorate {
     /// Dimensionality of the issue space. Every `*_center` must be this long.
@@ -27,6 +28,7 @@ pub struct Electorate {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Faction {
     /// Relative weight for assigning voters to this faction (need not sum to 1
@@ -62,6 +64,7 @@ impl Faction {
 
 /// Scaling function for the distance between a voter and candidate in the issue space.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default, PartialEq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DistanceFunction {
     /// Perceived utility is the negative of the Euclidean distance between the voter and
     /// candidate in the issue space.

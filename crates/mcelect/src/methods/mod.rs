@@ -38,6 +38,7 @@ use serde::{Deserialize, Serialize};
 /// `PartialEq` means "elects the same way": it's how the runner finds a
 /// strategic method's honest poll among the configured methods.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Method {
     Plurality(Plurality),
     Range(RangeVoting),
@@ -109,6 +110,7 @@ pub trait MethodSim {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum MultiWinMethod {
     RRV(RRV),
     PluralityTopN(PluralityTopN),

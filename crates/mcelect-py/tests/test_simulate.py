@@ -33,8 +33,9 @@ def test_simulate_returns_one_row_per_trial():
     table = mcelect.simulate(SINGLE_WINNER, 50)
     assert table.num_rows == 50
     assert "cand_regret" in table.column_names
-    assert set(table.column("methods").combine_chunks().type.field(i).name
-               for i in range(2)) == {"Borda_h", "pl_h"}
+    assert set(
+        table.column("methods").combine_chunks().type.field(i).name for i in range(2)
+    ) == {"Borda_h", "pl_h"}
 
 
 def test_regret_is_sorted_and_starts_at_zero():
