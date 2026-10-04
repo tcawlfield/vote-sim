@@ -100,64 +100,65 @@ impl Config {
                 .map_err(|e| format!("`considerations` entry {}: {e}", i + 1))?;
         }
         match self.mode {
-            RunMode::SingleWinner => {
-                if self.methods.is_empty() {
-                    return Err(
-                        "mode = SingleWinner requires at least one entry in `methods`".to_string(),
-                    );
-                }
-                // The primary elects `candidates` finalists out of `primary_candidates`.
-                if let Some(primary_candidates) = self.primary_candidates
-                    && primary_candidates <= self.candidates
-                {
-                    return Err(
-                        "primary_candidates must be greater than the number of candidates"
-                            .to_string(),
-                    );
-                }
-                for (i, method) in self.methods.iter().enumerate() {
-                    method
-                        .validate()
-                        .map_err(|e| format!("`methods` entry {}: {e}", i + 1))?;
-                }
-                // The primary only runs when there's a larger field to narrow.
-                if self.primary_candidates.is_some() {
-                    self.primary_method
-                        .validate()
-                        .map_err(|e| format!("`primary_method`: {e}"))?;
-                }
-                check_unique_colnames("methods", self.methods.iter().map(Method::colname))?;
-            }
-            RunMode::MultiWinner => {
-                if let Some(committee_size) = self.committee_size {
-                    if committee_size == 0 {
-                        return Err("committee_size must be at least 1".to_string());
-                    }
-                    if committee_size >= self.candidates {
-                        return Err(
-                            "committee_size must be less than the number of candidates".to_string()
-                        );
-                    }
-                } else {
-                    return Err("mode = MultiWinner requires `committee_size`".to_string());
-                }
-                if self.committee_methods.is_empty() {
-                    return Err(
-                        "mode = MultiWinner requires at least one entry in `committee_methods`"
-                            .to_string(),
-                    );
-                }
-                for (i, method) in self.committee_methods.iter().enumerate() {
-                    method
-                        .validate()
-                        .map_err(|e| format!("`committee_methods` entry {}: {e}", i + 1))?;
-                }
-                check_unique_colnames(
-                    "committee_methods",
-                    self.committee_methods.iter().map(MultiWinMethod::colname),
-                )?;
-            }
+            RunMode::SingleWinner => self.validate_single_winner(),
+            RunMode::MultiWinner => self.validate_multi_winner(),
         }
+    }
+
+    /// The `mode = SingleWinner` part of [`Config::validate`].
+    fn validate_single_winner(&self) -> Result<(), String> {
+        if self.methods.is_empty() {
+            return Err("mode = SingleWinner requires at least one entry in `methods`".to_string());
+        }
+        // The primary elects `candidates` finalists out of `primary_candidates`.
+        if let Some(primary_candidates) = self.primary_candidates
+            && primary_candidates <= self.candidates
+        {
+            return Err(
+                "primary_candidates must be greater than the number of candidates".to_string(),
+            );
+        }
+        for (i, method) in self.methods.iter().enumerate() {
+            method
+                .validate()
+                .map_err(|e| format!("`methods` entry {}: {e}", i + 1))?;
+        }
+        // The primary only runs when there's a larger field to narrow.
+        if self.primary_candidates.is_some() {
+            self.primary_method
+                .validate()
+                .map_err(|e| format!("`primary_method`: {e}"))?;
+        }
+        check_unique_colnames("methods", self.methods.iter().map(Method::colname))?;
+        Ok(())
+    }
+
+    /// The `mode = MultiWinner` part of [`Config::validate`].
+    fn validate_multi_winner(&self) -> Result<(), String> {
+        if let Some(committee_size) = self.committee_size {
+            if committee_size == 0 {
+                return Err("committee_size must be at least 1".to_string());
+            }
+            if committee_size >= self.candidates {
+                return Err("committee_size must be less than the number of candidates".to_string());
+            }
+        } else {
+            return Err("mode = MultiWinner requires `committee_size`".to_string());
+        }
+        if self.committee_methods.is_empty() {
+            return Err(
+                "mode = MultiWinner requires at least one entry in `committee_methods`".to_string(),
+            );
+        }
+        for (i, method) in self.committee_methods.iter().enumerate() {
+            method
+                .validate()
+                .map_err(|e| format!("`committee_methods` entry {}: {e}", i + 1))?;
+        }
+        check_unique_colnames(
+            "committee_methods",
+            self.committee_methods.iter().map(MultiWinMethod::colname),
+        )?;
         Ok(())
     }
 }
