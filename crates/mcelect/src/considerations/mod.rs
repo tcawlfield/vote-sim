@@ -44,6 +44,17 @@ pub enum Consideration {
 }
 
 impl Consideration {
+    /// Check the consideration's parameters; `Config::validate` reports any
+    /// error before a simulation starts.
+    pub fn validate(&self) -> Result<(), String> {
+        match self {
+            Consideration::Electorate(c) => c.validate(),
+            Consideration::Likability(_)
+            | Consideration::Issues(_)
+            | Consideration::Irrational(_) => Ok(()),
+        }
+    }
+
     pub fn new_sim(&self, sim: &Sim) -> ConsiderationSimKind {
         match self {
             Consideration::Likability(c) => ConsiderationSimKind::Likability(c.new_sim(sim)),

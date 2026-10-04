@@ -90,6 +90,11 @@ impl Config {
         if self.voters < 2 {
             return Err("voters must be at least 2".to_string());
         }
+        for (i, consideration) in self.considerations.iter().enumerate() {
+            consideration
+                .validate()
+                .map_err(|e| format!("`considerations` entry {}: {e}", i + 1))?;
+        }
         match self.mode {
             RunMode::SingleWinner => {
                 if self.methods.is_empty() {
@@ -243,6 +248,30 @@ mod tests {
         }
         config.voters = 2;
         assert!(config.validate().is_ok());
+    }
+
+    /// A consideration's own checks are reported with its place in the list.
+    /// A mismatched Electorate used to panic once the simulation started.
+    #[test]
+    fn an_invalid_consideration_fails_validation() {
+        let toml_str = base_toml("")
+            + r#"
+            [[considerations]]
+            [considerations.Electorate]
+            dimensions = 2
+            [[considerations.Electorate.factions]]
+            popularity = 1.0
+            voter_center = [0.0]
+            voter_spread = 1.0
+
+            [[methods]]
+            Plurality = { strat = "Honest" }
+            "#;
+        let config: Config = toml::from_str(&toml_str).unwrap();
+        assert_eq!(
+            config.validate().unwrap_err(),
+            "`considerations` entry 2: Electorate faction 1: voter_center has length 1, but dimensions = 2"
+        );
     }
 
     fn multi_winner_with_committee_size(committee_size: usize) -> Config {
