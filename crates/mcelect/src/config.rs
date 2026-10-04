@@ -90,7 +90,13 @@ impl Config {
                 check_unique_colnames("methods", self.methods.iter().map(Method::colname))?;
             }
             RunMode::MultiWinner => {
-                if self.committee_size.is_none() {
+                if let Some(committee_size) = self.committee_size {
+                    if committee_size >= self.candidates {
+                        return Err(
+                            "committee_size must be less than the number of candidates".to_string()
+                        );
+                    }
+                } else {
                     return Err("mode = MultiWinner requires `committee_size`".to_string());
                 }
                 if self.committee_methods.is_empty() {
@@ -182,6 +188,28 @@ mod tests {
         assert_eq!(config.mode, RunMode::MultiWinner);
         assert_eq!(config.committee_size, Some(3));
         assert!(config.validate().is_ok());
+    }
+
+    fn multi_winner_with_committee_size(committee_size: usize) -> Config {
+        let toml_str = base_toml(&format!(
+            "mode = \"multi_winner\"\ncommittee_size = {committee_size}"
+        )) + "[[committee_methods]]\nPluralityTopN = {}\n";
+        toml::from_str(&toml_str).unwrap()
+    }
+
+    #[test]
+    fn committee_size_must_be_less_than_candidates() {
+        // base_toml has 4 candidates.
+        assert!(multi_winner_with_committee_size(3).validate().is_ok());
+        for committee_size in [4, 5] {
+            assert_eq!(
+                multi_winner_with_committee_size(committee_size)
+                    .validate()
+                    .unwrap_err(),
+                "committee_size must be less than the number of candidates",
+                "committee_size = {committee_size}"
+            );
+        }
     }
 
     fn single_winner_with_methods(entries: &[&str]) -> Config {
