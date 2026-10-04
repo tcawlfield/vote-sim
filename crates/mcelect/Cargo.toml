@@ -23,7 +23,7 @@ toml = "1.1"
 strum_macros = "0.28"
 log = { version = "0.4.27", features = ["release_max_level_info"] }
 work-queue = "0.1.4"
-serde_arrow = { version = "0.15", features = ["arrow-59"] }
+serde_arrow = { version = "0.15", features = ["arrow-60"] }
 
 [dev-dependencies]
 approx = "0.5.1"
