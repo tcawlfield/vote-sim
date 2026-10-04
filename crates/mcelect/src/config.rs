@@ -78,8 +78,13 @@ impl Config {
         serde_json::from_str(config_str)
     }
 
-    /// Check that the fields relevant to `mode` are actually populated.
+    /// Check that the fields relevant to `mode` are actually populated, and
+    /// that the config describes an election the simulation can run.
     pub fn validate(&self) -> Result<(), String> {
+        // Every method looks for a runner-up, so there must be someone to lose.
+        if self.candidates < 2 {
+            return Err("candidates must be at least 2".to_string());
+        }
         match self.mode {
             RunMode::SingleWinner => {
                 if self.methods.is_empty() {
@@ -196,6 +201,22 @@ mod tests {
         let config: Config = toml::from_str(&toml_str).unwrap();
         assert_eq!(config.mode, RunMode::MultiWinner);
         assert_eq!(config.committee_size, Some(3));
+        assert!(config.validate().is_ok());
+    }
+
+    /// One candidate used to panic in the tallies, which look for a runner-up.
+    #[test]
+    fn candidates_must_be_at_least_2() {
+        let mut config = single_winner_with_methods(&[r#"Plurality = { strat = "Honest" }"#]);
+        for candidates in [0, 1] {
+            config.candidates = candidates;
+            assert_eq!(
+                config.validate().unwrap_err(),
+                "candidates must be at least 2",
+                "candidates = {candidates}"
+            );
+        }
+        config.candidates = 2;
         assert!(config.validate().is_ok());
     }
 
