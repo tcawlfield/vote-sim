@@ -85,6 +85,11 @@ impl Config {
         if self.candidates < 2 {
             return Err("candidates must be at least 2".to_string());
         }
+        // The candidate/candidate utility covariance is a sample covariance over
+        // voters, dividing by `voters - 1`.
+        if self.voters < 2 {
+            return Err("voters must be at least 2".to_string());
+        }
         match self.mode {
             RunMode::SingleWinner => {
                 if self.methods.is_empty() {
@@ -217,6 +222,23 @@ mod tests {
             );
         }
         config.candidates = 2;
+        assert!(config.validate().is_ok());
+    }
+
+    /// Zero voters used to panic computing the utility covariance; one gave a
+    /// division by zero there.
+    #[test]
+    fn voters_must_be_at_least_2() {
+        let mut config = single_winner_with_methods(&[r#"Plurality = { strat = "Honest" }"#]);
+        for voters in [0, 1] {
+            config.voters = voters;
+            assert_eq!(
+                config.validate().unwrap_err(),
+                "voters must be at least 2",
+                "voters = {voters}"
+            );
+        }
+        config.voters = 2;
         assert!(config.validate().is_ok());
     }
 
