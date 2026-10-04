@@ -90,6 +90,10 @@ impl Config {
         if self.voters < 2 {
             return Err("voters must be at least 2".to_string());
         }
+        // With nothing to score candidates by, every utility is 0 and regret is NaN.
+        if self.considerations.is_empty() {
+            return Err("at least one entry in `considerations` is required".to_string());
+        }
         for (i, consideration) in self.considerations.iter().enumerate() {
             consideration
                 .validate()
@@ -111,6 +115,17 @@ impl Config {
                             .to_string(),
                     );
                 }
+                for (i, method) in self.methods.iter().enumerate() {
+                    method
+                        .validate()
+                        .map_err(|e| format!("`methods` entry {}: {e}", i + 1))?;
+                }
+                // The primary only runs when there's a larger field to narrow.
+                if self.primary_candidates.is_some() {
+                    self.primary_method
+                        .validate()
+                        .map_err(|e| format!("`primary_method`: {e}"))?;
+                }
                 check_unique_colnames("methods", self.methods.iter().map(Method::colname))?;
             }
             RunMode::MultiWinner => {
@@ -131,6 +146,11 @@ impl Config {
                         "mode = MultiWinner requires at least one entry in `committee_methods`"
                             .to_string(),
                     );
+                }
+                for (i, method) in self.committee_methods.iter().enumerate() {
+                    method
+                        .validate()
+                        .map_err(|e| format!("`committee_methods` entry {}: {e}", i + 1))?;
                 }
                 check_unique_colnames(
                     "committee_methods",
@@ -272,6 +292,131 @@ mod tests {
             config.validate().unwrap_err(),
             "`considerations` entry 2: Electorate faction 1: voter_center has length 1, but dimensions = 2"
         );
+    }
+
+    #[test]
+    fn at_least_one_consideration_is_required() {
+        let mut config = single_winner_with_methods(&[r#"Plurality = { strat = "Honest" }"#]);
+        config.considerations.clear();
+        assert_eq!(
+            config.validate().unwrap_err(),
+            "at least one entry in `considerations` is required"
+        );
+    }
+
+    fn with_irrational(individualism_deg: f64) -> Config {
+        let toml_str = base_toml("")
+            + &format!(
+                "[[considerations]]\nIrrational = {{ sigma = 1.0, camps = 3, individualism_deg = {individualism_deg:?} }}\n"
+            )
+            + "[[methods]]\nPlurality = { strat = \"Honest\" }\n";
+        toml::from_str(&toml_str).unwrap()
+    }
+
+    #[test]
+    fn irrational_individualism_must_be_an_angle_from_0_to_90() {
+        for ok in [0.0, 45.0, 90.0] {
+            assert!(with_irrational(ok).validate().is_ok(), "{ok}");
+        }
+        for bad in [-1.0, 90.5] {
+            assert_eq!(
+                with_irrational(bad).validate().unwrap_err(),
+                format!(
+                    "`considerations` entry 2: Irrational needs 0 <= individualism_deg <= 90, not {bad}"
+                )
+            );
+        }
+    }
+
+    /// Method parameters with no sensible election behind them. Range and STAR
+    /// with fewer than 2 scores, or zero Multivote votes, used to run and
+    /// report meaningless results.
+    #[test]
+    fn invalid_method_parameters_fail_validation() {
+        let cases = [
+            (
+                r#"Range = { strat = "Honest", nranks = 1 }"#,
+                "Range needs nranks >= 2, not 1",
+            ),
+            (
+                r#"STAR = { strat = "Honest", nranks = 0 }"#,
+                "STAR needs nranks >= 2, not 0",
+            ),
+            (
+                r#"Multivote = { strat = "Honest", votes = 0, spread_fact = 1.0 }"#,
+                "Multivote needs votes >= 1, not 0",
+            ),
+        ];
+        for (entry, err) in cases {
+            // Second in the list, to check the reported position.
+            let config =
+                single_winner_with_methods(&[r#"Plurality = { strat = "Honest" }"#, entry]);
+            assert_eq!(
+                config.validate().unwrap_err(),
+                format!("`methods` entry 2: {err}")
+            );
+        }
+    }
+
+    #[test]
+    fn method_parameters_at_their_limits_validate() {
+        let config = single_winner_with_methods(&[
+            r#"Range = { strat = "Honest", nranks = 2 }"#,
+            r#"STAR = { strat = "Honest", nranks = 2 }"#,
+            r#"Multivote = { strat = "Honest", votes = 1, spread_fact = 1.0 }"#,
+        ]);
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn invalid_rrv_parameters_fail_validation() {
+        let cases = [
+            ("ranks = 1, k = 0.5", "RRV needs ranks >= 2, not 1"),
+            ("ranks = 10, k = 0.4", "RRV needs 0.5 <= k <= 1.0, not 0.4"),
+            ("ranks = 10, k = 1.5", "RRV needs 0.5 <= k <= 1.0, not 1.5"),
+        ];
+        for (params, err) in cases {
+            let committees = multi_winner_with_committee_methods(&[
+                "PluralityTopN = {}",
+                &format!(r#"RRV = {{ strat = "Honest", {params} }}"#),
+            ]);
+            assert_eq!(
+                committees.validate().unwrap_err(),
+                format!("`committee_methods` entry 2: {err}")
+            );
+
+            let primary = single_winner_with_primary(
+                8,
+                &format!(
+                    "[primary_method.RRV]\nstrat = \"Honest\"\n{}\n",
+                    params.replace(", ", "\n")
+                ),
+            );
+            assert_eq!(
+                primary.validate().unwrap_err(),
+                format!("`primary_method`: {err}")
+            );
+        }
+    }
+
+    #[test]
+    fn rrv_k_at_its_limits_validates() {
+        let committees = multi_winner_with_committee_methods(&[
+            r#"RRV = { strat = "Honest", ranks = 10, k = 0.5, colname = "rrv_k05" }"#,
+            r#"RRV = { strat = "Honest", ranks = 10, k = 1.0, colname = "rrv_k10" }"#,
+        ]);
+        assert!(committees.validate().is_ok());
+    }
+
+    /// Without `primary_candidates` there's no primary election, so its method
+    /// is never run and isn't checked.
+    #[test]
+    fn an_unused_primary_method_is_not_checked() {
+        let toml_str = base_toml("")
+            + "[[methods]]\nPlurality = { strat = \"Honest\" }\n"
+            + "[primary_method.RRV]\nstrat = \"Honest\"\nranks = 1\nk = 0.5\n";
+        let config: Config = toml::from_str(&toml_str).unwrap();
+        assert!(config.validate().is_ok());
     }
 
     fn multi_winner_with_committee_size(committee_size: usize) -> Config {

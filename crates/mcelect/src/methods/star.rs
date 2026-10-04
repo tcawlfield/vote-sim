@@ -42,6 +42,14 @@ pub struct STARSim {
 }
 
 impl STAR {
+    /// Check the parameters: like Range, a ballot needs at least two scores.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.nranks < 2 {
+            return Err(format!("STAR needs nranks >= 2, not {}", self.nranks));
+        }
+        Ok(())
+    }
+
     /// The output column name for this method's results: the configured
     /// `colname`, or else the method's default.
     pub fn colname(&self) -> String {

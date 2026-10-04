@@ -30,6 +30,14 @@ pub struct MultivoteSim {
 }
 
 impl Multivote {
+    /// Check the parameters: each voter must cast at least one vote.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.votes < 1 {
+            return Err(format!("Multivote needs votes >= 1, not {}", self.votes));
+        }
+        Ok(())
+    }
+
     /// The output column name for this method's results: the configured
     /// `colname`, or else the method's default.
     pub fn colname(&self) -> String {

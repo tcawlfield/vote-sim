@@ -83,6 +83,22 @@ impl Method {
         }
     }
 
+    /// Check the method's parameters; `Config::validate` reports any error
+    /// before a simulation starts.
+    pub fn validate(&self) -> Result<(), String> {
+        match self {
+            Method::Range(m) => m.validate(),
+            Method::Multivote(m) => m.validate(),
+            Method::STAR(m) => m.validate(),
+            Method::Plurality(_)
+            | Method::InstantRunoff(_)
+            | Method::Borda(_)
+            | Method::RP(_)
+            | Method::BtrIrv(_)
+            | Method::MM(_) => Ok(()),
+        }
+    }
+
     /// The honest method whose result this one takes as its pre-election poll,
     /// for strategic methods whose voters react to the front-runners. `None`
     /// for honest methods and for strategic methods that don't use a poll.
@@ -121,6 +137,15 @@ impl MultiWinMethod {
         match self {
             MultiWinMethod::RRV(m) => Box::new(m.new_sim(sim)),
             MultiWinMethod::PluralityTopN(m) => Box::new(m.new_sim(sim)),
+        }
+    }
+
+    /// Check the method's parameters; `Config::validate` reports any error
+    /// before a simulation starts.
+    pub fn validate(&self) -> Result<(), String> {
+        match self {
+            MultiWinMethod::RRV(m) => m.validate(),
+            MultiWinMethod::PluralityTopN(_) => Ok(()),
         }
     }
 

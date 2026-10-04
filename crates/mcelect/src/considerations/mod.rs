@@ -49,9 +49,8 @@ impl Consideration {
     pub fn validate(&self) -> Result<(), String> {
         match self {
             Consideration::Electorate(c) => c.validate(),
-            Consideration::Likability(_)
-            | Consideration::Issues(_)
-            | Consideration::Irrational(_) => Ok(()),
+            Consideration::Irrational(c) => c.validate(),
+            Consideration::Likability(_) | Consideration::Issues(_) => Ok(()),
         }
     }
 
