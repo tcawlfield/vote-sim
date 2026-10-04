@@ -110,6 +110,9 @@ impl Config {
             }
             RunMode::MultiWinner => {
                 if let Some(committee_size) = self.committee_size {
+                    if committee_size == 0 {
+                        return Err("committee_size must be at least 1".to_string());
+                    }
                     if committee_size >= self.candidates {
                         return Err(
                             "committee_size must be less than the number of candidates".to_string()
@@ -247,6 +250,16 @@ mod tests {
             "mode = \"multi_winner\"\ncommittee_size = {committee_size}"
         )) + "[[committee_methods]]\nPluralityTopN = {}\n";
         toml::from_str(&toml_str).unwrap()
+    }
+
+    /// An empty committee used to panic writing the (empty) output columns.
+    #[test]
+    fn committee_size_must_be_at_least_1() {
+        assert_eq!(
+            multi_winner_with_committee_size(0).validate().unwrap_err(),
+            "committee_size must be at least 1"
+        );
+        assert!(multi_winner_with_committee_size(1).validate().is_ok());
     }
 
     #[test]
