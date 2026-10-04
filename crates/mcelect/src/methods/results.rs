@@ -19,6 +19,7 @@ pub struct WinnerAndRunnerup {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Strategy {
     Honest,
     Strategic,

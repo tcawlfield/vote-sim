@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 /// `PartialEq` on a method means "elects the same way", which is how the runner
 /// matches a strategic method to its honest poll.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(transparent)]
 pub struct ColName(Option<String>);
 

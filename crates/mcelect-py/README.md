@@ -30,7 +30,12 @@ config = Config(
     considerations=[Likability(mean=0.5), Issues([Issue(sigma=1.0, halfcsep=0.5)])],
     methods=[
         Plurality(strat="Honest"),
-        RangeVoting(strat="Strategic", nranks=10, strategic_stretch_factor=2.0, colname="range_s_2x"),
+        RangeVoting(
+            strat="Strategic",
+            nranks=10,
+            strategic_stretch_factor=2.0,
+            colname="range_s_2x",
+        ),
     ],
 )
 table = mcelect.simulate(config, 10_000)

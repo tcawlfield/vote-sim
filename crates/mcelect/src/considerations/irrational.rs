@@ -22,6 +22,7 @@ use super::ConsiderationSim;
 
 /// A consideration factor that is random for each voter, for each candidate.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Irrational {
     /// Scores are uniform distributions, and sigma is the standard deviation.
@@ -50,6 +51,17 @@ const RAD_PER_DEG: f64 = std::f64::consts::PI / 180.0;
 const SQRT12: f64 = 2.0 * SQRT_3;
 
 impl Irrational {
+    /// Check the parameters: `individualism_deg` is an angle from 0 to 90.
+    pub fn validate(&self) -> Result<(), String> {
+        if !(0.0..=90.0).contains(&self.individualism_deg) {
+            return Err(format!(
+                "Irrational needs 0 <= individualism_deg <= 90, not {}",
+                self.individualism_deg
+            ));
+        }
+        Ok(())
+    }
+
     pub fn new_sim(&self, sim: &Sim) -> IrrationalSim {
         if self.uses_camps() {
             IrrationalSim {

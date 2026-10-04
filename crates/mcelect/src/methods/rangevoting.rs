@@ -11,6 +11,7 @@ use super::tallies::{Tallies, tally_votes};
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct RangeVoting {
     pub strat: Strategy,
@@ -34,6 +35,15 @@ pub struct RangeVotingSim {
 }
 
 impl RangeVoting {
+    /// Check the parameters: a ballot needs at least two scores to choose
+    /// between (`fill_range_ballot` divides by `nranks - 1`).
+    pub fn validate(&self) -> Result<(), String> {
+        if self.nranks < 2 {
+            return Err(format!("Range needs nranks >= 2, not {}", self.nranks));
+        }
+        Ok(())
+    }
+
     /// The output column name for this method's results: the configured
     /// `colname`, or else the method's default.
     pub fn colname(&self) -> String {

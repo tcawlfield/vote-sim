@@ -281,6 +281,7 @@ Consideration = _tagged_union(Likability, Issues, Irrational, Electorate)
 
 class Plurality(_Variant):
     """Plurality, of First-past-the-post voting."""
+
     TAG: ClassVar[str] = "Plurality"
 
     strat: Strategy
@@ -301,6 +302,7 @@ class RangeVoting(_Variant):
 
 class InstantRunoff(_Variant):
     """Instant-runoff voting. Also known as "ranked-choice voting"."""
+
     TAG: ClassVar[str] = "InstantRunoff"
 
     colname: str | None = None
@@ -308,6 +310,7 @@ class InstantRunoff(_Variant):
 
 class Borda(_Variant):
     """Borda count voting."""
+
     TAG: ClassVar[str] = "Borda"
 
     strat: Strategy | None = None
@@ -319,6 +322,7 @@ class Borda(_Variant):
 
 class Multivote(_Variant):
     """Multivote, where each voter can cast multiple votes."""
+
     TAG: ClassVar[str] = "Multivote"
 
     strat: Strategy
@@ -329,6 +333,7 @@ class Multivote(_Variant):
 
 class STAR(_Variant):
     """Score then run (STAR) voting."""
+
     TAG: ClassVar[str] = "STAR"
 
     strat: Strategy
@@ -358,6 +363,7 @@ class BtrIrv(_Variant):
 
 class Minimax(_Variant):
     """Minimax voting."""
+
     TAG: ClassVar[str] = "MM"
 
     colname: str | None = None

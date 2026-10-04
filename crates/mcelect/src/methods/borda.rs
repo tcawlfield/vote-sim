@@ -29,6 +29,7 @@ use crate::sim::Sim;
 /// be worth considering or at least comparing with.
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Borda {
     /// Strategic or Honest (defaults to Honest).

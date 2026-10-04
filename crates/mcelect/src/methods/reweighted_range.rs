@@ -12,6 +12,7 @@ use crate::methods::ElectResult;
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct RRV {
     pub strat: Strategy,
@@ -36,6 +37,18 @@ I'm using this purely as a method of spreading out candidates across the positio
 */
 
 impl RRV {
+    /// Check the parameters: at least two scores per ballot (ballot weights
+    /// divide by `ranks - 1`), and `k` within the range RRV is defined for.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.ranks < 2 {
+            return Err(format!("RRV needs ranks >= 2, not {}", self.ranks));
+        }
+        if !(0.5..=1.0).contains(&self.k) {
+            return Err(format!("RRV needs 0.5 <= k <= 1.0, not {}", self.k));
+        }
+        Ok(())
+    }
+
     /// The output column name for this method's results: the configured
     /// `colname`, or else the method's default.
     pub fn colname(&self) -> String {

@@ -12,6 +12,7 @@ use crate::sim::Sim;
 /// PluralityTopN is a (bad) multi-winner method based on a plurality
 /// ballot. The top N vote-getters are elected.
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PluralityTopN {
     /// Replaces the default output column name; see [`ColName`].

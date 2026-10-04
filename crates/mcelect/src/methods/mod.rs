@@ -38,6 +38,7 @@ use serde::{Deserialize, Serialize};
 /// `PartialEq` means "elects the same way": it's how the runner finds a
 /// strategic method's honest poll among the configured methods.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Method {
     Plurality(Plurality),
     Range(RangeVoting),
@@ -82,6 +83,22 @@ impl Method {
         }
     }
 
+    /// Check the method's parameters; `Config::validate` reports any error
+    /// before a simulation starts.
+    pub fn validate(&self) -> Result<(), String> {
+        match self {
+            Method::Range(m) => m.validate(),
+            Method::Multivote(m) => m.validate(),
+            Method::STAR(m) => m.validate(),
+            Method::Plurality(_)
+            | Method::InstantRunoff(_)
+            | Method::Borda(_)
+            | Method::RP(_)
+            | Method::BtrIrv(_)
+            | Method::MM(_) => Ok(()),
+        }
+    }
+
     /// The honest method whose result this one takes as its pre-election poll,
     /// for strategic methods whose voters react to the front-runners. `None`
     /// for honest methods and for strategic methods that don't use a poll.
@@ -109,6 +126,7 @@ pub trait MethodSim {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum MultiWinMethod {
     RRV(RRV),
     PluralityTopN(PluralityTopN),
@@ -119,6 +137,15 @@ impl MultiWinMethod {
         match self {
             MultiWinMethod::RRV(m) => Box::new(m.new_sim(sim)),
             MultiWinMethod::PluralityTopN(m) => Box::new(m.new_sim(sim)),
+        }
+    }
+
+    /// Check the method's parameters; `Config::validate` reports any error
+    /// before a simulation starts.
+    pub fn validate(&self) -> Result<(), String> {
+        match self {
+            MultiWinMethod::RRV(m) => m.validate(),
+            MultiWinMethod::PluralityTopN(_) => Ok(()),
         }
     }
 
