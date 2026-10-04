@@ -17,9 +17,9 @@ doc = false
 [dependencies]
 mcelect = { path = "../mcelect", features = ["schema"] }
 schemars = "1"
-arrow-array = "59"
-arrow-pyarrow = "59"
-arrow-schema = "59"
+arrow-array = "60"
+arrow-pyarrow = "60"
+arrow-schema = "60"
 serde_json = "1.0"
 # `extension-module` is deliberately absent: it is turned on by maturin (see
 # `features` in pyproject.toml) so that a plain `cargo build --all-features`
