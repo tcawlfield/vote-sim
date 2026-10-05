@@ -215,7 +215,7 @@ def test_rust_aliases_are_accepted_and_written_canonically():
 
 def test_unknown_fields_are_rejected_like_in_rust():
     with pytest.raises(pydantic.ValidationError, match="strategic_strech_factor"):
-        RangeVoting(strat="Strategic", nranks=10, strategic_strech_factor=2.0)
+        RangeVoting(strat="Strategic", nranks=10, strategic_strech_factor=2.0)  # ty: ignore[unknown-argument]
     with pytest.raises(pydantic.ValidationError, match="colnmae"):
         Config.model_validate(
             {
@@ -244,7 +244,7 @@ def test_an_unknown_method_names_the_valid_ones():
 
 def test_a_bad_strategy_is_rejected():
     with pytest.raises(pydantic.ValidationError):
-        Plurality(strat="Sneaky")
+        Plurality(strat="Sneaky")  # ty: ignore[invalid-argument-type]
 
 
 def test_simulate_accepts_a_config_model():
