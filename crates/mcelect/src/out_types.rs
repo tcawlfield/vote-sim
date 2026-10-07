@@ -75,7 +75,9 @@ pub struct ElectorateInfo {
 /// how many winners get chosen. There's no `ideal_cand` here: the reference
 /// committee used to judge a method's `regret` is implicitly
 /// `cand_regret[0..committee_size]`, the individually-lowest-regret
-/// candidates.
+/// candidates. That standard is majoritarian; the optional `welfare` columns
+/// judge committees by other standards, including proportional ones (see
+/// [`crate::committee_welfare`]).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub struct CommitteeResult {
@@ -100,6 +102,31 @@ pub struct CommitteeResult {
     pub in_smith: Vec<bool>,
     /// One entry per committee method, keyed by the method's column name.
     pub methods: BTreeMap<String, CommitteeMethodResult>,
+    /// The best and mean welfare over every possible committee, per configured
+    /// welfare function (keyed by its column name). Only when the config has
+    /// `committee_welfare`; otherwise the column is left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub welfare: Option<BTreeMap<String, WelfareBounds>>,
+}
+
+/// One welfare function's best and mean over every possible committee in a
+/// trial: the yardsticks for [`MethodWelfare::regret`].
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
+pub struct WelfareBounds {
+    pub best: f64,
+    pub mean: f64,
+}
+
+/// One method's committee under one welfare function.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
+pub struct MethodWelfare {
+    /// The committee's welfare, in [0, 1].
+    pub value: f64,
+    /// `(best - value) / (best - mean)`: 0 for the best committee, 1 for an
+    /// average one.
+    pub regret: f64,
 }
 
 /// One multi-winner method's elected committee for a trial.
@@ -112,6 +139,10 @@ pub struct CommitteeMethodResult {
     /// Mean regret of the committee's members. See [`CommitteeResult`]'s docs
     /// for the reference committee this is naturally compared against.
     pub regret: f64,
+    /// The committee under each configured welfare function, keyed by its
+    /// column name. Only when the config has `committee_welfare`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub welfare: Option<BTreeMap<String, MethodWelfare>>,
 }
 
 impl ExperimentResult {
@@ -527,6 +558,7 @@ mod tests {
                     CommitteeMethodResult {
                         winners: vec![0, 2],
                         regret,
+                        welfare: None,
                     },
                 ),
                 (
@@ -534,9 +566,11 @@ mod tests {
                     CommitteeMethodResult {
                         winners: vec![1, 0],
                         regret: regret + 1.0,
+                        welfare: None,
                     },
                 ),
             ]),
+            welfare: None,
         }
     }
 

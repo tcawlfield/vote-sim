@@ -32,8 +32,17 @@ use ndarray::{Array2, ArrayView2};
 use crate::sim::Sim;
 
 /// A welfare function over committees: how a voter's utilities for the
-/// members, sorted best first, are weighted.
-#[derive(Debug, Clone, PartialEq)]
+/// members, sorted best first, are weighted. Configured in a multi-winner
+/// config's `committee_welfare` list:
+///
+/// ```toml
+/// committee_welfare = ["Additive", "Harmonic", "ChamberlinCourant"]
+/// [[committee_welfare]]
+/// Owa = { weights = [1.0, 0.5, 0.25], colname = "geo" }
+/// ```
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub enum Welfare {
     /// Weights 1, 1, 1, ...: every member counts equally.
     Additive,
@@ -47,6 +56,29 @@ pub enum Welfare {
 }
 
 impl Welfare {
+    /// Check that an `Owa`'s weights make sense for a committee of `k`.
+    pub fn validate(&self, k: usize) -> Result<(), String> {
+        let Welfare::Owa { weights, colname } = self else {
+            return Ok(());
+        };
+        if colname.is_empty() {
+            return Err("Owa needs a non-empty `colname`".to_string());
+        }
+        if weights.len() > k {
+            return Err(format!(
+                "Owa has {} weights, more than committee_size = {k}",
+                weights.len()
+            ));
+        }
+        if weights.iter().any(|w| !(w.is_finite() && *w >= 0.0)) {
+            return Err("Owa weights must be finite and non-negative".to_string());
+        }
+        if weights.iter().sum::<f64>() <= 0.0 {
+            return Err("Owa needs at least one positive weight".to_string());
+        }
+        Ok(())
+    }
+
     /// The name this welfare function's results go under.
     pub fn colname(&self) -> String {
         match self {
@@ -89,6 +121,8 @@ impl Welfare {
 pub struct WelfareEval {
     /// The committee size
     k: usize,
+    /// Each welfare function's [`Welfare::colname`], in configured order.
+    colnames: Vec<String>,
     /// One row per welfare function, `k` weights each.
     weights: Array2<f64>,
     /// Rescaled utilities, transposed from `Sim::scores`: `ncand` x `nvtr`, so
@@ -119,6 +153,7 @@ impl WelfareEval {
         }
         WelfareEval {
             k,
+            colnames: welfare.iter().map(Welfare::colname).collect(),
             weights,
             norm_t: Array2::zeros((sim.ncand, sim.nvtr)),
             search: SearchBufs::new(sim.nvtr, k),
@@ -127,6 +162,12 @@ impl WelfareEval {
             best: vec![0.0; welfare.len()],
             mean: vec![0.0; welfare.len()],
         }
+    }
+
+    /// Each welfare function's name, in the order of every per-function
+    /// slice here ([`best`](Self::best), [`mean`](Self::mean), `score`'s output).
+    pub fn colnames(&self) -> &[String] {
+        &self.colnames
     }
 
     /// Once per trial, after the election: rescale the utilities and search
@@ -430,6 +471,39 @@ mod tests {
             owa.weights(4).as_slice(),
             [2.0 / 3.0, 1.0 / 3.0, 0.0, 0.0].as_slice()
         );
+    }
+
+    #[test]
+    fn owa_weights_are_validated_against_the_committee_size() {
+        let owa = |weights: Vec<f64>, colname: &str| Welfare::Owa {
+            weights,
+            colname: colname.to_string(),
+        };
+        assert!(owa(vec![1.0, 0.5], "geo").validate(2).is_ok());
+        assert!(Welfare::Harmonic.validate(2).is_ok());
+        let cases = [
+            (owa(vec![1.0], ""), "Owa needs a non-empty `colname`"),
+            (
+                owa(vec![1.0, 0.5, 0.25], "geo"),
+                "Owa has 3 weights, more than committee_size = 2",
+            ),
+            (
+                owa(vec![1.0, -0.5], "geo"),
+                "Owa weights must be finite and non-negative",
+            ),
+            (
+                owa(vec![f64::NAN], "geo"),
+                "Owa weights must be finite and non-negative",
+            ),
+            (
+                owa(vec![0.0, 0.0], "geo"),
+                "Owa needs at least one positive weight",
+            ),
+            (owa(vec![], "geo"), "Owa needs at least one positive weight"),
+        ];
+        for (welfare, err) in cases {
+            assert_eq!(welfare.validate(2).unwrap_err(), err, "{welfare:?}");
+        }
     }
 
     #[test]

@@ -27,6 +27,7 @@ from mcelect.config import (
     Likability,
     Minimax,
     Multivote,
+    Owa,
     Plurality,
     PluralityTopN,
     QGaussian2,
@@ -105,6 +106,8 @@ def every_variant_config() -> Config:
             BtrIrv(),
             Minimax(colname="minimax"),
         ],
+        # Only used in multi-winner mode, but still parsed and kept.
+        committee_welfare=["Harmonic", Owa(weights=[1.0, 0.5], colname="geo")],
     )
 
 

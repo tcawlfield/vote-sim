@@ -7,6 +7,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+use crate::committee_welfare::Welfare;
 use crate::considerations::Consideration;
 use crate::methods::{Method, MultiWinMethod};
 
@@ -31,6 +32,13 @@ pub struct Config {
     /// `mode == MultiWinner`.
     #[serde(default)]
     pub committee_methods: Vec<MultiWinMethod>,
+    /// Welfare functions to judge every committee by, in multi-winner mode.
+    /// Each trial then searches every possible committee for the best and
+    /// mean welfare, which costs far more than the rest of a trial: about 30x
+    /// at 12 candidates choose 5, 100x at 16 choose 5. Empty (the default)
+    /// skips all of it, and leaves the welfare columns out of the output.
+    #[serde(default)]
+    pub committee_welfare: Vec<Welfare>,
 }
 
 /// Which kind of election this config runs.
@@ -135,15 +143,14 @@ impl Config {
 
     /// The `mode = MultiWinner` part of [`Config::validate`].
     fn validate_multi_winner(&self) -> Result<(), String> {
-        if let Some(committee_size) = self.committee_size {
-            if committee_size == 0 {
-                return Err("committee_size must be at least 1".to_string());
-            }
-            if committee_size >= self.candidates {
-                return Err("committee_size must be less than the number of candidates".to_string());
-            }
-        } else {
+        let Some(committee_size) = self.committee_size else {
             return Err("mode = MultiWinner requires `committee_size`".to_string());
+        };
+        if committee_size == 0 {
+            return Err("committee_size must be at least 1".to_string());
+        }
+        if committee_size >= self.candidates {
+            return Err("committee_size must be less than the number of candidates".to_string());
         }
         if self.committee_methods.is_empty() {
             return Err(
@@ -158,6 +165,15 @@ impl Config {
         check_unique_colnames(
             "committee_methods",
             self.committee_methods.iter().map(MultiWinMethod::colname),
+        )?;
+        for (i, welfare) in self.committee_welfare.iter().enumerate() {
+            welfare
+                .validate(committee_size)
+                .map_err(|e| format!("`committee_welfare` entry {}: {e}", i + 1))?;
+        }
+        check_unique_colnames(
+            "committee_welfare",
+            self.committee_welfare.iter().map(Welfare::colname),
         )?;
         Ok(())
     }
@@ -545,6 +561,58 @@ mod tests {
         ]);
         let err = config.validate().unwrap_err();
         assert!(err.contains("`star_6_s`"), "{err}");
+    }
+
+    fn multi_winner_with_welfare(welfare: &str) -> Config {
+        let toml_str = base_toml(&format!(
+            "mode = \"multi_winner\"\ncommittee_size = 2\ncommittee_welfare = {welfare}"
+        )) + "[[committee_methods]]\nPluralityTopN = {}\n";
+        toml::from_str(&toml_str).unwrap()
+    }
+
+    #[test]
+    fn committee_welfare_defaults_to_none_and_parses_every_form() {
+        assert!(
+            multi_winner_with_committee_size(2)
+                .committee_welfare
+                .is_empty()
+        );
+
+        let config = multi_winner_with_welfare(
+            r#"["Additive", "Harmonic", "ChamberlinCourant", { Owa = { weights = [1.0, 0.5], colname = "geo" } }]"#,
+        );
+        assert_eq!(
+            config.committee_welfare,
+            [
+                Welfare::Additive,
+                Welfare::Harmonic,
+                Welfare::ChamberlinCourant,
+                Welfare::Owa {
+                    weights: vec![1.0, 0.5],
+                    colname: "geo".to_string()
+                },
+            ]
+        );
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn invalid_committee_welfare_fails_validation() {
+        let config = multi_winner_with_welfare(
+            r#"["Harmonic", { Owa = { weights = [1.0, 0.5, 0.25], colname = "geo" } }]"#,
+        );
+        assert_eq!(
+            config.validate().unwrap_err(),
+            "`committee_welfare` entry 2: Owa has 3 weights, more than committee_size = 2"
+        );
+
+        let config = multi_winner_with_welfare(
+            r#"["Harmonic", { Owa = { weights = [1.0], colname = "pav" } }]"#,
+        );
+        assert_eq!(
+            config.validate().unwrap_err(),
+            "`committee_welfare` entries 1 and 2 would both write output column `pav`"
+        );
     }
 
     fn multi_winner_with_committee_methods(entries: &[&str]) -> Config {
