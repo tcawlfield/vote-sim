@@ -20,12 +20,10 @@
 //! Regret is `(W* - W(S)) / (W* - W̄)`, with `W*` the best and `W̄` the mean
 //! welfare over every possible committee: 0 for the best committee, 1 for an
 //! average one, as single-winner regret is. Both are found by searching every
-//! committee, which is by far the costliest part (see [`search`]).
+//! committee, which is by far the costliest part (see [`WelfareEval::prepare`]).
 //!
-//! The working buffers are allocated once, in [`WelfareEval::new`] and
-//! [`SearchBufs::new`], and reused for every trial. The free functions take
-//! their buffers as arguments so the benchmarks can compare that with
-//! allocating fresh ones.
+//! [`WelfareEval`] allocates its working buffers once and reuses them for
+//! every trial.
 
 use ndarray::{Array2, ArrayView2};
 
@@ -128,12 +126,18 @@ pub struct WelfareEval {
     /// Rescaled utilities, transposed from `Sim::scores`: `ncand` x `nvtr`, so
     /// one candidate's utilities for every voter are contiguous.
     norm_t: Array2<f64>,
-    search: SearchBufs,
+    /// For each depth `d` of the search, every voter's utilities for the first
+    /// `d + 1` members chosen so far, sorted best first. Flat, voter-major, `k`
+    /// slots per voter. The last member is folded straight into `col_sums`,
+    /// so there's no level for it.
+    levels: Vec<Vec<f64>>,
     /// One voter's utilities for a committee's members (`k`).
     scratch: Vec<f64>,
     /// For a committee: the sum over voters of each voter's j-th best member's
     /// utility (`k`).
     col_sums: Vec<f64>,
+    /// One committee's welfare, per welfare function.
+    welfare: Vec<f64>,
     /// `W*` this trial, per welfare function.
     pub best: Vec<f64>,
     /// `W̄` this trial, per welfare function.
@@ -156,9 +160,10 @@ impl WelfareEval {
             colnames: welfare.iter().map(Welfare::colname).collect(),
             weights,
             norm_t: Array2::zeros((sim.ncand, sim.nvtr)),
-            search: SearchBufs::new(sim.nvtr, k),
+            levels: (0..k - 1).map(|_| vec![0.0; sim.nvtr * k]).collect(),
             scratch: vec![0.0; k],
             col_sums: vec![0.0; k],
+            welfare: vec![0.0; welfare.len()],
             best: vec![0.0; welfare.len()],
             mean: vec![0.0; welfare.len()],
         }
@@ -170,17 +175,23 @@ impl WelfareEval {
         &self.colnames
     }
 
-    /// Once per trial, after the election: rescale the utilities and search
+    /// Once per trial, after the election: rescale the utilities, then visit
     /// every committee for [`best`](Self::best) and [`mean`](Self::mean).
+    ///
+    /// The visit is a depth-first walk over the combinations: each level keeps
+    /// every voter's chosen members' utilities sorted, and each committee
+    /// costs one pass over the voters, about `nvtr * k` work, however many
+    /// welfare functions there are. With `m` candidates the whole search is
+    /// about `nvtr * sum(d * C(m, d))` for `d` up to `k`: dozens of times a
+    /// trial's other work at 12 choose 5.
     pub fn prepare(&mut self, sim: &Sim) {
         normalize_into(sim.scores.view(), &mut self.norm_t);
-        search(
-            self.norm_t.view(),
-            self.weights.view(),
-            &mut self.search,
-            &mut self.best,
-            &mut self.mean,
-        );
+        self.best.fill(f64::NEG_INFINITY);
+        self.mean.fill(0.0); // a running sum until the end
+        let count = self.descend(0, 0) as f64;
+        for m in self.mean.iter_mut() {
+            *m /= count;
+        }
     }
 
     /// `W(committee)` for every welfare function, into `out`. Needs
@@ -215,149 +226,48 @@ impl WelfareEval {
             0.0
         }
     }
-}
 
-/// Rescale each voter's utilities (a row of `scores`, `nvtr` x `ncand`) to
-/// [0, 1] over the whole candidate field, writing them transposed into
-/// `norm_t` (`ncand` x `nvtr`). A voter indifferent between every candidate
-/// gets all zeros: they don't care who's elected.
-pub fn normalize_into(scores: ArrayView2<f64>, norm_t: &mut Array2<f64>) {
-    assert_eq!(norm_t.dim(), (scores.ncols(), scores.nrows()));
-    for (ivtr, row) in scores.rows().into_iter().enumerate() {
-        let lo = row.iter().copied().fold(f64::INFINITY, f64::min);
-        let hi = row.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-        let span = hi - lo;
-        for (icand, &u) in row.iter().enumerate() {
-            norm_t[(icand, ivtr)] = if span > 0.0 { (u - lo) / span } else { 0.0 };
-        }
-    }
-}
-
-/// Working memory for [`search`]: for each depth `d` of the search, every
-/// voter's utilities for the first `d + 1` members chosen so far, sorted best
-/// first. Laid out flat, voter-major, `k` slots per voter.
-pub struct SearchBufs {
-    k: usize,
-    levels: Vec<Vec<f64>>,
-    col_sums: Vec<f64>,
-    /// One committee's welfare, per welfare function. Sized on first use.
-    welfare: Vec<f64>,
-}
-
-impl SearchBufs {
-    pub fn new(nvtr: usize, k: usize) -> SearchBufs {
-        SearchBufs {
-            k,
-            // The last member is folded straight into `col_sums`, so the
-            // deepest level is never stored.
-            levels: (0..k.saturating_sub(1))
-                .map(|_| vec![0.0; nvtr * k])
-                .collect(),
-            col_sums: vec![0.0; k],
-            welfare: Vec::new(),
-        }
-    }
-}
-
-/// Find the best (`best`) and mean (`mean`) welfare over every committee of
-/// `bufs`' size, for each row of `weights`, by visiting each committee.
-///
-/// A depth-first walk over the combinations: each level keeps every voter's
-/// chosen members' utilities sorted, and each committee costs one pass over
-/// the voters, about `nvtr * k` work, however many welfare functions there
-/// are. With `m` candidates the whole search is about `nvtr * sum(d * C(m, d))`
-/// for `d` up to `k`: dozens of times a trial's other work at 12 choose 5.
-pub fn search(
-    norm_t: ArrayView2<f64>,
-    weights: ArrayView2<f64>,
-    bufs: &mut SearchBufs,
-    best: &mut [f64],
-    mean: &mut [f64],
-) {
-    let (ncand, nvtr) = norm_t.dim();
-    let k = bufs.k;
-    assert!(norm_t.is_standard_layout(), "norm_t must be row-major");
-    assert!((1..=ncand).contains(&k));
-    assert_eq!(weights.dim(), (best.len(), k));
-    assert_eq!(bufs.levels.first().map_or(nvtr * k, Vec::len), nvtr * k);
-
-    best.fill(f64::NEG_INFINITY);
-    mean.fill(0.0); // a running sum until the end
-    bufs.welfare.resize(best.len(), 0.0);
-    let mut walk = Walk {
-        norm_t,
-        weights,
-        nvtr,
-        k,
-        bufs,
-        best,
-        mean,
-        count: 0,
-    };
-    walk.descend(0, 0);
-    let count = walk.count as f64;
-    for m in mean.iter_mut() {
-        *m /= count; // from a running sum to the mean
-    }
-}
-
-/// The state of one [`search`], so the recursion needn't pass it all along.
-struct Walk<'a> {
-    norm_t: ArrayView2<'a, f64>,
-    weights: ArrayView2<'a, f64>,
-    nvtr: usize,
-    k: usize,
-    bufs: &'a mut SearchBufs,
-    best: &'a mut [f64],
-    mean: &'a mut [f64],
-    count: usize,
-}
-
-impl Walk<'_> {
     /// `depth` members are chosen (sorted per voter in `levels[depth - 1]`);
-    /// try each candidate from `start` on as the next.
-    fn descend(&mut self, depth: usize, start: usize) {
-        let ncand = self.norm_t.nrows();
+    /// try each candidate from `start` on as the next. Returns the number of
+    /// committees completed.
+    fn descend(&mut self, depth: usize, start: usize) -> usize {
+        let (ncand, nvtr) = self.norm_t.dim();
         let k = self.k;
         if depth == k - 1 {
             for icand in start..ncand {
                 self.finish_committee(depth, icand);
             }
-            return;
+            return ncand - start;
         }
+        let mut count = 0;
         // Leave enough candidates after this one to fill the committee.
         for icand in start..=ncand - (k - depth) {
             let utils = self.norm_t.row(icand);
             let utils = utils.as_slice().expect("row-major norm_t");
-            let (done, rest) = self.bufs.levels.split_at_mut(depth);
+            let (done, rest) = self.levels.split_at_mut(depth);
             let next = &mut rest[0];
-            for ivtr in 0..self.nvtr {
-                let row = &mut next[ivtr * k..ivtr * k + depth + 1];
+            for ivtr in 0..nvtr {
                 let prev = match done.last() {
                     Some(prev) => &prev[ivtr * k..ivtr * k + depth],
                     None => &[][..],
                 };
-                insert_sorted(prev, utils[ivtr], row);
+                insert_sorted(prev, utils[ivtr], &mut next[ivtr * k..ivtr * k + depth + 1]);
             }
-            self.descend(depth + 1, icand + 1);
+            count += self.descend(depth + 1, icand + 1);
         }
+        count
     }
 
     /// Complete a committee with `icand`, folding each voter's utilities
     /// straight into the column sums, and record its welfare.
     fn finish_committee(&mut self, depth: usize, icand: usize) {
+        let (_, nvtr) = self.norm_t.dim();
         let k = self.k;
         let utils = self.norm_t.row(icand);
         let utils = utils.as_slice().expect("row-major norm_t");
-        let SearchBufs {
-            levels,
-            col_sums,
-            welfare,
-            ..
-        } = &mut *self.bufs;
-        col_sums.fill(0.0);
-        for ivtr in 0..self.nvtr {
-            let prev = match levels.last() {
+        self.col_sums.fill(0.0);
+        for ivtr in 0..nvtr {
+            let prev = match self.levels.last() {
                 Some(prev) => &prev[ivtr * k..ivtr * k + depth],
                 None => &[][..],
             };
@@ -367,28 +277,42 @@ impl Walk<'_> {
             let mut placed = false;
             for &x in prev {
                 if !placed && u > x {
-                    col_sums[j] += u;
+                    self.col_sums[j] += u;
                     j += 1;
                     placed = true;
                 }
-                col_sums[j] += x;
+                self.col_sums[j] += x;
                 j += 1;
             }
             if !placed {
-                col_sums[j] += u;
+                self.col_sums[j] += u;
             }
         }
-        welfare_from_col_sums(self.weights, col_sums, self.nvtr, welfare);
+        welfare_from_col_sums(self.weights.view(), &self.col_sums, nvtr, &mut self.welfare);
         for ((b, m), &w) in self
             .best
             .iter_mut()
             .zip(self.mean.iter_mut())
-            .zip(&*welfare)
+            .zip(&self.welfare)
         {
             *b = b.max(w);
             *m += w;
         }
-        self.count += 1;
+    }
+}
+
+/// Rescale each voter's utilities (a row of `scores`, `nvtr` x `ncand`) to
+/// [0, 1] over the whole candidate field, writing them transposed into
+/// `norm_t` (`ncand` x `nvtr`). A voter indifferent between every candidate
+/// gets all zeros: they don't care who's elected.
+fn normalize_into(scores: ArrayView2<f64>, norm_t: &mut Array2<f64>) {
+    for (ivtr, row) in scores.rows().into_iter().enumerate() {
+        let lo = row.iter().copied().fold(f64::INFINITY, f64::min);
+        let hi = row.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        let span = hi - lo;
+        for (icand, &u) in row.iter().enumerate() {
+            norm_t[(icand, ivtr)] = if span > 0.0 { (u - lo) / span } else { 0.0 };
+        }
     }
 }
 
