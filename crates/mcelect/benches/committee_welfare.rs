@@ -6,7 +6,13 @@
 //! For each (candidates, committee size, voters):
 //! * `election` -- `Sim::election` with Likability and 2-D Issues: the work a
 //!   committee trial already does, as the yardstick.
-//! * `prepare` -- `WelfareEval::prepare`: rescale, then search every committee.
+//! * `prepare_all` -- `WelfareEval::prepare` for Additive, Harmonic and
+//!   Chamberlin-Courant: rescale, find each mean, and search for each best.
+//! * `prepare_cc` -- the same for Chamberlin-Courant alone, whose search is a
+//!   branch and bound.
+//!
+//! How much branch and bound prunes varies from election to election, so the
+//! `prepare` benchmarks cycle through a batch of them.
 //! * `score` -- one method's committee, all welfare functions at once.
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
@@ -14,6 +20,9 @@ use mcelect::committee_welfare::{Welfare, WelfareEval};
 use mcelect::considerations::{Consideration, ConsiderationSimKind};
 use mcelect::sim::Sim;
 use std::time::Duration;
+
+/// Elections the `prepare` benchmarks cycle through.
+const ELECTIONS: usize = 16;
 
 const WELFARE: [Welfare; 3] = [
     Welfare::Additive,
@@ -55,10 +64,26 @@ fn bench_committee_welfare(c: &mut Criterion) {
             b.iter(|| sim.election(&mut axes, &mut rng))
         });
 
+        let elections: Vec<Sim> = (0..ELECTIONS)
+            .map(|_| {
+                let mut sim = Sim::new(ncand, nvtr);
+                sim.election(&mut axes, &mut rng);
+                sim
+            })
+            .collect();
+        for (name, welfare) in [
+            ("prepare_all", &WELFARE[..]),
+            ("prepare_cc", &[Welfare::ChamberlinCourant][..]),
+        ] {
+            let mut eval = WelfareEval::new(welfare, &sim, k);
+            let mut next = elections.iter().cycle();
+            group.bench_function(BenchmarkId::new(name, &size), |b| {
+                b.iter(|| eval.prepare(next.next().unwrap()))
+            });
+        }
+
         let mut eval = WelfareEval::new(&WELFARE, &sim, k);
-        group.bench_function(BenchmarkId::new("prepare", &size), |b| {
-            b.iter(|| eval.prepare(&sim))
-        });
+        eval.prepare(&sim);
 
         let committee: Vec<usize> = (0..k).collect();
         let mut out = vec![0.0; WELFARE.len()];
