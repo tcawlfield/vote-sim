@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::ColName;
 use super::MethodSim;
-use super::results::{Strategy, WinnerAndRunnerup};
+use super::results::{Standings, Strategy};
 use super::tallies::{Tallies, tally_votes};
 use crate::sim::Sim;
 
@@ -31,6 +31,7 @@ fn default_stretch() -> f64 {
 pub struct RangeVotingSim {
     params: RangeVoting,
     tallies: Tallies,
+    standings: Standings,
     ballot: Tallies,
 }
 
@@ -79,13 +80,14 @@ impl RangeVoting {
         RangeVotingSim {
             params: self.clone(),
             tallies: vec![0; sim.ncand],
+            standings: Standings::with_capacity(sim.ncand),
             ballot: vec![0; sim.ncand],
         }
     }
 }
 
 impl MethodSim for RangeVotingSim {
-    fn elect(&mut self, sim: &Sim, honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup {
+    fn elect(&mut self, sim: &Sim, honest_rslt: Option<&Standings>) -> &Standings {
         self.tallies.fill(0);
         for vscores in sim.scores.outer_iter() {
             match self.params.strat {
@@ -94,8 +96,8 @@ impl MethodSim for RangeVotingSim {
                 }
                 Strategy::Strategic => {
                     let pre_election = honest_rslt.expect("strategic Range needs an honest poll");
-                    let score_break = (vscores[pre_election.winner.cand]
-                        + vscores[pre_election.runnerup.cand])
+                    let score_break = (vscores[pre_election.winner().cand]
+                        + vscores[pre_election.runnerup().cand])
                         / 2.0;
                     fill_range_ballot_strat(
                         &vscores,
@@ -111,7 +113,8 @@ impl MethodSim for RangeVotingSim {
             }
         }
         log::debug!("{} tallies: {:?}", self.name(), self.tallies);
-        tally_votes(&self.tallies)
+        tally_votes(&self.tallies, &mut self.standings);
+        &self.standings
     }
 
     fn name(&self) -> String {
@@ -203,9 +206,9 @@ mod tests {
             colname: ColName::default(),
         }
         .new_sim(&sim);
-        let honest_results = method.elect(&sim, None);
-        assert_eq!(honest_results.winner.cand, 2);
-        assert_eq!(honest_results.runnerup.cand, 0);
+        let honest_results = method.elect(&sim, None).clone();
+        assert_eq!(honest_results.winner().cand, 2);
+        assert_eq!(honest_results.runnerup().cand, 0);
 
         let mut method2 = RangeVoting {
             strat: Strategy::Strategic,
@@ -214,7 +217,7 @@ mod tests {
             colname: ColName::default(),
         }
         .new_sim(&sim);
-        let strat_results = method2.elect(&sim, Some(honest_results));
-        assert_eq!(strat_results.winner.cand, 1);
+        let strat_results = method2.elect(&sim, Some(&honest_results)).clone();
+        assert_eq!(strat_results.winner().cand, 1);
     }
 }

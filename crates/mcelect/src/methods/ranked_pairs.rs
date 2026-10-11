@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use super::ColName;
 use super::MethodSim;
 use super::condorcet_util::{CandPair, find_candidate_pairoffs, find_locked_in_winner, lock_in};
-use super::results::{ElectResult, Strategy, WinnerAndRunnerup};
+use super::results::{Standings, Strategy};
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -26,6 +26,9 @@ pub struct RPSim {
     params: RP,
     pairs: Vec<CandPair>,
     locked_in: Array2<bool>,
+    /// Whether each candidate has been given a place yet.
+    placed: Vec<bool>,
+    standings: Standings,
 }
 
 impl RP {
@@ -43,34 +46,33 @@ impl RP {
             params: self.clone(),
             pairs: Vec::with_capacity(sim.ncand * (sim.ncand - 1) / 2),
             locked_in: Array2::default((sim.ncand, sim.ncand)),
+            placed: vec![false; sim.ncand],
+            standings: Standings::with_capacity(sim.ncand),
         }
     }
 }
 
 impl MethodSim for RPSim {
-    fn elect(&mut self, sim: &Sim, _honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup {
+    fn elect(&mut self, sim: &Sim, _honest_rslt: Option<&Standings>) -> &Standings {
         find_candidate_pairoffs(&mut self.pairs, sim);
         // Sort by decreasing margin of victory -- first element is the highest-ranked pair.
         self.pairs.sort_by_key(|p| -p.margin);
 
-        let winner = self.find_winner(sim);
-        let runner_up = if sim.ncand > 2 {
+        // Each place goes to the winner among those not yet placed: drop the
+        // placed candidates' pairs and lock in the rest again. Each scores the
+        // number of candidates placed below them.
+        self.standings.clear();
+        self.placed.fill(false);
+        for place in 0..sim.ncand - 1 {
+            let winner = self.find_winner(sim);
+            self.standings.push(winner, (sim.ncand - 1 - place) as f64);
+            self.placed[winner] = true;
             self.pairs
                 .retain(|p| p.winner != winner && p.loser != winner);
-            self.find_winner(sim)
-        } else {
-            (winner + 1) % 2
-        };
-        WinnerAndRunnerup {
-            winner: ElectResult {
-                cand: winner,
-                score: 1.0, // don't know a meaningful stat for this.
-            },
-            runnerup: ElectResult {
-                cand: runner_up,
-                score: 0.0,
-            },
         }
+        let last = self.placed.iter().position(|&placed| !placed).unwrap();
+        self.standings.push(last, 0.0);
+        &self.standings
     }
 
     fn name(&self) -> String {
@@ -154,7 +156,34 @@ mod tests {
             ]
         );
 
-        let honest_results = method.elect(&sim, None);
-        assert_eq!(honest_results.winner.cand, 2);
+        let honest_results = method.elect(&sim, None).clone();
+        assert_eq!(honest_results.winner().cand, 2);
+    }
+
+    /// Each place goes to the winner once those above are set aside: C wins,
+    /// then A beats B. Each scores the number placed below them.
+    #[test]
+    fn rp_ranks_every_candidate() {
+        let mut sim = Sim::new(3, 12);
+        let rows: Vec<[f64; 3]> = [
+            [[-1., -2., -3.]; 4].as_slice(), // 4x A>B>C
+            [[-3., -1., -2.]; 3].as_slice(), // 3x B>C>A
+            [[-2., -3., -1.]; 5].as_slice(), // 5x C>A>B
+        ]
+        .concat();
+        sim.scores = ndarray::Array2::from_shape_fn((12, 3), |(v, c)| rows[v][c]);
+        sim.rank_candidates();
+        let mut method = RP {
+            strat: Strategy::Honest,
+            colname: ColName::default(),
+        }
+        .new_sim(&sim);
+        let standings = method.elect(&sim, None);
+        let places: Vec<(usize, f64)> = standings
+            .order()
+            .iter()
+            .map(|r| (r.cand, r.score))
+            .collect();
+        assert_eq!(places, [(2, 2.0), (0, 1.0), (1, 0.0)]);
     }
 }

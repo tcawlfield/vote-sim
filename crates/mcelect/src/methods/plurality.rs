@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::MethodSim;
-use super::results::{Strategy, WinnerAndRunnerup};
+use super::results::{Standings, Strategy};
 use super::tallies::{Tallies, tally_votes};
 use crate::sim::Sim;
 use serde::{Deserialize, Serialize};
@@ -50,6 +50,7 @@ pub struct Plurality {
 pub struct PluralitySim {
     params: Plurality,
     tallies: Tallies,
+    standings: Standings,
 }
 
 impl Plurality {
@@ -75,12 +76,13 @@ impl Plurality {
         PluralitySim {
             params: self.clone(),
             tallies: vec![0; sim.ncand],
+            standings: Standings::with_capacity(sim.ncand),
         }
     }
 }
 
 impl MethodSim for PluralitySim {
-    fn elect(&mut self, sim: &Sim, honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup {
+    fn elect(&mut self, sim: &Sim, honest_rslt: Option<&Standings>) -> &Standings {
         match self.params.strat {
             Strategy::Honest => {
                 self.tallies.fill(0);
@@ -93,7 +95,7 @@ impl MethodSim for PluralitySim {
                 self.tallies.fill(0);
                 for vtr_ranks in sim.ranks.rows() {
                     for &icand in vtr_ranks {
-                        if icand == pre_poll.winner.cand || icand == pre_poll.runnerup.cand {
+                        if icand == pre_poll.winner().cand || icand == pre_poll.runnerup().cand {
                             self.tallies[icand] += 1;
                             break;
                         }
@@ -106,7 +108,8 @@ impl MethodSim for PluralitySim {
             self.params.strat,
             self.tallies
         );
-        tally_votes(&self.tallies)
+        tally_votes(&self.tallies, &mut self.standings);
+        &self.standings
     }
 
     fn name(&self) -> String {
@@ -121,7 +124,6 @@ impl MethodSim for PluralitySim {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::methods::ElectResult;
     use crate::methods::test_utils::sim_from_scores;
     use crate::sim::Sim;
 
@@ -151,13 +153,13 @@ mod tests {
         sim.rank_candidates();
 
         let mut method = honest(&sim);
-        let result = method.elect(&sim, None);
+        let result = method.elect(&sim, None).clone();
 
         assert_eq!(method.tallies, vec![5, 3, 2]);
-        assert_eq!(result.winner.cand, 0);
-        assert_eq!(result.winner.score, 5.0);
-        assert_eq!(result.runnerup.cand, 1);
-        assert_eq!(result.runnerup.score, 3.0);
+        assert_eq!(result.winner().cand, 0);
+        assert_eq!(result.winner().score, 5.0);
+        assert_eq!(result.runnerup().cand, 1);
+        assert_eq!(result.runnerup().score, 3.0);
     }
 
     #[test]
@@ -166,20 +168,13 @@ mod tests {
             sim_from_scores(&[(&[3., 1., 0.], 5), (&[1., 3., 0.], 3), (&[0., 1., 3.], 2)]);
         sim.rank_candidates();
 
-        let bogus = WinnerAndRunnerup {
-            winner: ElectResult {
-                cand: 2,
-                score: 99.0,
-            },
-            runnerup: ElectResult {
-                cand: 2,
-                score: 99.0,
-            },
-        };
-        let with_hint = honest(&sim).elect(&sim, Some(bogus));
-        let without_hint = honest(&sim).elect(&sim, None);
-        assert_eq!(with_hint.winner.cand, without_hint.winner.cand);
-        assert_eq!(with_hint.winner.cand, 0);
+        let mut bogus = Standings::default();
+        bogus.push(2, 99.0);
+        bogus.push(2, 99.0);
+        let with_hint = honest(&sim).elect(&sim, Some(&bogus)).clone();
+        let without_hint = honest(&sim).elect(&sim, None).clone();
+        assert_eq!(with_hint.winner().cand, without_hint.winner().cand);
+        assert_eq!(with_hint.winner().cand, 0);
     }
 
     #[test]
@@ -193,10 +188,10 @@ mod tests {
         sim.rank_candidates();
 
         let mut method = honest(&sim);
-        let result = method.elect(&sim, None);
+        let result = method.elect(&sim, None).clone();
 
         assert_eq!(method.tallies, vec![5, 4, 0]);
-        assert_eq!(result.winner.cand, 0);
+        assert_eq!(result.winner().cand, 0);
     }
 
     #[test]
@@ -208,17 +203,17 @@ mod tests {
         ]);
         sim.rank_candidates();
 
-        let honest_result = honest(&sim).elect(&sim, None);
-        assert_eq!(honest_result.winner.cand, 0);
-        assert_eq!(honest_result.runnerup.cand, 1);
+        let honest_result = honest(&sim).elect(&sim, None).clone();
+        assert_eq!(honest_result.winner().cand, 0);
+        assert_eq!(honest_result.runnerup().cand, 1);
 
         let mut method = strategic(&sim);
-        let result = method.elect(&sim, Some(honest_result));
+        let result = method.elect(&sim, Some(&honest_result)).clone();
 
         // Frontrunners are 0 and 1. The 2 candidate-2 voters prefer 1 to 0, so
         // they abandon 2 and vote 1, which overtakes 0.
         assert_eq!(method.tallies, vec![4, 5, 0]);
-        assert_eq!(result.winner.cand, 1);
+        assert_eq!(result.winner().cand, 1);
     }
 
     #[test]

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use super::ColName;
 use super::MethodSim;
-use super::results::{ElectResult, WinnerAndRunnerup};
+use super::results::Standings;
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
@@ -23,6 +23,7 @@ pub struct MinimaxSim {
     _p: Minimax,
     min_victory_margin: Vec<i32>,
     cands: Vec<usize>,
+    standings: Standings,
 }
 
 impl Minimax {
@@ -37,12 +38,13 @@ impl Minimax {
             _p: self.clone(),
             min_victory_margin: vec![0; sim.ncand],
             cands: (0..sim.ncand).collect(),
+            standings: Standings::with_capacity(sim.ncand),
         }
     }
 }
 
 impl MethodSim for MinimaxSim {
-    fn elect(&mut self, sim: &Sim, _honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup {
+    fn elect(&mut self, sim: &Sim, _honest_rslt: Option<&Standings>) -> &Standings {
         // self.min_victory_margin will hold the lowest margin of victory (negative when
         // the candidate loses against another) that the indexing candidate has over others
         // in pair-wise matchups.
@@ -57,19 +59,21 @@ impl MethodSim for MinimaxSim {
         // Find winner and runner-up. The winner has the largest worst-margin-of-victory.
         // Candidates in the Smith set will have at least a worst-margin-of-victory of zero,
         // And there will be at least one such candidate.
-        let (_, rup, winner) = self.cands.select_nth_unstable_by(sim.ncand - 2, |&a, &b| {
-            self.min_victory_margin[a].cmp(&self.min_victory_margin[b])
-        });
-        WinnerAndRunnerup {
-            winner: ElectResult {
-                cand: winner[0],
-                score: self.min_victory_margin[winner[0]] as f64,
-            },
-            runnerup: ElectResult {
-                cand: *rup,
-                score: self.min_victory_margin[*rup] as f64,
-            },
+        let mvm = &self.min_victory_margin;
+        let (rest, rup, winner) = self
+            .cands
+            .select_nth_unstable_by(sim.ncand - 2, |&a, &b| mvm[a].cmp(&mvm[b]));
+        self.standings.clear();
+        self.standings.push(winner[0], mvm[winner[0]] as f64);
+        self.standings.push(*rup, mvm[*rup] as f64);
+        // The rest by their worst margin, best first. Sorted here rather than
+        // in `cands`, whose order carries over to break the next trial's ties.
+        for &icand in rest.iter() {
+            self.standings.push(icand, mvm[icand] as f64);
         }
+        self.standings.order_mut()[2..]
+            .sort_unstable_by(|a, b| b.score.total_cmp(&a.score).then(a.cand.cmp(&b.cand)));
+        &self.standings
     }
 
     fn name(&self) -> String {
@@ -106,11 +110,11 @@ mod tests {
             ]
         );
         let mut method = Minimax::default().new_sim(&sim);
-        let honest_results = method.elect(&sim, None);
+        let honest_results = method.elect(&sim, None).clone();
         assert_eq!(method.min_victory_margin, vec![-16, 16, -36, -66]);
-        assert_eq!(honest_results.winner.cand, 1);
-        assert_eq!(honest_results.winner.score, 16.);
-        assert_eq!(honest_results.runnerup.cand, 0);
-        assert_eq!(honest_results.runnerup.score, -16.);
+        assert_eq!(honest_results.winner().cand, 1);
+        assert_eq!(honest_results.winner().score, 16.);
+        assert_eq!(honest_results.runnerup().cand, 0);
+        assert_eq!(honest_results.runnerup().score, -16.);
     }
 }

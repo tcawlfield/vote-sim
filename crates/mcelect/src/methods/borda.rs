@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::ColName;
 use super::MethodSim;
-use super::results::{Strategy, WinnerAndRunnerup, default_honest};
+use super::results::{Standings, Strategy, default_honest};
 use super::tallies::{Tallies, tally_votes};
 use crate::sim::Sim;
 
@@ -56,6 +56,7 @@ fn default_none() -> Option<usize> {
 pub struct BordaSim {
     p: Borda,
     tallies: Tallies,
+    standings: Standings,
 }
 
 impl Borda {
@@ -82,12 +83,13 @@ impl Borda {
         BordaSim {
             p: self.clone(),
             tallies: vec![0; sim.ncand],
+            standings: Standings::with_capacity(sim.ncand),
         }
     }
 }
 
 impl MethodSim for BordaSim {
-    fn elect(&mut self, sim: &Sim, honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup {
+    fn elect(&mut self, sim: &Sim, honest_rslt: Option<&Standings>) -> &Standings {
         self.tallies.fill(0);
         let top_ncand = if let Some(n) = self.p.rank_top_n {
             n
@@ -106,12 +108,12 @@ impl MethodSim for BordaSim {
                 // Note strategic scoring is reduced by 1 so that threat == 0 always.
                 let pre_elect = honest_rslt.expect("strategic Borda needs an honest poll");
                 for (ivtr, cand_fav_list) in sim.ranks.lanes(Axis(1)).into_iter().enumerate() {
-                    let (preferred, threat) = if sim.scores[(ivtr, pre_elect.winner.cand)]
-                        >= sim.scores[(ivtr, pre_elect.runnerup.cand)]
+                    let (preferred, threat) = if sim.scores[(ivtr, pre_elect.winner().cand)]
+                        >= sim.scores[(ivtr, pre_elect.runnerup().cand)]
                     {
-                        (pre_elect.winner.cand, pre_elect.runnerup.cand)
+                        (pre_elect.winner().cand, pre_elect.runnerup().cand)
                     } else {
-                        (pre_elect.runnerup.cand, pre_elect.winner.cand)
+                        (pre_elect.runnerup().cand, pre_elect.winner().cand)
                     };
                     let mut score_shift: i32 = -2; // leave room for preferred to score max
                     for (cand_rank, &icand) in cand_fav_list.indexed_iter() {
@@ -128,7 +130,8 @@ impl MethodSim for BordaSim {
             }
         }
         log::debug!("Borda tallies are: {:?}", self.tallies);
-        tally_votes(&self.tallies)
+        tally_votes(&self.tallies, &mut self.standings);
+        &self.standings
     }
 
     fn name(&self) -> String {
@@ -166,11 +169,11 @@ mod tests {
         }
         .new_sim(&sim);
         sim.rank_candidates();
-        let honest_results = method.elect(&sim, None);
-        assert_eq!(honest_results.winner.cand, 1);
-        assert_eq!(honest_results.winner.score, 15.);
-        assert_eq!(honest_results.runnerup.cand, 0);
-        assert_eq!(honest_results.runnerup.score, 14.);
+        let honest_results = method.elect(&sim, None).clone();
+        assert_eq!(honest_results.winner().cand, 1);
+        assert_eq!(honest_results.winner().score, 15.);
+        assert_eq!(honest_results.runnerup().cand, 0);
+        assert_eq!(honest_results.runnerup().score, 14.);
 
         let mut method = Borda {
             strat: Strategy::Strategic,
@@ -178,7 +181,7 @@ mod tests {
             colname: ColName::default(),
         }
         .new_sim(&sim);
-        let strat_results = method.elect(&sim, Some(honest_results));
+        let strat_results = method.elect(&sim, Some(&honest_results)).clone();
         // scores: Note strategic scoring is reduced by 1 so that threat == 0 always
         // 3 0 2 1
         // 0 3 1 2
@@ -186,7 +189,7 @@ mod tests {
         // 3 0 1 2
         // 3 0 2 1
         assert_eq!(method.tallies, vec![9, 6, 8, 7]);
-        assert_eq!(strat_results.winner.cand, 0);
+        assert_eq!(strat_results.winner().cand, 0);
     }
 
     #[test]
@@ -207,10 +210,10 @@ mod tests {
         }
         .new_sim(&sim);
         sim.rank_candidates();
-        let honest_results = method.elect(&sim, None);
+        let honest_results = method.elect(&sim, None).clone();
         assert_eq!(method.tallies, vec![4, 6, 2, 3]);
-        assert_eq!(honest_results.winner.cand, 1);
-        assert_eq!(honest_results.runnerup.cand, 0);
+        assert_eq!(honest_results.winner().cand, 1);
+        assert_eq!(honest_results.runnerup().cand, 0);
 
         let mut method = Borda {
             strat: Strategy::Strategic,
@@ -218,7 +221,7 @@ mod tests {
             colname: ColName::default(),
         }
         .new_sim(&sim);
-        let strat_results = method.elect(&sim, Some(honest_results));
+        let strat_results = method.elect(&sim, Some(&honest_results)).clone();
         // scores: Note strategic scoring is reduced by 1 so that threat == 0 always
         // 2 0 1 0
         // 0 2 0 1
@@ -226,6 +229,6 @@ mod tests {
         // 2 0 0 1
         // 0 2 1 0
         assert_eq!(method.tallies, vec![4, 6, 3, 2]);
-        assert_eq!(strat_results.winner.cand, 1);
+        assert_eq!(strat_results.winner().cand, 1);
     }
 }

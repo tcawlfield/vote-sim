@@ -26,7 +26,7 @@ pub use plurality::Plurality;
 pub use plurality_top_n::PluralityTopN;
 pub use rangevoting::RangeVoting;
 pub use ranked_pairs::RP;
-pub use results::{ElectResult, Strategy, WinnerAndRunnerup};
+pub use results::{ElectResult, Standings, Strategy};
 pub use reweighted_range::RRV;
 pub use star::STAR;
 
@@ -118,9 +118,10 @@ impl Method {
 }
 
 pub trait MethodSim {
-    /// Run this trial's election. `honest_rslt` is the result of the method's
-    /// [`Method::honest_poll`] this trial, and is `Some` exactly when that is.
-    fn elect(&mut self, sim: &Sim, honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup;
+    /// Run this trial's election, returning every candidate's place. `poll` is
+    /// the standings of the method's [`Method::honest_poll`] this trial, and is
+    /// `Some` exactly when that is.
+    fn elect(&mut self, sim: &Sim, poll: Option<&Standings>) -> &Standings;
     fn name(&self) -> String;
     fn colname(&self) -> String;
 }
@@ -162,4 +163,70 @@ pub trait MWMethodSim {
     fn multi_elect(&mut self, sim: &Sim, nwinners: usize) -> &Vec<ElectResult>;
     fn name(&self) -> String;
     fn colname(&self) -> String;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::considerations::{Consideration, ConsiderationSimKind};
+    use rand::SeedableRng;
+    use rand::rngs::StdRng;
+
+    fn every_method() -> Vec<Method> {
+        [
+            r#"{"Plurality": {"strat": "Honest"}}"#,
+            r#"{"Plurality": {"strat": "Strategic"}}"#,
+            r#"{"Range": {"strat": "Honest", "nranks": 5}}"#,
+            r#"{"Range": {"strat": "Strategic", "nranks": 2}}"#,
+            r#"{"InstantRunoff": {}}"#,
+            r#"{"Borda": {"strat": "Honest"}}"#,
+            r#"{"Borda": {"strat": "Strategic"}}"#,
+            r#"{"Multivote": {"strat": "Honest", "votes": 3, "spread_fact": 1.0}}"#,
+            r#"{"Multivote": {"strat": "Strategic", "votes": 3, "spread_fact": 1.0}}"#,
+            r#"{"STAR": {"strat": "Honest"}}"#,
+            r#"{"STAR": {"strat": "Strategic"}}"#,
+            r#"{"RP": {"strat": "Honest"}}"#,
+            r#"{"BtrIrv": {}}"#,
+            r#"{"MM": {}}"#,
+        ]
+        .iter()
+        .map(|json| serde_json::from_str(json).unwrap())
+        .collect()
+    }
+
+    /// Every method's standings place every candidate exactly once, across
+    /// field sizes and electorates small enough to tie.
+    #[test]
+    fn every_method_places_every_candidate_once() {
+        let considerations: Vec<Consideration> = serde_json::from_str(
+            r#"[{"Likability": {"mean": 0.3}}, {"Issues": [{"sigma": 1.0, "halfcsep": 0.5}]}]"#,
+        )
+        .unwrap();
+        let mut rng = StdRng::seed_from_u64(9);
+        for ncand in [2, 3, 6] {
+            for nvtr in [2, 5, 51] {
+                let mut sim = Sim::new(ncand, nvtr);
+                let mut axes: Vec<ConsiderationSimKind> =
+                    considerations.iter().map(|c| c.new_sim(&sim)).collect();
+                for _ in 0..20 {
+                    sim.election(&mut axes, &mut rng);
+                    for method in every_method() {
+                        let poll = method
+                            .honest_poll()
+                            .map(|honest| honest.new_sim(&sim).elect(&sim, None).clone());
+                        let mut method_sim = method.new_sim(&sim);
+                        let standings = method_sim.elect(&sim, poll.as_ref());
+                        let mut placed: Vec<usize> =
+                            standings.order().iter().map(|r| r.cand).collect();
+                        placed.sort_unstable();
+                        assert_eq!(
+                            placed,
+                            (0..ncand).collect::<Vec<_>>(),
+                            "{method:?}, {ncand} candidates, {nvtr} voters: {standings:?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
 }

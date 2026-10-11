@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::ColName;
 use super::MethodSim;
-use super::results::{Strategy, WinnerAndRunnerup};
+use super::results::{Standings, Strategy};
 use super::tallies::{Tallies, tally_votes};
 use crate::sim::Sim;
 
@@ -26,6 +26,7 @@ pub struct Multivote {
 pub struct MultivoteSim {
     p: Multivote,
     tallies: Tallies,
+    standings: Standings,
     cand_scores: Vec<f64>,
 }
 
@@ -51,19 +52,21 @@ impl Multivote {
         MultivoteSim {
             p: self.clone(),
             tallies: vec![0; sim.ncand],
+            standings: Standings::with_capacity(sim.ncand),
             cand_scores: vec![0.0; sim.ncand],
         }
     }
 }
 
 impl MethodSim for MultivoteSim {
-    fn elect(&mut self, sim: &Sim, _honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup {
+    fn elect(&mut self, sim: &Sim, _honest_rslt: Option<&Standings>) -> &Standings {
         self.tallies.fill(0);
         if let Strategy::Strategic = self.p.strat {
             for ranks in sim.ranks.axis_iter(Axis(0)) {
                 self.tallies[ranks[0]] += self.p.votes;
             }
-            return tally_votes(&self.tallies);
+            tally_votes(&self.tallies, &mut self.standings);
+            return &self.standings;
         }
 
         for (ivtr, utilities) in sim.scores.axis_iter(Axis(0)).enumerate() {
@@ -96,7 +99,8 @@ impl MethodSim for MultivoteSim {
         }
 
         log::debug!("Multivote tallies are: {:?}", self.tallies);
-        tally_votes(&self.tallies)
+        tally_votes(&self.tallies, &mut self.standings);
+        &self.standings
     }
 
     fn name(&self) -> String {
@@ -138,11 +142,11 @@ mod tests {
         // Next scores:          1., 2., 1.25, 1.5  -- cand 1 gets the vote
         // Tallies:
         sim.rank_candidates();
-        let honest_results = method.elect(&sim, None);
-        assert_eq!(honest_results.winner.cand, 3);
-        assert_eq!(honest_results.winner.score, 7.);
-        assert_eq!(honest_results.runnerup.cand, 2);
-        assert_eq!(honest_results.runnerup.score, 5.);
+        let honest_results = method.elect(&sim, None).clone();
+        assert_eq!(honest_results.winner().cand, 3);
+        assert_eq!(honest_results.winner().score, 7.);
+        assert_eq!(honest_results.runnerup().cand, 2);
+        assert_eq!(honest_results.runnerup().score, 5.);
 
         let mut smethod = Multivote {
             strat: Strategy::Strategic,
@@ -152,8 +156,8 @@ mod tests {
         }
         .new_sim(&sim);
         // tallies: 4, 4, 4, 8
-        let strat_results = smethod.elect(&sim, Some(honest_results));
-        assert_eq!(strat_results.winner.cand, 3);
-        assert_eq!(strat_results.winner.score, 8.);
+        let strat_results = smethod.elect(&sim, Some(&honest_results)).clone();
+        assert_eq!(strat_results.winner().cand, 3);
+        assert_eq!(strat_results.winner().score, 8.);
     }
 }
