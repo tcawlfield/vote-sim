@@ -7,13 +7,14 @@
 //! * `election` -- `Sim::election` with Likability and 2-D Issues: the work a
 //!   committee trial already does, as the yardstick.
 //! * `prepare_all` -- `WelfareEval::prepare` for Additive, Harmonic and
-//!   Chamberlin-Courant: rescale, find each mean, and search for each best.
-//! * `prepare_cc` -- the same for Chamberlin-Courant alone, whose search is a
-//!   branch and bound.
+//!   Chamberlin-Courant: rescale, find each mean, and find each best -- by a
+//!   top-k for Additive and branch and bound for the others.
+//! * `prepare_exhaustive` -- the same for an `Owa` with rising weights, whose
+//!   best is found by visiting every committee: the yardstick for the others.
+//! * `score` -- one method's committee, all welfare functions at once.
 //!
 //! How much branch and bound prunes varies from election to election, so the
 //! `prepare` benchmarks cycle through a batch of them.
-//! * `score` -- one method's committee, all welfare functions at once.
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use mcelect::committee_welfare::{Welfare, WelfareEval};
@@ -71,9 +72,13 @@ fn bench_committee_welfare(c: &mut Criterion) {
                 sim
             })
             .collect();
+        let rising = [Welfare::Owa {
+            weights: vec![0.1, 0.2, 1.0],
+            colname: "rising".to_string(),
+        }];
         for (name, welfare) in [
             ("prepare_all", &WELFARE[..]),
-            ("prepare_cc", &[Welfare::ChamberlinCourant][..]),
+            ("prepare_exhaustive", &rising[..]),
         ] {
             let mut eval = WelfareEval::new(welfare, &sim, k);
             let mut next = elections.iter().cycle();

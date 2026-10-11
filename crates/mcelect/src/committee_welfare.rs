@@ -128,12 +128,18 @@ pub struct WelfareEval {
     /// candidate gets on average over every committee (`ncand` each), so
     /// that `W̄` is a weighted sum over each voter's sorted utilities.
     rank_weights: Array2<f64>,
-    /// The welfare functions whose `W*` is found by visiting every committee,
-    /// by index, and their weights. Chamberlin-Courant isn't among them.
+    /// The welfare functions, by index, whose weights are all equal (as
+    /// Additive's are): their best committee is simply the `k` candidates
+    /// with the most utility in total.
+    top_k: Vec<usize>,
+    /// The welfare functions, by index, whose weights never increase (as
+    /// Harmonic's and Chamberlin-Courant's), and each one's branch-and-bound
+    /// search for its best committee.
+    bounded: Vec<(usize, OwaSearch)>,
+    /// The rest, by index, whose best committee is found by visiting every
+    /// committee, and their weights.
     exhaustive: Vec<usize>,
     exhaustive_weights: Array2<f64>,
-    /// Chamberlin-Courant's index, and its branch-and-bound search.
-    cc: Option<(usize, CcSearch)>,
     /// Rescaled utilities, transposed from `Sim::scores`: `ncand` x `nvtr`, so
     /// one candidate's utilities for every voter are contiguous.
     norm_t: Array2<f64>,
@@ -143,7 +149,7 @@ pub struct WelfareEval {
     /// into `col_sums`, so there's no level for it.
     levels: Vec<Vec<f64>>,
     /// One voter's utilities for a committee's members (`k`), or for every
-    /// candidate (`ncand`) when computing `W̄`.
+    /// candidate (`ncand`) when computing `W̄`, or every candidate's total.
     scratch: Vec<f64>,
     /// For a committee: the sum over voters of each voter's j-th best member's
     /// utility (`k`).
@@ -164,13 +170,18 @@ impl WelfareEval {
             "committee size {k} with {ncand} candidates"
         );
         let weights = weight_rows(welfare.iter(), k);
-        let cc = welfare
-            .iter()
-            .position(|w| *w == Welfare::ChamberlinCourant)
-            .map(|i| (i, CcSearch::new(ncand, nvtr, k)));
-        let exhaustive: Vec<usize> = (0..welfare.len())
-            .filter(|&i| cc.as_ref().is_none_or(|(icc, _)| i != *icc))
-            .collect();
+        // Each welfare function gets the cheapest search that's still exact.
+        let (mut top_k, mut bounded, mut exhaustive) = (Vec::new(), Vec::new(), Vec::new());
+        for (i, w) in weights.rows().into_iter().enumerate() {
+            let w = w.as_slice().expect("row-major weights");
+            if w.iter().all(|&x| x == w[0]) {
+                top_k.push(i);
+            } else if w.windows(2).all(|pair| pair[1] <= pair[0]) {
+                bounded.push((i, OwaSearch::new(w, ncand, nvtr)));
+            } else {
+                exhaustive.push(i);
+            }
+        }
         let levels = if exhaustive.is_empty() { 0 } else { k - 1 };
         WelfareEval {
             k,
@@ -180,7 +191,8 @@ impl WelfareEval {
             welfare: vec![0.0; exhaustive.len()],
             exhaustive,
             weights,
-            cc,
+            top_k,
+            bounded,
             norm_t: Array2::zeros((ncand, nvtr)),
             levels: (0..levels).map(|_| vec![0.0; nvtr * k]).collect(),
             scratch: vec![0.0; ncand.max(k)],
@@ -199,24 +211,34 @@ impl WelfareEval {
     /// Once per trial, after the election: rescale the utilities, then find
     /// [`mean`](Self::mean) and [`best`](Self::best) for every welfare function.
     ///
-    /// The mean is cheap, one sort per voter. The best takes a search:
-    /// Chamberlin-Courant's is a branch and bound that skips most committees,
-    /// for about a tenth of the work. Every other function's visits them all,
-    /// in a depth-first walk over the combinations that keeps every voter's
-    /// chosen members' utilities sorted, about `nvtr * k` work per committee.
-    /// That's about `nvtr * sum(d * C(m, d))` for `d` up to `k` with `m`
-    /// candidates: dozens of times a trial's other work at 12 choose 5.
+    /// The mean is cheap, one sort per voter. How the best is found depends
+    /// on the welfare function's weights:
+    ///
+    /// * all equal (Additive): it's the `k` candidates with the most total
+    ///   utility, no search needed;
+    /// * never increasing (Harmonic, Chamberlin-Courant): a branch and bound
+    ///   (see `OwaSearch`) that skips most committees. At 12 candidates
+    ///   choose 5 it's about a third of the work of visiting them all for
+    ///   Harmonic, a sixteenth for Chamberlin-Courant;
+    /// * otherwise: a depth-first walk over every committee that keeps every
+    ///   voter's chosen members' utilities sorted, about `nvtr * k` work per
+    ///   committee. That's about `nvtr * sum(d * C(m, d))` for `d` up to `k`
+    ///   with `m` candidates: dozens of times a trial's other work at 12
+    ///   choose 5.
     pub fn prepare(&mut self, sim: &Sim) {
         normalize_into(sim.scores.view(), &mut self.norm_t);
         self.mean_welfare();
+        if !self.top_k.is_empty() {
+            self.best_of_top_k();
+        }
+        for (i, search) in &mut self.bounded {
+            self.best[*i] = search.best(self.norm_t.view());
+        }
         if !self.exhaustive.is_empty() {
             for &i in &self.exhaustive {
                 self.best[i] = f64::NEG_INFINITY;
             }
             self.descend(0, 0);
-        }
-        if let Some((i, cc)) = &mut self.cc {
-            self.best[*i] = cc.best(self.norm_t.view());
         }
     }
 
@@ -270,6 +292,22 @@ impl WelfareEval {
         }
         for m in self.mean.iter_mut() {
             *m /= nvtr as f64;
+        }
+    }
+
+    /// `W*` for the welfare functions with equal weights: each member then
+    /// counts the same for every voter, so the best committee is the `k`
+    /// candidates with the most utility in total.
+    fn best_of_top_k(&mut self) {
+        let (ncand, nvtr) = self.norm_t.dim();
+        let totals = &mut self.scratch[..ncand];
+        for (total, utils) in totals.iter_mut().zip(self.norm_t.rows()) {
+            *total = utils.sum();
+        }
+        totals.sort_unstable_by(|a, b| b.total_cmp(a));
+        let top: f64 = totals[..self.k].iter().sum();
+        for &i in &self.top_k {
+            self.best[i] = self.weights[(i, 0)] * top / nvtr as f64;
         }
     }
 
@@ -343,36 +381,55 @@ impl WelfareEval {
     }
 }
 
-/// Branch and bound for the best Chamberlin-Courant committee, the one
-/// maximizing the sum over voters of their best member's utility.
+/// Branch and bound for the best committee under a welfare function whose
+/// weights never increase: Harmonic, Chamberlin-Courant, and any `Owa` like
+/// them.
 ///
-/// That welfare is submodular: a candidate adds less to a bigger committee.
-/// So a committee `P` with `r` seats left to fill can't end up better than
-/// `f(P)` plus the `r` largest gains any one remaining candidate would add to
-/// `P` -- and a branch whose bound is no better than the best committee found
-/// so far is skipped. The same gains are the children's values, so the bound
-/// costs little beyond the plain search.
-struct CcSearch {
-    k: usize,
-    /// For each depth `d`: each voter's best utility among the `d` members
-    /// chosen so far (`nvtr` each; all 0 at depth 0).
-    cur: Vec<Vec<f64>>,
+/// Such a welfare function is submodular: a candidate adds less to a bigger
+/// committee. (It's a sum, with non-negative coefficients `w[t-1] - w[t]`, of
+/// each voter's total utility for their `t` best members, and each of those is
+/// submodular.) So a committee `P` with `r` seats left to fill can't end up
+/// better than `f(P)` plus the `r` largest gains any one remaining candidate
+/// would add to `P` -- and a branch whose bound is no better than the best
+/// committee found so far is skipped. The same gains are the children's
+/// values, so the bound costs little beyond the plain search.
+///
+/// Members past a voter's last positive weight add nothing, so each voter
+/// keeps only their best `width` members' utilities: just one for
+/// Chamberlin-Courant.
+struct OwaSearch {
+    /// The weights, `k` of them, best member first.
+    weights: Vec<f64>,
+    /// How many of a voter's best members can count: up to the last positive
+    /// weight.
+    width: usize,
+    /// For each depth `d`: each voter's utilities for their best
+    /// `min(d, width)` of the `d` members chosen so far, best first. Flat,
+    /// voter-major, `width` slots per voter.
+    kept: Vec<Vec<f64>>,
     /// For each depth: each remaining candidate's gain over that committee,
     /// summed over voters (`ncand` each, from the depth's `start` on).
     gains: Vec<Vec<f64>>,
     /// The gains, sorted to find the largest (`ncand`).
     top: Vec<f64>,
+    /// For each depth: the candidates to try next, biggest gain first, so a
+    /// good committee turns up early and prunes more (`ncand` each).
+    order: Vec<Vec<usize>>,
     /// The best committee's welfare so far, summed over voters.
     best: f64,
 }
 
-impl CcSearch {
-    fn new(ncand: usize, nvtr: usize, k: usize) -> CcSearch {
-        CcSearch {
-            k,
-            cur: (0..k).map(|_| vec![0.0; nvtr]).collect(),
+impl OwaSearch {
+    fn new(weights: &[f64], ncand: usize, nvtr: usize) -> OwaSearch {
+        let k = weights.len();
+        let width = weights.iter().rposition(|&w| w > 0.0).map_or(0, |j| j + 1);
+        OwaSearch {
+            weights: weights.to_vec(),
+            width,
+            kept: (0..k).map(|_| vec![0.0; nvtr * width]).collect(),
             gains: (0..k).map(|_| vec![0.0; ncand]).collect(),
             top: Vec::with_capacity(ncand),
+            order: (0..k).map(|_| Vec::with_capacity(ncand)).collect(),
             best: 0.0,
         }
     }
@@ -380,7 +437,6 @@ impl CcSearch {
     /// The best committee's welfare, as a mean over voters.
     fn best(&mut self, norm_t: ArrayView2<f64>) -> f64 {
         self.best = f64::NEG_INFINITY;
-        self.cur[0].fill(0.0);
         self.descend(norm_t, 0, 0, 0.0);
         self.best / norm_t.ncols() as f64
     }
@@ -389,18 +445,32 @@ impl CcSearch {
     /// `start` on as the next, unless the bound rules all of them out.
     fn descend(&mut self, norm_t: ArrayView2<f64>, depth: usize, start: usize, value: f64) {
         let ncand = norm_t.nrows();
-        let left = self.k - depth;
-        let cur = &self.cur[depth];
+        let width = self.width;
+        let (have, next_have) = (depth.min(width), (depth + 1).min(width));
+        let left = self.weights.len() - depth;
+        let weights = &self.weights;
+        let kept = &self.kept[depth];
         let gains = &mut self.gains[depth];
         for (gain, utils) in gains[start..]
             .iter_mut()
             .zip(norm_t.rows().into_iter().skip(start))
         {
-            *gain = utils
-                .iter()
-                .zip(cur)
-                .map(|(&u, &have)| (u - have).max(0.0))
-                .sum();
+            *gain = if have == 1 && width == 1 {
+                // Only each voter's best member counts (Chamberlin-Courant):
+                // the common case, kept fast.
+                let raised: f64 = utils
+                    .iter()
+                    .zip(kept)
+                    .map(|(&u, &best)| (u - best).max(0.0))
+                    .sum();
+                weights[0] * raised
+            } else {
+                utils
+                    .iter()
+                    .zip(kept.chunks_exact(width))
+                    .map(|(&u, slots)| voter_gain(weights, &slots[..have], u))
+                    .sum()
+            };
         }
         self.top.clear();
         self.top.extend_from_slice(&gains[start..]);
@@ -414,16 +484,55 @@ impl CcSearch {
             }
             return;
         }
-        // Leave enough candidates after this one to fill the committee.
-        for icand in start..=ncand - left {
-            let (done, rest) = self.cur.split_at_mut(depth + 1);
-            for ((next, &have), &u) in rest[0].iter_mut().zip(&done[depth]).zip(norm_t.row(icand)) {
-                *next = have.max(u);
+        // Leave enough candidates after each one to fill the committee.
+        let gains = &self.gains[depth];
+        let order = &mut self.order[depth];
+        order.clear();
+        order.extend(start..=ncand - left);
+        order.sort_unstable_by(|&a, &b| gains[b].total_cmp(&gains[a]));
+        for i in 0..self.order[depth].len() {
+            let icand = self.order[depth][i];
+            // The same bound for this child alone, from these gains: looser
+            // than the child's own, but free.
+            let gains = &self.gains[depth];
+            self.top.clear();
+            self.top.extend_from_slice(&gains[icand + 1..]);
+            self.top.sort_unstable_by(|a, b| b.total_cmp(a));
+            let rest_bound: f64 = self.top[..left - 1].iter().sum();
+            if value + gains[icand] + rest_bound <= self.best {
+                continue;
+            }
+            let (done, rest) = self.kept.split_at_mut(depth + 1);
+            let voters = done[depth]
+                .chunks_exact(width)
+                .zip(rest[0].chunks_exact_mut(width))
+                .zip(norm_t.row(icand));
+            if have == 1 && width == 1 {
+                for ((prev, next), &u) in voters {
+                    next[0] = prev[0].max(u);
+                }
+            } else {
+                for ((prev, next), &u) in voters {
+                    insert_sorted(&prev[..have], u, &mut next[..next_have]);
+                }
             }
             let gain = self.gains[depth][icand];
             self.descend(norm_t, depth + 1, icand + 1, value + gain);
         }
     }
+}
+
+/// How much a member with utility `u` adds to one voter's welfare, given
+/// their utilities for the members so far, best first (`have`, possibly only
+/// the best of them -- the rest have weight 0). Slotting `u` in at position
+/// `p` gives it weight `w[p]`, and moves each worse member `j` from weight
+/// `w[j]` to `w[j + 1]`.
+fn voter_gain(weights: &[f64], have: &[f64], u: f64) -> f64 {
+    let p = have.iter().position(|&x| u > x).unwrap_or(have.len());
+    weights[p] * u
+        + (p..have.len())
+            .map(|j| (weights[j + 1] - weights[j]) * have[j])
+            .sum::<f64>()
 }
 
 /// The welfare functions' weights for a committee of `k`, one row each.
@@ -473,12 +582,17 @@ fn normalize_into(scores: ArrayView2<f64>, norm_t: &mut Array2<f64>) {
 }
 
 /// Write `prev` (sorted best first) with `u` inserted in order into `out`,
-/// which is one longer.
+/// which is one longer, or the same length to keep only the best.
 fn insert_sorted(prev: &[f64], u: f64, out: &mut [f64]) {
+    let n = out.len();
     let pos = prev.iter().position(|&x| u > x).unwrap_or(prev.len());
+    if pos == n {
+        out.copy_from_slice(&prev[..n]);
+        return;
+    }
     out[..pos].copy_from_slice(&prev[..pos]);
     out[pos] = u;
-    out[pos + 1..].copy_from_slice(&prev[pos..]);
+    out[pos + 1..].copy_from_slice(&prev[pos..n - 1]);
 }
 
 /// Mean welfare over voters for each row of `weights`, from the column sums:
@@ -503,6 +617,29 @@ mod tests {
         Welfare::Harmonic,
         Welfare::ChamberlinCourant,
     ];
+
+    fn owa(weights: &[f64], colname: &str) -> Welfare {
+        Welfare::Owa {
+            weights: weights.to_vec(),
+            colname: colname.to_string(),
+        }
+    }
+
+    /// A welfare function for each of `prepare`'s searches, as many as fit a
+    /// committee of `k`: Additive's top `k`; branch and bound for Harmonic,
+    /// Chamberlin-Courant and a plateau of equal weights (which keeps only 3
+    /// members per voter); every committee for weights that rise.
+    fn every_kind(k: usize) -> Vec<Welfare> {
+        let mut welfare = ALL.to_vec();
+        if k >= 2 {
+            welfare.push(owa(&[0.5, 1.0], "rising"));
+        }
+        if k >= 3 {
+            welfare.push(owa(&[1.0, 1.0, 0.25], "plateau"));
+            welfare.push(owa(&[0.1, 0.2, 1.0], "rising3"));
+        }
+        welfare
+    }
 
     fn eval_for(scores: Array2<f64>, welfare: &[Welfare], k: usize) -> WelfareEval {
         let (nvtr, ncand) = scores.dim();
@@ -620,17 +757,18 @@ mod tests {
     }
 
     /// `prepare`'s best and mean match scoring every committee one by one,
-    /// across committee sizes from 1 to the whole field.
+    /// across committee sizes from 1 to the whole field, for every search.
     #[test]
     fn search_matches_scoring_every_committee() {
         let mut rng = StdRng::seed_from_u64(7);
         let (nvtr, ncand) = (9, 7);
         for k in 1..=ncand {
+            let welfare = every_kind(k);
             let scores = Array2::from_shape_fn((nvtr, ncand), |_| rng.random::<f64>() - 0.5);
-            let mut eval = eval_for(scores, &ALL, k);
+            let mut eval = eval_for(scores, &welfare, k);
             let committees = combinations(ncand, k);
-            let mut best = vec![f64::NEG_INFINITY; ALL.len()];
-            let mut mean = vec![0.0; ALL.len()];
+            let mut best = vec![f64::NEG_INFINITY; welfare.len()];
+            let mut mean = vec![0.0; welfare.len()];
             for c in &committees {
                 for (i, w) in score(&mut eval, c).into_iter().enumerate() {
                     best[i] = best[i].max(w);
@@ -671,25 +809,64 @@ mod tests {
         })
     }
 
-    /// Branch and bound finds the same best Chamberlin-Courant committee as
-    /// trying them all, alone or alongside exhaustively searched functions.
+    /// Every welfare function finds the same best committee as trying them
+    /// all, on the electorates branch and bound prunes on.
     #[test]
-    fn cc_branch_and_bound_finds_the_best_committee() {
+    fn every_search_finds_the_best_committee() {
         let mut rng = StdRng::seed_from_u64(3);
         let (nvtr, ncand) = (30, 10);
         for seed_round in 0..4 {
             for k in 1..=ncand {
+                let welfare = every_kind(k);
                 let scores = bloc_scores(&mut rng, nvtr, ncand, 2 + seed_round);
-                for welfare in [&[Welfare::ChamberlinCourant][..], &ALL[..]] {
-                    let icc = welfare.len() - 1;
-                    let mut eval = eval_for(scores.clone(), welfare, k);
-                    let naive = combinations(ncand, k)
-                        .iter()
-                        .map(|c| score(&mut eval, c)[icc])
-                        .fold(f64::NEG_INFINITY, f64::max);
-                    assert_abs_diff_eq!(eval.best[icc], naive, epsilon = 1e-12);
+                let mut eval = eval_for(scores, &welfare, k);
+                let mut naive = vec![f64::NEG_INFINITY; welfare.len()];
+                for c in combinations(ncand, k) {
+                    for (best, w) in naive.iter_mut().zip(score(&mut eval, &c)) {
+                        *best = best.max(w);
+                    }
                 }
+                assert_abs_diff_eq!(eval.best.as_slice(), naive.as_slice(), epsilon = 1e-12);
             }
+        }
+    }
+
+    #[test]
+    fn each_welfare_function_gets_the_cheapest_exact_search() {
+        let welfare = [
+            Welfare::Additive,
+            Welfare::Harmonic,
+            Welfare::ChamberlinCourant,
+            owa(&[2.0, 2.0, 2.0], "equal"),
+            owa(&[1.0, 1.0], "plateau"),
+            owa(&[0.5, 1.0], "rising"),
+        ];
+        let eval = WelfareEval::new(&welfare, &Sim::new(6, 4), 3);
+        assert_eq!(eval.top_k, [0, 3]);
+        let bounded: Vec<(usize, usize)> =
+            eval.bounded.iter().map(|(i, s)| (*i, s.width)).collect();
+        // Chamberlin-Courant keeps 1 member per voter; the plateau, 2.
+        assert_eq!(bounded, [(1, 3), (2, 1), (4, 2)]);
+        assert_eq!(eval.exhaustive, [5]);
+    }
+
+    /// A voter's gain from a new member, against working it out in full.
+    #[test]
+    fn voter_gain_is_the_change_in_weighted_utility() {
+        let weights = [0.5, 0.3, 0.2, 0.0];
+        let have = [0.9, 0.4, 0.1];
+        let welfare = |members: &[f64]| -> f64 {
+            let mut sorted = members.to_vec();
+            sorted.sort_by(|a, b| b.total_cmp(a));
+            sorted.iter().zip(&weights).map(|(u, w)| u * w).sum()
+        };
+        for u in [1.0, 0.6, 0.4, 0.05] {
+            let with_u = [&have[..], &[u]].concat();
+            assert_abs_diff_eq!(
+                voter_gain(&weights, &have, u),
+                welfare(&with_u) - welfare(&have),
+                epsilon = 1e-12
+            );
         }
     }
 
@@ -761,5 +938,11 @@ mod tests {
         let mut one = [0.0];
         insert_sorted(&[], 0.3, &mut one);
         assert_eq!(one, [0.3]);
+        // Keeping only the best.
+        let mut best2 = [0.0; 2];
+        insert_sorted(&[0.9, 0.5], 0.6, &mut best2);
+        assert_eq!(best2, [0.9, 0.6]);
+        insert_sorted(&[0.9, 0.5], 0.1, &mut best2);
+        assert_eq!(best2, [0.9, 0.5]);
     }
 }
