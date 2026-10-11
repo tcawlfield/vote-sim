@@ -107,6 +107,18 @@ impl Config {
                 .validate()
                 .map_err(|e| format!("`considerations` entry {}: {e}", i + 1))?;
         }
+        // The output has room for one electorate's factions, and two would
+        // describe two unrelated sets of factions anyway.
+        let electorates = self
+            .considerations
+            .iter()
+            .filter(|c| matches!(c, Consideration::Electorate(_)))
+            .count();
+        if electorates > 1 {
+            return Err(format!(
+                "at most one Electorate consideration is allowed, not {electorates}"
+            ));
+        }
         match self.mode {
             RunMode::SingleWinner => self.validate_single_winner(),
             RunMode::MultiWinner => self.validate_multi_winner(),
@@ -285,6 +297,30 @@ mod tests {
         }
         config.voters = 2;
         assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn at_most_one_electorate_is_allowed() {
+        let electorate = r#"
+            [[considerations]]
+            [considerations.Electorate]
+            dimensions = 1
+            [[considerations.Electorate.factions]]
+            popularity = 1.0
+            voter_center = [0.0]
+            voter_spread = 1.0
+            "#;
+        let methods = "\n[[methods]]\nPlurality = { strat = \"Honest\" }\n";
+
+        let one: Config = toml::from_str(&(base_toml("") + electorate + methods)).unwrap();
+        assert!(one.validate().is_ok());
+
+        let two: Config =
+            toml::from_str(&(base_toml("") + electorate + electorate + methods)).unwrap();
+        assert_eq!(
+            two.validate().unwrap_err(),
+            "at most one Electorate consideration is allowed, not 2"
+        );
     }
 
     /// A consideration's own checks are reported with its place in the list.
