@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use super::ColName;
 use super::MethodSim;
-use super::results::{ElectResult, WinnerAndRunnerup};
-use super::tallies::Tallies;
+use super::results::{ElectResult, Standings};
+use super::tallies::{Tallies, standings_after_elimination};
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
@@ -26,6 +26,9 @@ pub struct BtrIrvSim {
     tallies: Tallies,
     eliminated: Vec<bool>,
     candidates: Vec<usize>,
+    /// The eliminated, in the order they went out, with their votes then.
+    out_order: Vec<ElectResult>,
+    standings: Standings,
 }
 
 impl BtrIrv {
@@ -41,13 +44,16 @@ impl BtrIrv {
             tallies: vec![0; sim.ncand],
             eliminated: vec![false; sim.ncand],
             candidates: Vec::with_capacity(sim.ncand),
+            out_order: Vec::with_capacity(sim.ncand),
+            standings: Standings::with_capacity(sim.ncand),
         }
     }
 }
 
 impl MethodSim for BtrIrvSim {
-    fn elect(&mut self, sim: &Sim, _honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup {
+    fn elect(&mut self, sim: &Sim, _honest_rslt: Option<&Standings>) -> &Standings {
         self.eliminated.fill(false);
+        self.out_order.clear();
         loop {
             log::debug!("IRV round: eliminated = {:?}", self.eliminated);
             // Tally up the votes -- each voter's favorite non-eliminated candidate gets a tally.
@@ -76,16 +82,21 @@ impl MethodSim for BtrIrvSim {
             let top_votes = self.tallies[top_cand];
             if self.candidates.len() <= 2 || top_votes >= (sim.nvtr as i32 + 1) / 2 {
                 let runner_up = self.candidates[self.candidates.len() - 2];
-                return WinnerAndRunnerup {
-                    winner: ElectResult {
+                standings_after_elimination(
+                    &mut self.standings,
+                    ElectResult {
                         cand: top_cand,
                         score: top_votes as f64,
                     },
-                    runnerup: ElectResult {
+                    Some(ElectResult {
                         cand: runner_up,
                         score: self.tallies[runner_up] as f64,
-                    },
-                };
+                    }),
+                    &self.tallies,
+                    &self.eliminated,
+                    &self.out_order,
+                );
+                return &self.standings;
             }
 
             // Eliminate one of the bottom two candidates
@@ -100,6 +111,10 @@ impl MethodSim for BtrIrvSim {
             }
             log::debug!("top_cand = {}, bot_cand = {}", top_cand, bot_cand);
             self.eliminated[bot_cand] = true;
+            self.out_order.push(ElectResult {
+                cand: bot_cand,
+                score: self.tallies[bot_cand] as f64,
+            });
         }
     }
 
@@ -131,10 +146,10 @@ mod tests {
          */
         let mut method = BtrIrv::default().new_sim(&sim);
         sim.rank_candidates();
-        let honest_results = method.elect(&sim, None);
-        assert_eq!(honest_results.winner.cand, 1);
-        assert_eq!(honest_results.winner.score, 58.);
-        assert_eq!(honest_results.runnerup.cand, 0);
-        assert_eq!(honest_results.runnerup.score, 42.);
+        let honest_results = method.elect(&sim, None).clone();
+        assert_eq!(honest_results.winner().cand, 1);
+        assert_eq!(honest_results.winner().score, 58.);
+        assert_eq!(honest_results.runnerup().cand, 0);
+        assert_eq!(honest_results.runnerup().score, 42.);
     }
 }

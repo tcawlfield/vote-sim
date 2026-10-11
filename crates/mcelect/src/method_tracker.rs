@@ -4,7 +4,7 @@
 use meansd::MeanSD;
 
 use crate::committee_welfare::{Welfare, WelfareEval};
-use crate::methods::{MWMethodSim, Method, MethodSim, MultiWinMethod, WinnerAndRunnerup};
+use crate::methods::{MWMethodSim, Method, MethodSim, MultiWinMethod, Standings};
 use crate::out_types::{CommitteeMethodResult, MethodResult, MethodWelfare};
 use crate::sim::Sim;
 
@@ -29,6 +29,8 @@ pub struct MethodTracker {
     /// The mean and standard deviation of the regret of the winner
     /// on trials where the winner was sub-optimal.
     mean_subopt_regret: MeanSD,
+    /// This trial's standings, ties for first broken.
+    standings: Standings,
 }
 
 impl MethodTracker {
@@ -41,36 +43,36 @@ impl MethodTracker {
             ntrials_subopt: 0,
             mean_regret: MeanSD::default(),
             mean_subopt_regret: MeanSD::default(),
+            standings: Standings::with_capacity(sim.ncand),
         }
     }
 
-    /// Run the method for one trial. Returns the winner/runner-up pairing (for
-    /// the honest pre-poll that strategic methods consume) and the per-trial
-    /// [`MethodResult`] destined for the output.
-    pub fn elect(
-        &mut self,
-        sim: &Sim,
-        honest_rslt: Option<WinnerAndRunnerup>,
-    ) -> (WinnerAndRunnerup, MethodResult) {
-        let mut result = self.method.elect(sim, honest_rslt);
-
-        if result.is_tied() {
-            result = sim.break_tie_with_plurality(&result);
-        }
+    /// Run the method for one trial, given its honest `poll`'s standings if it
+    /// has one. Returns the per-trial [`MethodResult`] destined for the output;
+    /// the full result is then [`standings`](Self::standings).
+    pub fn elect(&mut self, sim: &Sim, poll: Option<&Standings>) -> MethodResult {
+        self.standings.clone_from(self.method.elect(sim, poll));
+        sim.break_tie_with_plurality(&mut self.standings);
 
         self.ntrials += 1;
-        let regret = sim.regrets[result.winner.cand];
+        let winner = self.standings.winner().cand;
+        let regret = sim.regrets[winner];
         self.mean_regret.update(regret);
         if regret > 0.0 {
             self.ntrials_subopt += 1;
             self.mean_subopt_regret.update(regret);
         }
 
-        let method_result = MethodResult {
-            winner: sim.regret_rank[result.winner.cand] as u32,
+        MethodResult {
+            winner: sim.regret_rank[winner] as u32,
             regret,
-        };
-        (result, method_result)
+        }
+    }
+
+    /// This trial's standings, after [`elect`](Self::elect): the poll that
+    /// strategic methods read.
+    pub fn standings(&self) -> &Standings {
+        &self.standings
     }
 
     pub fn colname(&self) -> String {

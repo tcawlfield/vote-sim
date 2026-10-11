@@ -17,7 +17,7 @@ use crate::config::{Config, RunMode};
 use crate::considerations::{ConsiderationSim, ConsiderationSimKind};
 use crate::cov_matrix::CovMatrix;
 use crate::method_tracker::{CommitteeTracker, MethodTracker, SendableMethodReport};
-use crate::methods::{MWMethodSim, Method, WinnerAndRunnerup};
+use crate::methods::{MWMethodSim, Method};
 use crate::out_types::{
     CommitteeMethodResult, CommitteeResult, ExperimentResult, MethodResult, WelfareBounds,
 };
@@ -55,8 +55,6 @@ pub(crate) struct TrialRunner<R: Rng> {
     ordered_final_cands: Vec<usize>,
     /// Trials run so far, for logging.
     itrial: usize,
-    /// Saved results for strategic methods' pre-election polls.
-    method_poll_pairings: Vec<WinnerAndRunnerup>,
 }
 
 impl<R: Rng> TrialRunner<R> {
@@ -119,7 +117,6 @@ impl<R: Rng> TrialRunner<R> {
             .map(|sim_primary| config.primary_method.new_sim(sim_primary));
 
         let ordered_final_cands = vec![0; sim.ncand];
-        let method_poll_pairings = Vec::with_capacity(methods.len());
 
         TrialRunner {
             mode: config.mode,
@@ -134,7 +131,6 @@ impl<R: Rng> TrialRunner<R> {
             primary_method,
             ordered_final_cands,
             itrial: 0,
-            method_poll_pairings,
         }
     }
 
@@ -187,13 +183,12 @@ impl<R: Rng> TrialRunner<R> {
         self.run_election();
 
         let mut method_results: BTreeMap<String, MethodResult> = BTreeMap::new();
-        // This trial's winner/runner-up for each tracker so far, which later
-        // strategic methods look up by index as their pre-election poll.
-        self.method_poll_pairings.clear();
-        for method in self.methods.iter_mut() {
-            let poll = method.poll.map(|i| self.method_poll_pairings[i]);
-            let (pairing, result) = method.elect(&self.sim, poll);
-            self.method_poll_pairings.push(pairing);
+        for i in 0..self.methods.len() {
+            // A strategic method's poll is an earlier tracker's standings.
+            let (done, rest) = self.methods.split_at_mut(i);
+            let method = &mut rest[0];
+            let poll = method.poll.map(|j| done[j].standings());
+            let result = method.elect(&self.sim, poll);
             if !method.reported {
                 continue;
             }
@@ -201,7 +196,7 @@ impl<R: Rng> TrialRunner<R> {
             log::debug!(
                 "Method {:?} found winner {} -- regret {}",
                 method.method.name(),
-                pairing.winner.cand,
+                method.standings().winner().cand,
                 result.regret,
             );
             method_results.insert(method.colname(), result);

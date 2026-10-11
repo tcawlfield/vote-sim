@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 
 use super::ColName;
 use super::MethodSim;
-use super::results::{ElectResult, WinnerAndRunnerup};
-use super::tallies::Tallies;
+use super::results::{ElectResult, Standings};
+use super::tallies::{Tallies, standings_after_elimination};
 use crate::sim::Sim;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
@@ -26,6 +26,9 @@ pub struct IRVSim {
     _p: InstantRunoff,
     tallies: Tallies,
     eliminated: Vec<bool>,
+    /// The eliminated, in the order they went out, with their votes then.
+    out_order: Vec<ElectResult>,
+    standings: Standings,
 }
 
 impl InstantRunoff {
@@ -45,13 +48,16 @@ impl InstantRunoff {
             _p: self.clone(),
             tallies: vec![0; sim.ncand],
             eliminated: vec![false; sim.ncand],
+            out_order: Vec::with_capacity(sim.ncand),
+            standings: Standings::with_capacity(sim.ncand),
         }
     }
 }
 
 impl MethodSim for IRVSim {
-    fn elect(&mut self, sim: &Sim, _honest_rslt: Option<WinnerAndRunnerup>) -> WinnerAndRunnerup {
+    fn elect(&mut self, sim: &Sim, _honest_rslt: Option<&Standings>) -> &Standings {
         self.eliminated.fill(false);
+        self.out_order.clear();
         loop {
             debug!("IRV round: eliminated = {:?}", self.eliminated);
             // Tally up the votes -- each voter's favorite non-eliminated candidate gets a tally.
@@ -98,18 +104,29 @@ impl MethodSim for IRVSim {
             );
             // Do we have an election, or not?
             if top_votes >= (sim.nvtr as i32 + 1) / 2 || runner_up == bot_cand {
-                return WinnerAndRunnerup {
-                    winner: ElectResult {
+                // The runner-up is unset when no other candidate has a vote.
+                let runner_up = (runner_up < sim.ncand).then_some(ElectResult {
+                    cand: runner_up,
+                    score: runup_votes as f64,
+                });
+                standings_after_elimination(
+                    &mut self.standings,
+                    ElectResult {
                         cand: top_cand,
                         score: top_votes as f64,
                     },
-                    runnerup: ElectResult {
-                        cand: runner_up,
-                        score: runup_votes as f64,
-                    },
-                };
+                    runner_up,
+                    &self.tallies,
+                    &self.eliminated,
+                    &self.out_order,
+                );
+                return &self.standings;
             } else {
                 self.eliminated[bot_cand] = true;
+                self.out_order.push(ElectResult {
+                    cand: bot_cand,
+                    score: bot_votes as f64,
+                });
             }
         }
     }
@@ -144,10 +161,46 @@ mod tests {
          */
         let mut method = InstantRunoff::default().new_sim(&sim);
         sim.rank_candidates();
-        let honest_results = method.elect(&sim, None);
-        assert_eq!(honest_results.winner.cand, 0);
-        assert_eq!(honest_results.winner.score, 3.);
-        assert_eq!(honest_results.runnerup.cand, 1);
-        assert_eq!(honest_results.runnerup.score, 2.);
+        let honest_results = method.elect(&sim, None).clone();
+        assert_eq!(honest_results.winner().cand, 0);
+        assert_eq!(honest_results.winner().score, 3.);
+        assert_eq!(honest_results.runnerup().cand, 1);
+        assert_eq!(honest_results.runnerup().score, 2.);
+    }
+
+    /// After the winner and runner-up, the eliminated follow, last out first.
+    #[test]
+    fn irv_places_the_eliminated_last_out_first() {
+        let mut sim = Sim::new(4, 5);
+        sim.scores = ndarray::array![
+            [4., 3., 2., 1.],
+            [1., 4., 2., 3.],
+            [3., 4., 2., 1.],
+            [3., 2., 1., 4.],
+            [4., 2., 3., 1.],
+        ];
+        sim.rank_candidates();
+        // As in `test_irv_honest`: 2 goes out (0 votes), then 3 (1 vote).
+        let mut method = InstantRunoff::default().new_sim(&sim);
+        let standings = method.elect(&sim, None);
+        let places: Vec<(usize, f64)> = standings
+            .order()
+            .iter()
+            .map(|r| (r.cand, r.score))
+            .collect();
+        assert_eq!(places, [(0, 3.0), (1, 2.0), (3, 1.0), (2, 0.0)]);
+    }
+
+    /// When the winner takes every vote, no other candidate is a runner-up by
+    /// votes; the rest still get a place, in candidate order.
+    #[test]
+    fn irv_places_everyone_when_the_winner_takes_every_vote() {
+        let mut sim = Sim::new(3, 3);
+        sim.scores = ndarray::array![[3., 2., 1.], [3., 1., 2.], [3., 2., 1.]];
+        sim.rank_candidates();
+        let mut method = InstantRunoff::default().new_sim(&sim);
+        let standings = method.elect(&sim, None);
+        let order: Vec<usize> = standings.order().iter().map(|r| r.cand).collect();
+        assert_eq!(order, [0, 1, 2]);
     }
 }

@@ -3,7 +3,7 @@
 
 use crate::considerations::*;
 use crate::methods::condorcet_util::mark_smith_candidates;
-use crate::methods::{ElectResult, WinnerAndRunnerup};
+use crate::methods::{ElectResult, Standings};
 use ndarray::{Array2, Axis};
 use rand::Rng;
 
@@ -135,30 +135,25 @@ impl Sim {
         self.in_smith_set.iter().filter(|b| **b).count()
     }
 
-    /// If winner and runnerup have the same score, break_tie_with_plurality
-    /// will swap runnerup and winner if the runnerup would win a plurality vote.
-    pub fn break_tie_with_plurality(&self, result: &WinnerAndRunnerup) -> WinnerAndRunnerup {
-        if !result.is_tied() {
-            *result
-        } else {
-            let mut runup_votes = 0;
-            let mut winner_votes = 0;
-            for utilities in self.scores.axis_iter(Axis(0)) {
-                if utilities[result.winner.cand] > utilities[result.runnerup.cand] {
-                    winner_votes += 1;
-                } else if utilities[result.winner.cand] < utilities[result.runnerup.cand] {
-                    runup_votes += 1;
-                }
-                // Equal scores don't count. But we don't usually get exactly equal scores.
+    /// If the winner and runner-up have the same score, break_tie_with_plurality
+    /// puts the runner-up first if they would win a plurality vote between the two.
+    pub fn break_tie_with_plurality(&self, standings: &mut Standings) {
+        if !standings.is_tied() {
+            return;
+        }
+        let (winner, runnerup) = (standings.winner().cand, standings.runnerup().cand);
+        let mut runup_votes = 0;
+        let mut winner_votes = 0;
+        for utilities in self.scores.axis_iter(Axis(0)) {
+            if utilities[winner] > utilities[runnerup] {
+                winner_votes += 1;
+            } else if utilities[winner] < utilities[runnerup] {
+                runup_votes += 1;
             }
-            if runup_votes > winner_votes {
-                WinnerAndRunnerup {
-                    winner: result.runnerup,
-                    runnerup: result.winner,
-                }
-            } else {
-                *result
-            }
+            // Equal scores don't count. But we don't usually get exactly equal scores.
+        }
+        if runup_votes > winner_votes {
+            standings.swap_top_two();
         }
     }
 }
@@ -320,34 +315,28 @@ mod tests {
         assert_eq!(sim.i_beats_j_by[(0, 1)], 4);
     }
 
-    fn tied(winner: usize, runnerup: usize) -> WinnerAndRunnerup {
-        WinnerAndRunnerup {
-            winner: ElectResult {
-                cand: winner,
-                score: 9.0,
-            },
-            runnerup: ElectResult {
-                cand: runnerup,
-                score: 9.0,
-            },
+    fn standings(places: &[(usize, f64)]) -> Standings {
+        let mut s = Standings::default();
+        for &(cand, score) in places {
+            s.push(cand, score);
         }
+        s
+    }
+
+    fn order(s: &Standings) -> Vec<usize> {
+        s.order().iter().map(|r| r.cand).collect()
+    }
+
+    fn tied(winner: usize, runnerup: usize) -> Standings {
+        standings(&[(winner, 9.0), (runnerup, 9.0)])
     }
 
     #[test]
     fn break_tie_returns_untied_result_unchanged() {
         let sim = Sim::new(3, 2);
-        let r = WinnerAndRunnerup {
-            winner: ElectResult {
-                cand: 0,
-                score: 5.0,
-            },
-            runnerup: ElectResult {
-                cand: 1,
-                score: 3.0,
-            },
-        };
-        let out = sim.break_tie_with_plurality(&r);
-        assert_eq!((out.winner.cand, out.runnerup.cand), (0, 1));
+        let mut s = standings(&[(0, 5.0), (1, 3.0), (2, 3.0)]);
+        sim.break_tie_with_plurality(&mut s);
+        assert_eq!(order(&s), [0, 1, 2]);
     }
 
     #[test]
@@ -355,24 +344,27 @@ mod tests {
         let mut sim = Sim::new(2, 3);
         // 2 of 3 voters score candidate 1 above candidate 0.
         sim.scores = array![[1., 5.], [1., 5.], [5., 1.]];
-        let out = sim.break_tie_with_plurality(&tied(0, 1));
-        assert_eq!((out.winner.cand, out.runnerup.cand), (1, 0));
+        let mut s = tied(0, 1);
+        sim.break_tie_with_plurality(&mut s);
+        assert_eq!(order(&s), [1, 0]);
     }
 
     #[test]
     fn break_tie_keeps_order_when_winner_wins_the_head_to_head() {
         let mut sim = Sim::new(2, 3);
         sim.scores = array![[5., 1.], [5., 1.], [1., 5.]];
-        let out = sim.break_tie_with_plurality(&tied(0, 1));
-        assert_eq!(out.winner.cand, 0);
+        let mut s = tied(0, 1);
+        sim.break_tie_with_plurality(&mut s);
+        assert_eq!(order(&s), [0, 1]);
     }
 
     #[test]
     fn break_tie_keeps_order_on_a_head_to_head_tie() {
         let mut sim = Sim::new(2, 2);
         sim.scores = array![[5., 1.], [1., 5.]];
-        let out = sim.break_tie_with_plurality(&tied(0, 1));
-        assert_eq!(out.winner.cand, 0); // swap needs runnerup strictly ahead
+        let mut s = tied(0, 1);
+        sim.break_tie_with_plurality(&mut s);
+        assert_eq!(order(&s), [0, 1]); // swap needs runnerup strictly ahead
     }
 
     #[test]
