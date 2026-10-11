@@ -101,6 +101,8 @@ pub struct ElectorateSim {
     cand_factions: Vec<usize>,
     /// in-group likability bonus for each candidate
     in_group_like: Vec<f64>,
+    /// How many voters were drawn into each faction this trial.
+    faction_voters: Vec<u32>,
     /// Position of some voter in issue space (scratch vector, reused for every voter).
     vtr_pos: Vec<f64>,
 }
@@ -170,6 +172,7 @@ impl Electorate {
             cand_positions: Array2::zeros((sim.ncand, self.dimensions)),
             cand_factions: vec![0; sim.ncand],
             in_group_like: vec![0.0f64; sim.ncand],
+            faction_voters: vec![0; self.factions.len()],
             vtr_pos: vec![0.0f64; self.dimensions],
         }
     }
@@ -202,9 +205,11 @@ impl ConsiderationSim for ElectorateSim {
 
         // Voters: each is assigned a faction weighted by popularity, drawn around
         // that faction's center, then scored against every candidate.
+        self.faction_voters.fill(0);
         for mut vtr_scores in scores.rows_mut() {
             let r = rng.random_range(0.0..self.total_popularity);
             let vfac = self.popularity_cdf.partition_point(|&c| c <= r);
+            self.faction_voters[vfac] += 1;
             let faction = &self.factions[vfac];
             for (pos, &c) in self.vtr_pos.iter_mut().zip(&faction.voter_center) {
                 let z: f64 = rng.sample(StandardNormal);
@@ -257,6 +262,7 @@ impl ElectorateSim {
             positions: premade_positions,
             faction: Vec::with_capacity(final_candidates.len()),
             in_group_likability: Vec::with_capacity(final_candidates.len()),
+            faction_voters: self.faction_voters.clone(),
         };
         for &fc in final_candidates {
             fi.faction.push(self.cand_factions[fc] as u32);
@@ -378,6 +384,31 @@ mod tests {
             e.validate().unwrap_err(),
             "Electorate needs positive total popularity"
         );
+    }
+
+    /// Every voter is counted in exactly one faction, in proportion to
+    /// popularity: none in a faction with popularity 0.
+    #[test]
+    fn faction_voters_counts_each_factions_voters() {
+        let e = electorate(
+            2,
+            vec![
+                faction([0.0, 0.0], 1.0),
+                faction([1.0, 1.0], 0.0),
+                faction([2.0, 2.0], 3.0),
+            ],
+        );
+        let sim = Sim::new(3, 400);
+        let mut esim = e.new_sim(&sim);
+        let mut scores = Array2::zeros((400, 3));
+        let mut rng = StdRng::seed_from_u64(5);
+        for _ in 0..2 {
+            esim.add_to_scores(&mut scores, &mut rng);
+            let counts = &esim.make_faction_info(vec![], &[]).faction_voters;
+            assert_eq!(counts.iter().sum::<u32>(), 400, "{counts:?}");
+            assert_eq!(counts[1], 0);
+            assert!(counts[2] > 2 * counts[0], "{counts:?}");
+        }
     }
 
     #[test]

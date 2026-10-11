@@ -66,6 +66,10 @@ pub struct ElectorateInfo {
     pub faction: Vec<u32>,
     /// The likability of each candidate within their faction.
     pub in_group_likability: Vec<f64>,
+    /// How many voters were drawn into each faction this trial, by faction
+    /// number (as in `faction`). Each faction's share of the voters, the
+    /// baseline for its fair share of a committee.
+    pub faction_voters: Vec<u32>,
 }
 
 /// One row of multi-winner ("committee") election output, one per trial.
@@ -186,6 +190,13 @@ impl ExperimentResult {
                 ncand,
                 false,
             ));
+            let nfactions = factions_count(results.iter().map(|r| r.electorate.as_ref()));
+            fixed.push(fixed_list(
+                "electorate.faction_voters",
+                "U32",
+                nfactions,
+                false,
+            ));
         }
 
         let opts = apply_overwrites(tracing_options(), fixed);
@@ -240,6 +251,13 @@ impl CommitteeResult {
                 "electorate.in_group_likability",
                 "F64",
                 ncand,
+                false,
+            ));
+            let nfactions = factions_count(results.iter().map(|r| r.electorate.as_ref()));
+            fixed.push(fixed_list(
+                "electorate.faction_voters",
+                "U32",
+                nfactions,
                 false,
             ));
         }
@@ -298,6 +316,14 @@ fn tracing_options() -> TracingOptions {
         // Prefer the conventional 32-bit-offset List / Utf8 over the "large" forms.
         .sequence_as_large_list(false)
         .strings_as_large_utf8(false)
+}
+
+/// The number of factions, from the first result with electorate info: the
+/// length of every `faction_voters`, fixed by the config.
+fn factions_count<'a>(mut electorates: impl Iterator<Item = Option<&'a ElectorateInfo>>) -> usize {
+    electorates
+        .find_map(|e| e.map(|e| e.faction_voters.len()))
+        .unwrap_or(0)
 }
 
 fn f64_element() -> serde_json::Value {
@@ -378,6 +404,7 @@ mod tests {
                 positions: vec![vec![0.1, 0.2], vec![-0.3, 0.4], vec![1.0, -1.0]],
                 faction: vec![0, 1, 0],
                 in_group_likability: vec![0.5, 0.0, 0.25],
+                faction_voters: vec![12, 7],
             }),
             ..sample(num_smith, true)
         }
@@ -496,7 +523,15 @@ mod tests {
             .iter()
             .map(|f| f.name().as_str())
             .collect();
-        assert_eq!(field_names, ["positions", "faction", "in_group_likability"]);
+        assert_eq!(
+            field_names,
+            [
+                "positions",
+                "faction",
+                "in_group_likability",
+                "faction_voters"
+            ]
+        );
 
         // 3 candidates (from `sample`), positions have 2 coordinates each.
         match electorate.column_by_name("positions").unwrap().data_type() {
@@ -516,6 +551,20 @@ mod tests {
                 .data_type(),
             DataType::FixedSizeList(_, 3)
         ));
+
+        // One count per faction (2 in `sample_with_electorate`), not per candidate.
+        let faction_voters = electorate
+            .column_by_name("faction_voters")
+            .unwrap()
+            .as_fixed_size_list();
+        assert_eq!(faction_voters.value_length(), 2);
+        assert_eq!(
+            faction_voters
+                .value(1)
+                .as_primitive::<arrow_array::types::UInt32Type>()
+                .values(),
+            &[12, 7]
+        );
 
         // The data still reads back correctly through the fixed layout.
         let faction = electorate

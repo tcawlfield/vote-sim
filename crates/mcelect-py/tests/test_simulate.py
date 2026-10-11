@@ -78,6 +78,33 @@ def test_committee_welfare_columns_appear_only_when_configured():
             assert w["regret"] >= -1e-12
 
 
+ELECTORATE = {
+    "Electorate": {
+        "dimensions": 1,
+        "factions": [
+            {"popularity": 2.0, "voter_center": [-1.0], "voter_spread": 0.5},
+            {"popularity": 1.0, "voter_center": [1.0], "voter_spread": 0.5},
+        ],
+    }
+}
+
+
+@pytest.mark.parametrize("base", [SINGLE_WINNER, MULTI_WINNER], ids=["single", "multi"])
+def test_electorate_reports_each_factions_voters(base):
+    config = {**base, "considerations": [ELECTORATE]}
+    table = mcelect.simulate(config, 10)
+    for electorate in table.column("electorate").to_pylist():
+        counts = electorate["faction_voters"]
+        assert len(counts) == 2
+        assert sum(counts) == config["voters"]
+
+
+def test_two_electorates_are_rejected():
+    config = {**MULTI_WINNER, "considerations": [ELECTORATE, ELECTORATE]}
+    with pytest.raises(ValueError, match="at most one Electorate"):
+        mcelect.simulate(config, 1)
+
+
 def test_invalid_config_raises_value_error():
     with pytest.raises(ValueError, match="invalid config"):
         mcelect.simulate({"voters": 10}, 5)
