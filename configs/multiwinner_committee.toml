@@ -2,6 +2,11 @@ voters = 500
 candidates = 12
 mode = "multi_winner"
 committee_size = 5
+# Also judge every committee by these welfare functions: adds a `welfare`
+# column (best and mean over all committees) and `methods.<name>.welfare`.
+# Costly -- each trial searches every possible committee, about 30x the rest of
+# a trial at 12 candidates choose 5.
+committee_welfare = ["Additive", "Harmonic", "ChamberlinCourant"]
 
 [[considerations]]
 Likability = { mean = 0.1 }

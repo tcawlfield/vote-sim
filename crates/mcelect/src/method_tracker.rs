@@ -3,8 +3,9 @@
 
 use meansd::MeanSD;
 
+use crate::committee_welfare::{Welfare, WelfareEval};
 use crate::methods::{MWMethodSim, Method, MethodSim, MultiWinMethod, WinnerAndRunnerup};
-use crate::out_types::{CommitteeMethodResult, MethodResult};
+use crate::out_types::{CommitteeMethodResult, MethodResult, MethodWelfare};
 use crate::sim::Sim;
 
 /// Tracks one single-winner method across trials, recording the mean and standard deviation
@@ -98,6 +99,7 @@ impl MethodTracker {
             ntrials_subopt: self.ntrials_subopt,
             mean_regret: self.mean_regret,
             mean_subopt_regret: self.mean_subopt_regret,
+            welfare_regret: Vec::new(),
         }
     }
 }
@@ -108,7 +110,9 @@ impl MethodTracker {
 /// Regret here is the mean regret of the elected committee's members. It's a
 /// simple utilitarian measure -- it does not reward a method for proportionally
 /// representing a minority faction -- but it stays on the same scale as
-/// single-winner regret and costs nothing extra to compute.
+/// single-winner regret and costs nothing extra to compute. The configured
+/// `committee_welfare` functions, when there are any, judge the committee by
+/// other standards too.
 pub struct CommitteeTracker {
     pub method: Box<dyn MWMethodSim>,
     committee_size: usize,
@@ -116,10 +120,21 @@ pub struct CommitteeTracker {
     ntrials_subopt: usize,
     mean_regret: MeanSD,
     mean_subopt_regret: MeanSD,
+    /// Regret under each configured welfare function, by column name.
+    welfare_regret: Vec<(String, MeanSD)>,
+    /// The elected committee's candidate indices (scratch, `committee_size`).
+    committee: Vec<usize>,
+    /// The committee's welfare per welfare function (scratch).
+    welfare_values: Vec<f64>,
 }
 
 impl CommitteeTracker {
-    pub fn new(method: &MultiWinMethod, sim: &Sim, committee_size: usize) -> CommitteeTracker {
+    pub fn new(
+        method: &MultiWinMethod,
+        sim: &Sim,
+        committee_size: usize,
+        welfare: &[Welfare],
+    ) -> CommitteeTracker {
         CommitteeTracker {
             method: method.new_sim(sim),
             committee_size,
@@ -127,11 +142,19 @@ impl CommitteeTracker {
             ntrials_subopt: 0,
             mean_regret: MeanSD::default(),
             mean_subopt_regret: MeanSD::default(),
+            welfare_regret: welfare
+                .iter()
+                .map(|w| (w.colname(), MeanSD::default()))
+                .collect(),
+            committee: Vec::with_capacity(committee_size),
+            welfare_values: vec![0.0; welfare.len()],
         }
     }
 
     /// Run the method for one trial, electing `committee_size` winners.
-    pub fn elect(&mut self, sim: &Sim) -> CommitteeMethodResult {
+    /// `welfare`, when the config has welfare functions, must already be
+    /// prepared for this trial.
+    pub fn elect(&mut self, sim: &Sim, welfare: Option<&mut WelfareEval>) -> CommitteeMethodResult {
         // Cloned (cheap: committee_size is small) so the tracker's own fields
         // can be updated afterward without fighting the borrow on self.method.
         let winners = self.method.multi_elect(sim, self.committee_size).clone();
@@ -145,12 +168,29 @@ impl CommitteeTracker {
             self.mean_subopt_regret.update(regret);
         }
 
+        let welfare = welfare.map(|eval| {
+            self.committee.clear();
+            self.committee.extend(winners.iter().map(|w| w.cand));
+            eval.score(&self.committee, &mut self.welfare_values);
+            self.welfare_values
+                .iter()
+                .zip(self.welfare_regret.iter_mut())
+                .enumerate()
+                .map(|(i, (&value, (colname, stats)))| {
+                    let regret = eval.regret(i, value);
+                    stats.update(regret);
+                    (colname.clone(), MethodWelfare { value, regret })
+                })
+                .collect()
+        });
+
         CommitteeMethodResult {
             winners: winners
                 .iter()
                 .map(|w| sim.regret_rank[w.cand] as u32)
                 .collect(),
             regret,
+            welfare,
         }
     }
 
@@ -180,6 +220,7 @@ impl CommitteeTracker {
             ntrials_subopt: self.ntrials_subopt,
             mean_regret: self.mean_regret,
             mean_subopt_regret: self.mean_subopt_regret,
+            welfare_regret: self.welfare_regret.clone(),
         }
     }
 }
@@ -194,6 +235,9 @@ pub struct SendableMethodReport {
     pub ntrials_subopt: usize,
     pub mean_regret: MeanSD,
     pub mean_subopt_regret: MeanSD,
+    /// Regret under each `committee_welfare` function, by column name. Empty
+    /// for single-winner methods and when no welfare is configured.
+    pub welfare_regret: Vec<(String, MeanSD)>,
 }
 
 impl SendableMethodReport {
@@ -203,6 +247,12 @@ impl SendableMethodReport {
         self.ntrials_subopt += other.ntrials_subopt;
         self.mean_regret += other.mean_regret;
         self.mean_subopt_regret += other.mean_subopt_regret;
+        for ((name, stats), (other_name, other_stats)) in
+            self.welfare_regret.iter_mut().zip(&other.welfare_regret)
+        {
+            assert_eq!(name, other_name);
+            *stats += *other_stats;
+        }
     }
 
     pub fn report(&self) {
@@ -217,5 +267,12 @@ impl SendableMethodReport {
             self.mean_subopt_regret.mean(),
             self.ntrials,
         );
+        for (name, stats) in &self.welfare_regret {
+            println!(
+                "    {name} welfare regret: {}, σ: {}",
+                stats.mean(),
+                stats.sstdev()
+            );
+        }
     }
 }

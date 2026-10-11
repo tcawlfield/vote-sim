@@ -36,3 +36,7 @@ bench = false
 [[bench]]
 name = "issues_sim"
 harness = false
+
+[[bench]]
+name = "committee_welfare"
+harness = false

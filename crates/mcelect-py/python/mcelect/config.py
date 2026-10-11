@@ -83,6 +83,9 @@ __all__ = [
     "MultiWinMethod",
     "RRV",
     "PluralityTopN",
+    # Committee welfare
+    "Welfare",
+    "Owa",
 ]
 
 Strategy = Literal["Honest", "Strategic"]
@@ -398,6 +401,26 @@ MultiWinMethod = _tagged_union(RRV, PluralityTopN)
 """A multi-winner voting method."""
 
 
+# --- Committee welfare --------------------------------------------------------
+
+
+class Owa(_Variant):
+    """Committee welfare with explicit weights for each voter's utilities for
+    the members, best member first; padded with zeros to the committee size."""
+
+    TAG: ClassVar[str] = "Owa"
+
+    weights: list[float]
+    colname: str
+
+
+Welfare = Union[Literal["Additive", "Harmonic", "ChamberlinCourant"], Owa]
+"""A welfare function to judge committees by: equal weights ("Additive"),
+1, 1/2, 1/3, ... ("Harmonic", as in PAV), only the best representative
+("ChamberlinCourant"), or an `Owa`. Results go under "add", "pav", "cc", or
+the `Owa`'s colname."""
+
+
 # --- The config itself ------------------------------------------------------
 
 
@@ -424,6 +447,11 @@ class Config(_Strict):
     """Committee size. Required when mode is "multi_winner"."""
     committee_methods: list[MultiWinMethod] = Field(default_factory=list)
     """Multi-winner methods. Used when mode is "multi_winner"."""
+    committee_welfare: list[Welfare] = Field(default_factory=list)
+    """Welfare functions to judge every committee by, when mode is
+    "multi_winner". Each trial then searches every possible committee, which
+    costs far more than the rest of a trial (about 30x at 12 candidates choose
+    5). Empty leaves the welfare columns out of the output."""
 
     def to_json(self, **kwargs: Any) -> str:
         """This config as the JSON the Rust side reads: unset fields are left out,

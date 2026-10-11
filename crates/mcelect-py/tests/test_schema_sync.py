@@ -45,7 +45,7 @@ def _variant_payload(cls: type) -> Any:
     """The shape inside a `_Variant`/`_RootVariant`'s tag."""
     if issubclass(cls, RootModel):
         return _py_field_type(cls.model_fields["root"])
-    return _py_model(cls)
+    return _py_model(cls)  # ty: ignore[invalid-argument-type]
 
 
 def _py_model(cls: type[BaseModel]) -> Any:

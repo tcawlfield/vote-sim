@@ -58,6 +58,26 @@ def test_multi_winner_mode_elects_a_committee():
         assert len(row["pltn"]["winners"]) == MULTI_WINNER["committee_size"]
 
 
+def test_committee_welfare_columns_appear_only_when_configured():
+    table = mcelect.simulate(MULTI_WINNER, 5)
+    assert "welfare" not in table.column_names
+    assert "welfare" not in table.column("methods").to_pylist()[0]["pltn"]
+
+    config = {
+        **MULTI_WINNER,
+        "committee_welfare": ["Harmonic", {"Owa": {"weights": [1.0, 0.5], "colname": "geo"}}],
+    }
+    table = mcelect.simulate(config, 5)
+    for bounds, methods in zip(
+        table.column("welfare").to_pylist(), table.column("methods").to_pylist()
+    ):
+        assert set(bounds) == {"pav", "geo"}
+        for name, w in methods["pltn"]["welfare"].items():
+            assert bounds[name]["mean"] <= bounds[name]["best"]
+            assert w["value"] <= bounds[name]["best"] + 1e-12
+            assert w["regret"] >= -1e-12
+
+
 def test_invalid_config_raises_value_error():
     with pytest.raises(ValueError, match="invalid config"):
         mcelect.simulate({"voters": 10}, 5)

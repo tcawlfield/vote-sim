@@ -12,12 +12,15 @@ use std::collections::BTreeMap;
 
 use rand::Rng;
 
+use crate::committee_welfare::WelfareEval;
 use crate::config::{Config, RunMode};
 use crate::considerations::{ConsiderationSim, ConsiderationSimKind};
 use crate::cov_matrix::CovMatrix;
 use crate::method_tracker::{CommitteeTracker, MethodTracker, SendableMethodReport};
 use crate::methods::{MWMethodSim, Method, WinnerAndRunnerup};
-use crate::out_types::{CommitteeMethodResult, CommitteeResult, ExperimentResult, MethodResult};
+use crate::out_types::{
+    CommitteeMethodResult, CommitteeResult, ExperimentResult, MethodResult, WelfareBounds,
+};
 use crate::sim::Sim;
 
 /// Everything one worker needs to run a batch of trials in either mode.
@@ -39,6 +42,9 @@ pub(crate) struct TrialRunner<R: Rng> {
     methods: Vec<MethodTracker>,
     /// Multi-winner methods. Non-empty only in [`RunMode::MultiWinner`].
     committees: Vec<CommitteeTracker>,
+    /// Judges every committee by the config's `committee_welfare`. `Some` only
+    /// in [`RunMode::MultiWinner`], and only when that list isn't empty.
+    welfare: Option<WelfareEval>,
     cov_matrix: CovMatrix,
     /// Sim state for the config's `primary_method`. `Some` exactly when
     /// `sim_primary` is.
@@ -74,18 +80,33 @@ impl<R: Rng> TrialRunner<R> {
                 .collect()
         };
 
+        let mut welfare = None;
         let (methods, committees): (Vec<MethodTracker>, Vec<CommitteeTracker>) = match config.mode {
             RunMode::SingleWinner => (method_trackers(&config.methods, &sim), Vec::new()),
             RunMode::MultiWinner => {
                 let committee_size = config
                     .committee_size
                     .expect("Config::validate ensures committee_size is set in MultiWinner mode");
+                if !config.committee_welfare.is_empty() {
+                    welfare = Some(WelfareEval::new(
+                        &config.committee_welfare,
+                        &sim,
+                        committee_size,
+                    ));
+                }
                 (
                     Vec::new(),
                     config
                         .committee_methods
                         .iter()
-                        .map(|m| CommitteeTracker::new(m, &sim, committee_size))
+                        .map(|m| {
+                            CommitteeTracker::new(
+                                m,
+                                &sim,
+                                committee_size,
+                                &config.committee_welfare,
+                            )
+                        })
                         .collect(),
                 )
             }
@@ -108,6 +129,7 @@ impl<R: Rng> TrialRunner<R> {
             axes,
             methods,
             committees,
+            welfare,
             cov_matrix,
             primary_method,
             ordered_final_cands,
@@ -203,10 +225,13 @@ impl<R: Rng> TrialRunner<R> {
             "do_committee_trial is only valid in multi-winner mode"
         );
         self.run_election();
+        if let Some(welfare) = &mut self.welfare {
+            welfare.prepare(&self.sim);
+        }
 
         let mut method_results: BTreeMap<String, CommitteeMethodResult> = BTreeMap::new();
         for committee in self.committees.iter_mut() {
-            let result = committee.elect(&self.sim);
+            let result = committee.elect(&self.sim, self.welfare.as_mut());
             log::debug!(
                 "Method {:?} elected winners (regret ranks) {:?} -- mean regret {}",
                 committee.method.name(),
@@ -216,7 +241,20 @@ impl<R: Rng> TrialRunner<R> {
             method_results.insert(committee.colname(), result);
         }
 
-        committee_result(&self.sim, &self.axes, &self.cov_matrix, method_results)
+        let welfare_bounds = self.welfare.as_ref().map(|eval| {
+            eval.colnames()
+                .iter()
+                .zip(eval.best.iter().zip(&eval.mean))
+                .map(|(colname, (&best, &mean))| (colname.clone(), WelfareBounds { best, mean }))
+                .collect()
+        });
+        committee_result(
+            &self.sim,
+            &self.axes,
+            &self.cov_matrix,
+            method_results,
+            welfare_bounds,
+        )
     }
 
     /// Per-method summary statistics accumulated over every trial run so far,
@@ -342,6 +380,7 @@ fn committee_result(
     axes: &[ConsiderationSimKind],
     cov_matrix: &CovMatrix,
     methods: BTreeMap<String, CommitteeMethodResult>,
+    welfare: Option<BTreeMap<String, WelfareBounds>>,
 ) -> CommitteeResult {
     use ConsiderationSimKind::*;
     let by_regret = &sim.cand_by_regret;
@@ -391,6 +430,7 @@ fn committee_result(
         num_smith: sim.smith_set_size() as u32,
         in_smith,
         methods,
+        welfare,
     }
 }
 
@@ -542,9 +582,10 @@ pub(crate) mod tests {
             CommitteeMethodResult {
                 winners: vec![0, 2],
                 regret: 0.5,
+                welfare: None,
             },
         )]);
-        let cr = committee_result(&sim, &[], &cov, methods);
+        let cr = committee_result(&sim, &[], &cov, methods, None);
 
         assert_eq!(cr.cand_regret, vec![0.0, 1.0, 2.0]);
         assert_eq!(cr.in_smith, vec![true, false, true]);
@@ -624,6 +665,51 @@ pub(crate) mod tests {
             assert_eq!(a.methods["rrv_11_h"].regret, b.methods["rrv_11_h"].regret);
         }
         assert_ne!(first[0].cand_regret, first[1].cand_regret);
+    }
+
+    #[test]
+    fn committee_welfare_is_left_out_unless_configured() {
+        let config = multi_winner_config();
+        assert!(config.committee_welfare.is_empty());
+        let mut runner = TrialRunner::new(&config, StdRng::seed_from_u64(1));
+        assert!(runner.welfare.is_none());
+        let result = runner.do_committee_trial();
+        assert!(result.welfare.is_none());
+        assert!(result.methods.values().all(|m| m.welfare.is_none()));
+    }
+
+    #[test]
+    fn committee_welfare_judges_every_method_against_every_committee() {
+        use crate::committee_welfare::Welfare;
+        let mut config = multi_winner_config();
+        config.committee_welfare = vec![Welfare::Additive, Welfare::Harmonic];
+        let mut runner = TrialRunner::new(&config, StdRng::seed_from_u64(2));
+        for _ in 0..5 {
+            let result = runner.do_committee_trial();
+            let bounds = result.welfare.expect("welfare bounds when configured");
+            assert_eq!(bounds.keys().collect::<Vec<_>>(), ["add", "pav"]);
+            for b in bounds.values() {
+                assert!(b.best >= b.mean, "{b:?}");
+            }
+            for (colname, method) in &result.methods {
+                let welfare = method.welfare.as_ref().expect("per-method welfare");
+                assert_eq!(welfare.keys().collect::<Vec<_>>(), ["add", "pav"]);
+                for (name, w) in welfare {
+                    assert!(w.value <= bounds[name].best + 1e-12, "{colname} {name}");
+                    assert!(w.regret >= -1e-12, "{colname} {name}");
+                }
+            }
+        }
+        let stats = runner.method_stats();
+        assert_eq!(stats.len(), 2);
+        for report in stats {
+            let names: Vec<&str> = report
+                .welfare_regret
+                .iter()
+                .map(|(n, _)| n.as_str())
+                .collect();
+            assert_eq!(names, ["add", "pav"]);
+        }
     }
 
     #[test]
