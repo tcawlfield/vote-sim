@@ -7,8 +7,9 @@ use serde::{Deserialize, Serialize};
 use super::ColName;
 use super::MethodSim;
 use super::results::{Standings, Strategy};
-use super::tallies::{Tallies, tally_votes};
+use super::tallies::{Tallies, tally_votes, tie_rng};
 use crate::sim::Sim;
+use rand::rngs::StdRng;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -32,6 +33,8 @@ pub struct RangeVotingSim {
     params: RangeVoting,
     tallies: Tallies,
     standings: Standings,
+    /// Settles ties for first; see [`tie_rng`].
+    tie_rng: StdRng,
     ballot: Tallies,
 }
 
@@ -81,6 +84,7 @@ impl RangeVoting {
             params: self.clone(),
             tallies: vec![0; sim.ncand],
             standings: Standings::with_capacity(sim.ncand),
+            tie_rng: tie_rng(&self.colname()),
             ballot: vec![0; sim.ncand],
         }
     }
@@ -113,7 +117,7 @@ impl MethodSim for RangeVotingSim {
             }
         }
         log::debug!("{} tallies: {:?}", self.name(), self.tallies);
-        tally_votes(&self.tallies, &mut self.standings);
+        tally_votes(&self.tallies, &mut self.standings, &mut self.tie_rng);
         &self.standings
     }
 

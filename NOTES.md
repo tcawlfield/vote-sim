@@ -3,13 +3,16 @@
 ## To-Do
 
 * Strategic voting improvements
-  * Should I expand the runner-up concept? How?
   * Allow a fraction of the population to be strategic.
   * Allow a political faction to be more strategic than another.
     * Under different methods, how much are strategic voters wrongly rewarded?
     * Should Electorate and Irrational collaborate on their factions? These
       are fairly different in how they handle factions. Specifically, irrational
       currently does not have user-defined popularities.
+    * Another electorate concept is a spring model of cluster centers, as well as
+      max-radius (uniform within a radius) faction issue-space distributions such
+      that all candidates within a faction will be the closest to that faction's mean
+      position.
 * Add a Virtues consideration.
   * Intent is to uncork the idea of perceived versus actual utility.
     (Normally this distinction is understood to be beyond the scope of voting.)
@@ -27,9 +30,6 @@
     the winner list becomes stable (needs better definition) or a maximum cycle
     count is reached. Research prior art here, and consider repeating stability
     patterns.
-  * Existing methods such as ranked-pairs that can be continued naturally for committee
-    elections. The head-scratcher here is how this may synergize with strategic
-    voting info, supplying (fully?) ranked candidates instead of just `WinnerAndRunnerup`.
 * Explicit (conditional) output of the voter-candidate utility matrix and actual
   ballots. This may help to generate examples of intriguing elections.
   * Follow-up, compact ballot info to report counts of unique ballots. That would

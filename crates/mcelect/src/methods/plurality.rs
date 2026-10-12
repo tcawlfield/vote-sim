@@ -3,8 +3,9 @@
 
 use super::MethodSim;
 use super::results::{Standings, Strategy};
-use super::tallies::{Tallies, tally_votes};
+use super::tallies::{Tallies, tally_votes, tie_rng};
 use crate::sim::Sim;
+use rand::rngs::StdRng;
 use serde::{Deserialize, Serialize};
 
 use super::ColName;
@@ -51,6 +52,8 @@ pub struct PluralitySim {
     params: Plurality,
     tallies: Tallies,
     standings: Standings,
+    /// Settles ties for first; see [`tie_rng`].
+    tie_rng: StdRng,
 }
 
 impl Plurality {
@@ -77,6 +80,7 @@ impl Plurality {
             params: self.clone(),
             tallies: vec![0; sim.ncand],
             standings: Standings::with_capacity(sim.ncand),
+            tie_rng: tie_rng(&self.colname()),
         }
     }
 }
@@ -108,7 +112,7 @@ impl MethodSim for PluralitySim {
             self.params.strat,
             self.tallies
         );
-        tally_votes(&self.tallies, &mut self.standings);
+        tally_votes(&self.tallies, &mut self.standings, &mut self.tie_rng);
         &self.standings
     }
 
