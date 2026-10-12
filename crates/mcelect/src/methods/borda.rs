@@ -7,8 +7,9 @@ use serde::{Deserialize, Serialize};
 use super::ColName;
 use super::MethodSim;
 use super::results::{Standings, Strategy, default_honest};
-use super::tallies::{Tallies, tally_votes};
+use super::tallies::{Tallies, tally_votes, tie_rng};
 use crate::sim::Sim;
+use rand::rngs::StdRng;
 
 /// The Borda Count method is a *ranked* voting method.
 /// Every voter ranks each candidate on their ballot from
@@ -57,6 +58,8 @@ pub struct BordaSim {
     p: Borda,
     tallies: Tallies,
     standings: Standings,
+    /// Settles ties for first; see [`tie_rng`].
+    tie_rng: StdRng,
 }
 
 impl Borda {
@@ -84,6 +87,7 @@ impl Borda {
             p: self.clone(),
             tallies: vec![0; sim.ncand],
             standings: Standings::with_capacity(sim.ncand),
+            tie_rng: tie_rng(&self.colname()),
         }
     }
 }
@@ -130,7 +134,7 @@ impl MethodSim for BordaSim {
             }
         }
         log::debug!("Borda tallies are: {:?}", self.tallies);
-        tally_votes(&self.tallies, &mut self.standings);
+        tally_votes(&self.tallies, &mut self.standings, &mut self.tie_rng);
         &self.standings
     }
 

@@ -8,8 +8,9 @@ use super::ColName;
 use super::MethodSim;
 use super::rangevoting::{fill_range_ballot, fill_range_ballot_strat};
 use super::results::{Standings, Strategy};
-use super::tallies::{Tallies, tally_votes};
+use super::tallies::{Tallies, tally_votes, tie_rng};
 use crate::sim::Sim;
+use rand::rngs::StdRng;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -38,6 +39,8 @@ pub struct STARSim {
     params: STAR,
     tallies: Tallies,
     standings: Standings,
+    /// Settles ties for first; see [`tie_rng`].
+    tie_rng: StdRng,
     ballot: Tallies,
     preference_matrix: Array2<i32>,
 }
@@ -78,6 +81,7 @@ impl STAR {
             params: self.clone(),
             tallies: vec![0; sim.ncand],
             standings: Standings::with_capacity(sim.ncand),
+            tie_rng: tie_rng(&self.colname()),
             ballot: vec![0; sim.ncand],
             preference_matrix: Array2::zeros((sim.ncand, sim.ncand)),
         }
@@ -123,7 +127,7 @@ impl MethodSim for STARSim {
         log::debug!("{} tallies: {:?}", self.name(), self.tallies);
         // The top two by score go to a runoff; everyone else keeps their place
         // by score, and their score total.
-        tally_votes(&self.tallies, &mut self.standings);
+        tally_votes(&self.tallies, &mut self.standings, &mut self.tie_rng);
         let ca = self.standings.winner().cand;
         let cb = self.standings.runnerup().cand;
         let (ca_prefs, cb_prefs) = (

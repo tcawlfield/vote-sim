@@ -3,22 +3,41 @@
 
 use std::cmp::Ordering;
 
+use rand::rngs::StdRng;
+use rand::{RngExt as _, SeedableRng};
+
 use super::results::{ElectResult, Standings};
 
 pub type Tallies = Vec<i32>;
 
 /// Fill `standings` from vote tallies: most votes first, ties in candidate
-/// order -- except that a tie for first is settled by a coin toss.
-pub fn tally_votes(tallies: &Tallies, standings: &mut Standings) {
+/// order -- except that a tie for first is settled by a coin toss from `rng`.
+pub fn tally_votes(tallies: &Tallies, standings: &mut Standings, rng: &mut StdRng) {
     standings.clear();
     for (icand, &tally) in tallies.iter().enumerate() {
         standings.push(icand, tally as f64);
     }
     standings.order_mut().sort_unstable_by(most_first);
-    if standings.is_tied() && rand::random() {
+    if standings.is_tied() && rng.random::<bool>() {
         // 50/50 chance
         standings.swap_top_two();
     }
+}
+
+/// The coin a method tosses for ties, seeded from its column name: the same
+/// sequence of tosses on every run, and a different one for every method.
+///
+/// Ties for first that a head-to-head can't settle either are rare enough that
+/// these could be any fair coin; seeding it keeps them reproducible without
+/// touching the RNG that draws the elections.
+pub fn tie_rng(colname: &str) -> StdRng {
+    // FNV-1a, which (unlike std's hashers) is the same on every Rust release.
+    let seed = colname
+        .bytes()
+        .fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
+            (hash ^ byte as u64).wrapping_mul(0x0100_0000_01b3)
+        });
+    StdRng::seed_from_u64(seed)
 }
 
 /// Fill `standings` at the end of an elimination count: the `winner`, the
@@ -67,13 +86,23 @@ mod tests {
     #[test]
     fn tally_votes_orders_by_votes_then_candidate() {
         let mut standings = Standings::default();
-        tally_votes(&vec![3, 7, 3, 1, 5], &mut standings);
+        tally_votes(&vec![3, 7, 3, 1, 5], &mut standings, &mut tie_rng("test"));
         assert_eq!(order(&standings), [1, 4, 0, 2, 3]);
         assert_eq!(standings.winner().score, 7.0);
     }
 
     fn result(cand: usize, score: f64) -> ElectResult {
         ElectResult { cand, score }
+    }
+
+    #[test]
+    fn each_method_gets_its_own_fixed_coin() {
+        let tosses = |colname| -> Vec<bool> {
+            let mut rng = tie_rng(colname);
+            (0..64).map(|_| rng.random()).collect()
+        };
+        assert_eq!(tosses("pl_h"), tosses("pl_h"));
+        assert_ne!(tosses("pl_h"), tosses("aprv_h"));
     }
 
     /// Winner, runner-up, the rest still standing by votes, then the

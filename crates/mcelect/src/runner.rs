@@ -640,6 +640,64 @@ pub(crate) mod tests {
         assert_ne!(first[0].cand_regret, first[1].cand_regret);
     }
 
+    /// Two voters and three candidates: votes tie for first all the time.
+    fn tie_prone_config(methods: &str) -> Config {
+        let toml_str = format!(
+            r#"
+            voters = 2
+            candidates = 3
+            [[considerations]]
+            Likability = {{ mean = 0.1 }}
+            [[considerations]]
+            [[considerations.Issues]]
+            sigma = 1.0
+            halfcsep = 0.5
+            {methods}
+            "#
+        );
+        toml::from_str(&toml_str).expect("valid tie-prone test config")
+    }
+
+    const PL_H_TOML: &str = "[[methods]]\nPlurality = { strat = \"Honest\" }\n";
+
+    /// Ties for first are settled by each method's own seeded coin, so even a
+    /// run full of them replays exactly.
+    #[test]
+    fn ties_replay_with_a_seeded_rng() {
+        let config = tie_prone_config(
+            &(PL_H_TOML.to_string()
+                + "[[methods]]\nRange = { strat = \"Strategic\", nranks = 2 }\n"
+                + "[[methods]]\nBorda = {}\n"),
+        );
+        let trials = || {
+            let mut runner = TrialRunner::new(&config, StdRng::seed_from_u64(7));
+            (0..200)
+                .map(|_| serde_json::to_string(&runner.do_trial()).unwrap())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(trials(), trials());
+    }
+
+    /// Methods settle ties with their own coins, so methods that tie don't
+    /// change the elections: adding some leaves every trial's candidates as
+    /// they were.
+    #[test]
+    fn ties_never_change_the_elections() {
+        let elections = |config: &Config| {
+            let mut runner = TrialRunner::new(config, StdRng::seed_from_u64(8));
+            (0..200)
+                .map(|_| runner.do_trial().cand_regret)
+                .collect::<Vec<_>>()
+        };
+        let alone = tie_prone_config(PL_H_TOML);
+        let with_more = tie_prone_config(
+            &(PL_H_TOML.to_string()
+                + "[[methods]]\nRange = { strat = \"Honest\", nranks = 2 }\n"
+                + "[[methods]]\nMultivote = { strat = \"Honest\", votes = 2, spread_fact = 1.0 }\n"),
+        );
+        assert_eq!(elections(&alone), elections(&with_more));
+    }
+
     /// The multi-winner half of the same guarantee.
     #[test]
     fn runner_do_committee_trial_replays_with_a_seeded_rng() {
