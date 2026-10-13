@@ -33,6 +33,7 @@ from mcelect.config import (
     QGaussian2,
     RangeVoting,
     RP,
+    Sequential,
     TopStandings,
 )
 
@@ -108,7 +109,10 @@ def every_variant_config() -> Config:
             Minimax(colname="minimax"),
         ],
         # Only used in multi-winner mode, but still parsed and kept.
-        committee_methods=[TopStandings(STAR(strat="Strategic", nranks=6))],
+        committee_methods=[
+            TopStandings(STAR(strat="Strategic", nranks=6)),
+            Sequential(InstantRunoff()),
+        ],
         committee_welfare=["Harmonic", Owa(weights=[1.0, 0.5], colname="geo")],
     )
 

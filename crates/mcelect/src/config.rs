@@ -692,6 +692,29 @@ mod tests {
         );
     }
 
+    #[test]
+    fn sequential_wraps_any_single_winner_method() {
+        let config = multi_winner_with_committee_methods(&[
+            "Sequential = { InstantRunoff = {} }",
+            "TopStandings = { InstantRunoff = {} }",
+        ]);
+        let colnames: Vec<String> = config
+            .committee_methods
+            .iter()
+            .map(MultiWinMethod::colname)
+            .collect();
+        assert_eq!(colnames, ["seq_IRV_h", "top_IRV_h"]);
+        assert!(config.validate().is_ok());
+
+        let invalid = multi_winner_with_committee_methods(&[
+            r#"Sequential = { Multivote = { strat = "Honest", votes = 0, spread_fact = 1.0 } }"#,
+        ]);
+        assert_eq!(
+            invalid.validate().unwrap_err(),
+            "`committee_methods` entry 1: Multivote needs votes >= 1, not 0"
+        );
+    }
+
     /// `k` isn't part of RRV's column name, so these two would overwrite each
     /// other's results.
     #[test]

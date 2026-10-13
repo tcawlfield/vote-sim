@@ -58,17 +58,19 @@ def test_multi_winner_mode_elects_a_committee():
         assert len(row["pltn"]["winners"]) == MULTI_WINNER["committee_size"]
 
 
-def test_top_standings_seats_a_single_winner_methods_first_k():
+def test_single_winner_methods_elect_committees():
     config = {
         **MULTI_WINNER,
         "committee_methods": [
             {"TopStandings": {"RP": {"strat": "Honest"}}},
             {"TopStandings": {"Plurality": {"strat": "Strategic"}}},
+            {"Sequential": {"InstantRunoff": {}}},
+            {"Sequential": {"STAR": {"strat": "Strategic"}}},
         ],
     }
     table = mcelect.simulate(config, 10)
     for row in table.column("methods").to_pylist():
-        assert set(row) == {"top_rp_h", "top_pl_s"}
+        assert set(row) == {"top_rp_h", "top_pl_s", "seq_IRV_h", "seq_star_6_s"}
         for committee in row.values():
             winners = committee["winners"]
             assert len(winners) == config["committee_size"]

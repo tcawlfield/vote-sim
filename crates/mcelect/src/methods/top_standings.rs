@@ -6,8 +6,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::results::{ElectResult, Standings};
-use super::{MWMethodSim, Method, MethodSim};
+use super::results::ElectResult;
+use super::standalone::Standalone;
+use super::{MWMethodSim, Method};
 use crate::sim::Sim;
 
 /// The first `k` candidates of a single-winner method's standings, as a
@@ -31,11 +32,7 @@ use crate::sim::Sim;
 pub struct TopStandings(pub Method);
 
 pub struct TopStandingsSim {
-    method: Box<dyn MethodSim>,
-    /// The honest poll a strategic method reads, if it has one.
-    poll: Option<Box<dyn MethodSim>>,
-    /// This trial's standings, a tie for first broken.
-    standings: Standings,
+    election: Standalone,
     winners: Vec<ElectResult>,
 }
 
@@ -50,9 +47,7 @@ impl TopStandings {
 
     pub fn new_sim(&self, sim: &Sim) -> TopStandingsSim {
         TopStandingsSim {
-            method: self.0.new_sim(sim),
-            poll: self.0.honest_poll().map(|poll| poll.new_sim(sim)),
-            standings: Standings::with_capacity(sim.ncand),
+            election: Standalone::new(&self.0, sim),
             winners: Vec::with_capacity(sim.ncand),
         }
     }
@@ -60,60 +55,35 @@ impl TopStandings {
 
 impl MWMethodSim for TopStandingsSim {
     fn multi_elect(&mut self, sim: &Sim, nwinners: usize) -> &Vec<ElectResult> {
-        let poll = self.poll.as_mut().map(|poll| poll.elect(sim, None));
-        self.standings.clone_from(self.method.elect(sim, poll));
-        sim.break_tie_with_plurality(&mut self.standings);
+        let standings = self.election.elect(sim);
         self.winners.clear();
         self.winners
-            .extend_from_slice(&self.standings.order()[..nwinners]);
+            .extend_from_slice(&standings.order()[..nwinners]);
         &self.winners
     }
 
     fn name(&self) -> String {
-        format!("Top standings of {}", self.method.name())
+        format!("Top standings of {}", self.election.name())
     }
 
     fn colname(&self) -> String {
-        format!("top_{}", self.method.colname())
+        format!("top_{}", self.election.colname())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::considerations::{Consideration, ConsiderationSimKind};
+    use crate::methods::test_utils::random_elections;
     use crate::methods::tests::every_method;
     use crate::methods::{MultiWinMethod, PluralityTopN};
-    use rand::SeedableRng;
-    use rand::rngs::StdRng;
-
-    /// Random elections over a few field sizes, from electorates small enough
-    /// to tie up to ones that rarely do.
-    fn elections(mut each: impl FnMut(&Sim)) {
-        let considerations: Vec<Consideration> = serde_json::from_str(
-            r#"[{"Likability": {"mean": 0.3}}, {"Issues": [{"sigma": 1.0, "halfcsep": 0.5}]}]"#,
-        )
-        .unwrap();
-        let mut rng = StdRng::seed_from_u64(21);
-        for ncand in [2, 3, 6] {
-            for nvtr in [2, 5, 51] {
-                let mut sim = Sim::new(ncand, nvtr);
-                let mut axes: Vec<ConsiderationSimKind> =
-                    considerations.iter().map(|c| c.new_sim(&sim)).collect();
-                for _ in 0..20 {
-                    sim.election(&mut axes, &mut rng);
-                    each(&sim);
-                }
-            }
-        }
-    }
 
     /// The committee is the first `k` of what the method elects on its own:
     /// with its honest poll if strategic, and a tie for first broken the same
     /// way. So a committee of one is the single-winner method's winner.
     #[test]
     fn top_standings_seats_the_methods_first_k() {
-        elections(|sim| {
+        random_elections(|sim| {
             for method in every_method() {
                 let poll = method
                     .honest_poll()
@@ -140,7 +110,7 @@ mod tests {
     fn top_plurality_standings_match_plurality_top_n() {
         let plurality: Method =
             serde_json::from_str(r#"{"Plurality": {"strat": "Honest"}}"#).unwrap();
-        elections(|sim| {
+        random_elections(|sim| {
             let mut top = TopStandings(plurality.clone()).new_sim(sim);
             let mut pltn = MultiWinMethod::PluralityTopN(PluralityTopN::default()).new_sim(sim);
             for k in 2..sim.ncand {
