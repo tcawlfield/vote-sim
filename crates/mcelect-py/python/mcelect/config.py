@@ -84,6 +84,7 @@ __all__ = [
     "RRV",
     "PluralityTopN",
     "TopStandings",
+    "Sequential",
     # Committee welfare
     "Welfare",
     "Owa",
@@ -406,7 +407,16 @@ class TopStandings(_RootVariant[Method]):
     TAG: ClassVar[str] = "TopStandings"
 
 
-MultiWinMethod = _tagged_union(RRV, PluralityTopN, TopStandings)
+class Sequential(_RootVariant[Method]):
+    """A committee from any single-winner method, one seat at a time: each seat
+    a fresh election among the candidates not yet elected:
+    ``Sequential(InstantRunoff())``. Its column is the method's, prefixed with
+    ``seq_``."""
+
+    TAG: ClassVar[str] = "Sequential"
+
+
+MultiWinMethod = _tagged_union(RRV, PluralityTopN, TopStandings, Sequential)
 """A multi-winner voting method."""
 
 

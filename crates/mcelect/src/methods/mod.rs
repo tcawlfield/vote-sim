@@ -14,6 +14,8 @@ mod rangevoting;
 mod ranked_pairs;
 mod results;
 mod reweighted_range;
+mod sequential;
+mod standalone;
 mod star;
 mod tallies;
 mod test_utils;
@@ -29,6 +31,7 @@ pub use rangevoting::RangeVoting;
 pub use ranked_pairs::RP;
 pub use results::{ElectResult, Standings, Strategy};
 pub use reweighted_range::RRV;
+pub use sequential::Sequential;
 pub use star::STAR;
 pub use top_standings::TopStandings;
 
@@ -134,6 +137,7 @@ pub enum MultiWinMethod {
     RRV(RRV),
     PluralityTopN(PluralityTopN),
     TopStandings(TopStandings),
+    Sequential(Sequential),
 }
 
 impl MultiWinMethod {
@@ -142,6 +146,7 @@ impl MultiWinMethod {
             MultiWinMethod::RRV(m) => Box::new(m.new_sim(sim)),
             MultiWinMethod::PluralityTopN(m) => Box::new(m.new_sim(sim)),
             MultiWinMethod::TopStandings(m) => Box::new(m.new_sim(sim)),
+            MultiWinMethod::Sequential(m) => Box::new(m.new_sim(sim)),
         }
     }
 
@@ -152,6 +157,7 @@ impl MultiWinMethod {
             MultiWinMethod::RRV(m) => m.validate(),
             MultiWinMethod::PluralityTopN(_) => Ok(()),
             MultiWinMethod::TopStandings(m) => m.validate(),
+            MultiWinMethod::Sequential(m) => m.validate(),
         }
     }
 
@@ -161,6 +167,7 @@ impl MultiWinMethod {
             MultiWinMethod::RRV(m) => m.colname(),
             MultiWinMethod::PluralityTopN(m) => m.colname(),
             MultiWinMethod::TopStandings(m) => m.colname(),
+            MultiWinMethod::Sequential(m) => m.colname(),
         }
     }
 }
