@@ -669,6 +669,29 @@ mod tests {
         assert!(config.validate().is_ok());
     }
 
+    #[test]
+    fn top_standings_wraps_any_single_winner_method() {
+        let config = multi_winner_with_committee_methods(&[
+            r#"TopStandings = { RP = { strat = "Honest" } }"#,
+            "[committee_methods.TopStandings.STAR]\nstrat = \"Strategic\"",
+        ]);
+        let colnames: Vec<String> = config
+            .committee_methods
+            .iter()
+            .map(MultiWinMethod::colname)
+            .collect();
+        assert_eq!(colnames, ["top_rp_h", "top_star_6_s"]);
+        assert!(config.validate().is_ok());
+
+        let invalid = multi_winner_with_committee_methods(&[
+            r#"TopStandings = { Range = { strat = "Honest", nranks = 1 } }"#,
+        ]);
+        assert_eq!(
+            invalid.validate().unwrap_err(),
+            "`committee_methods` entry 1: Range needs nranks >= 2, not 1"
+        );
+    }
+
     /// `k` isn't part of RRV's column name, so these two would overwrite each
     /// other's results.
     #[test]

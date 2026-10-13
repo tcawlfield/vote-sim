@@ -83,6 +83,7 @@ __all__ = [
     "MultiWinMethod",
     "RRV",
     "PluralityTopN",
+    "TopStandings",
     # Committee welfare
     "Welfare",
     "Owa",
@@ -397,7 +398,15 @@ class PluralityTopN(_Variant):
     colname: str | None = None
 
 
-MultiWinMethod = _tagged_union(RRV, PluralityTopN)
+class TopStandings(_RootVariant[Method]):
+    """A committee from any single-winner method: run it once, and seat the
+    first k of its standings: ``TopStandings(RP(strat="Honest"))``. Its column
+    is the method's, prefixed with ``top_``."""
+
+    TAG: ClassVar[str] = "TopStandings"
+
+
+MultiWinMethod = _tagged_union(RRV, PluralityTopN, TopStandings)
 """A multi-winner voting method."""
 
 

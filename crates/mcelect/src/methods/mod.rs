@@ -17,6 +17,7 @@ mod reweighted_range;
 mod star;
 mod tallies;
 mod test_utils;
+mod top_standings;
 
 pub use borda::Borda;
 pub use colname::ColName;
@@ -29,6 +30,7 @@ pub use ranked_pairs::RP;
 pub use results::{ElectResult, Standings, Strategy};
 pub use reweighted_range::RRV;
 pub use star::STAR;
+pub use top_standings::TopStandings;
 
 use crate::sim::Sim;
 use serde::{Deserialize, Serialize};
@@ -131,6 +133,7 @@ pub trait MethodSim {
 pub enum MultiWinMethod {
     RRV(RRV),
     PluralityTopN(PluralityTopN),
+    TopStandings(TopStandings),
 }
 
 impl MultiWinMethod {
@@ -138,6 +141,7 @@ impl MultiWinMethod {
         match self {
             MultiWinMethod::RRV(m) => Box::new(m.new_sim(sim)),
             MultiWinMethod::PluralityTopN(m) => Box::new(m.new_sim(sim)),
+            MultiWinMethod::TopStandings(m) => Box::new(m.new_sim(sim)),
         }
     }
 
@@ -147,6 +151,7 @@ impl MultiWinMethod {
         match self {
             MultiWinMethod::RRV(m) => m.validate(),
             MultiWinMethod::PluralityTopN(_) => Ok(()),
+            MultiWinMethod::TopStandings(m) => m.validate(),
         }
     }
 
@@ -155,6 +160,7 @@ impl MultiWinMethod {
         match self {
             MultiWinMethod::RRV(m) => m.colname(),
             MultiWinMethod::PluralityTopN(m) => m.colname(),
+            MultiWinMethod::TopStandings(m) => m.colname(),
         }
     }
 }
@@ -172,7 +178,7 @@ mod tests {
     use rand::SeedableRng;
     use rand::rngs::StdRng;
 
-    fn every_method() -> Vec<Method> {
+    pub(super) fn every_method() -> Vec<Method> {
         [
             r#"{"Plurality": {"strat": "Honest"}}"#,
             r#"{"Plurality": {"strat": "Strategic"}}"#,
