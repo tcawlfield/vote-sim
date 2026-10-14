@@ -693,6 +693,27 @@ mod tests {
     }
 
     #[test]
+    fn harmonic_defaults_to_pav() {
+        let config = multi_winner_with_committee_methods(&[
+            "Harmonic = {}",
+            "Harmonic = { ranks = 10, k = 0.5 }",
+        ]);
+        let colnames: Vec<String> = config
+            .committee_methods
+            .iter()
+            .map(MultiWinMethod::colname)
+            .collect();
+        assert_eq!(colnames, ["pav", "harm_10"]);
+        assert!(config.validate().is_ok());
+
+        let invalid = multi_winner_with_committee_methods(&["Harmonic = { k = 0.25 }"]);
+        assert_eq!(
+            invalid.validate().unwrap_err(),
+            "`committee_methods` entry 1: Harmonic needs 0.5 <= k <= 1.0, not 0.25"
+        );
+    }
+
+    #[test]
     fn sequential_wraps_any_single_winner_method() {
         let config = multi_winner_with_committee_methods(&[
             "Sequential = { InstantRunoff = {} }",

@@ -46,7 +46,15 @@ k = 0.5
 # Any single-winner method can elect a committee: the first committee_size of
 # its standings (column "top_" + the method's, top_rp_h), or one seat at a
 # time, each a fresh election among those not yet elected ("seq_", seq_IRV_h).
-# [[committee_methods]]
-# TopStandings = { RP = { strat = "Honest" } }
-# [[committee_methods]]
-# Sequential = { InstantRunoff = {} }
+[[committee_methods]]
+TopStandings = { RP = { strat = "Honest" } }
+
+[[committee_methods]]
+Sequential = { InstantRunoff = {} }
+
+# Warren Smith's harmonic voting, found by an exact search over committees
+# (slow for a large field). The defaults, approval ballots (ranks = 2) and
+# k = 1, make it Proportional Approval Voting (column "pav"); Smith suggests
+# trying k = 0.5. Other settings get the column "harm_<ranks>".
+[[committee_methods]]
+Harmonic = {}

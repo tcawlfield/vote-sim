@@ -397,7 +397,11 @@ impl WelfareEval {
 /// Members past a voter's last positive weight add nothing, so each voter
 /// keeps only their best `width` members' utilities: just one for
 /// Chamberlin-Courant.
-struct OwaSearch {
+///
+/// The "utilities" can be anything in [0, 1] per voter and candidate: the
+/// [`Harmonic`](crate::methods::Harmonic) voting method (PAV among them)
+/// searches the same way over approval or score ballots.
+pub(crate) struct OwaSearch {
     /// The weights, `k` of them, best member first.
     weights: Vec<f64>,
     /// How many of a voter's best members can count: up to the last positive
@@ -417,10 +421,16 @@ struct OwaSearch {
     order: Vec<Vec<usize>>,
     /// The best committee's welfare so far, summed over voters.
     best: f64,
+    /// The members of the committee being explored, in the order chosen.
+    chosen: Vec<usize>,
+    /// The best committee found so far, in the order its members were chosen.
+    committee: Vec<usize>,
 }
 
 impl OwaSearch {
-    fn new(weights: &[f64], ncand: usize, nvtr: usize) -> OwaSearch {
+    /// Ready to search for committees of `weights.len()` among `ncand`
+    /// candidates and `nvtr` voters.
+    pub(crate) fn new(weights: &[f64], ncand: usize, nvtr: usize) -> OwaSearch {
         let k = weights.len();
         let width = weights.iter().rposition(|&w| w > 0.0).map_or(0, |j| j + 1);
         OwaSearch {
@@ -431,14 +441,30 @@ impl OwaSearch {
             top: Vec::with_capacity(ncand),
             order: (0..k).map(|_| Vec::with_capacity(ncand)).collect(),
             best: 0.0,
+            chosen: Vec::with_capacity(k),
+            committee: Vec::with_capacity(k),
         }
     }
 
-    /// The best committee's welfare, as a mean over voters.
-    fn best(&mut self, norm_t: ArrayView2<f64>) -> f64 {
+    /// The committee size searched for.
+    pub(crate) fn committee_size(&self) -> usize {
+        self.weights.len()
+    }
+
+    /// Search `norm_t` (`ncand` x `nvtr`) for the best committee, returning its
+    /// welfare as a mean over voters. The committee itself is then
+    /// [`committee`](Self::committee).
+    pub(crate) fn best(&mut self, norm_t: ArrayView2<f64>) -> f64 {
         self.best = f64::NEG_INFINITY;
+        self.chosen.clear();
         self.descend(norm_t, 0, 0, 0.0);
         self.best / norm_t.ncols() as f64
+    }
+
+    /// The best committee found by the last [`best`](Self::best), in the order
+    /// its members were chosen. Of committees that tie, the first found.
+    pub(crate) fn committee(&self) -> &[usize] {
+        &self.committee
     }
 
     /// `depth` members are chosen, worth `value`; try each candidate from
@@ -480,7 +506,12 @@ impl OwaSearch {
         }
         if left == 1 {
             for icand in start..ncand {
-                self.best = self.best.max(value + self.gains[depth][icand]);
+                let welfare = value + self.gains[depth][icand];
+                if welfare > self.best {
+                    self.best = welfare;
+                    self.committee.clone_from(&self.chosen);
+                    self.committee.push(icand);
+                }
             }
             return;
         }
@@ -517,7 +548,9 @@ impl OwaSearch {
                 }
             }
             let gain = self.gains[depth][icand];
+            self.chosen.push(icand);
             self.descend(norm_t, depth + 1, icand + 1, value + gain);
+            self.chosen.pop();
         }
     }
 }
@@ -827,6 +860,32 @@ mod tests {
                     }
                 }
                 assert_abs_diff_eq!(eval.best.as_slice(), naive.as_slice(), epsilon = 1e-12);
+            }
+        }
+    }
+
+    /// Branch and bound reports a committee that really scores its best.
+    #[test]
+    fn branch_and_bound_returns_its_best_committee() {
+        let mut rng = StdRng::seed_from_u64(4);
+        let (nvtr, ncand) = (30, 9);
+        for k in 1..=ncand {
+            let welfare = every_kind(k);
+            let scores = bloc_scores(&mut rng, nvtr, ncand, 3);
+            let mut eval = eval_for(scores, &welfare, k);
+            for i in 0..eval.bounded.len() {
+                let iwelfare = eval.bounded[i].0;
+                let mut committee = eval.bounded[i].1.committee().to_vec();
+                assert_eq!(committee.len(), k);
+                committee.sort_unstable();
+                committee.dedup();
+                assert_eq!(committee.len(), k, "distinct members");
+                let best = eval.best[iwelfare];
+                assert_abs_diff_eq!(
+                    score(&mut eval, &committee)[iwelfare],
+                    best,
+                    epsilon = 1e-12
+                );
             }
         }
     }

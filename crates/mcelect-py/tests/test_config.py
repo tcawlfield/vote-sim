@@ -27,6 +27,7 @@ from mcelect.config import (
     Likability,
     Minimax,
     Multivote,
+    Harmonic,
     Owa,
     Plurality,
     PluralityTopN,
@@ -112,6 +113,7 @@ def every_variant_config() -> Config:
         committee_methods=[
             TopStandings(STAR(strat="Strategic", nranks=6)),
             Sequential(InstantRunoff()),
+            Harmonic(ranks=5, k=0.5),
         ],
         committee_welfare=["Harmonic", Owa(weights=[1.0, 0.5], colname="geo")],
     )
