@@ -8,6 +8,7 @@ pub mod condorcet_util;
 mod instant_runoff;
 mod minimax;
 mod multivote;
+mod pav;
 mod plurality;
 mod plurality_top_n;
 mod rangevoting;
@@ -25,6 +26,7 @@ pub use borda::Borda;
 pub use colname::ColName;
 pub use instant_runoff::InstantRunoff;
 pub use multivote::Multivote;
+pub use pav::PAV;
 pub use plurality::Plurality;
 pub use plurality_top_n::PluralityTopN;
 pub use rangevoting::RangeVoting;
@@ -138,6 +140,7 @@ pub enum MultiWinMethod {
     PluralityTopN(PluralityTopN),
     TopStandings(TopStandings),
     Sequential(Sequential),
+    PAV(PAV),
 }
 
 impl MultiWinMethod {
@@ -147,6 +150,7 @@ impl MultiWinMethod {
             MultiWinMethod::PluralityTopN(m) => Box::new(m.new_sim(sim)),
             MultiWinMethod::TopStandings(m) => Box::new(m.new_sim(sim)),
             MultiWinMethod::Sequential(m) => Box::new(m.new_sim(sim)),
+            MultiWinMethod::PAV(m) => Box::new(m.new_sim(sim)),
         }
     }
 
@@ -158,6 +162,7 @@ impl MultiWinMethod {
             MultiWinMethod::PluralityTopN(_) => Ok(()),
             MultiWinMethod::TopStandings(m) => m.validate(),
             MultiWinMethod::Sequential(m) => m.validate(),
+            MultiWinMethod::PAV(m) => m.validate(),
         }
     }
 
@@ -168,6 +173,7 @@ impl MultiWinMethod {
             MultiWinMethod::PluralityTopN(m) => m.colname(),
             MultiWinMethod::TopStandings(m) => m.colname(),
             MultiWinMethod::Sequential(m) => m.colname(),
+            MultiWinMethod::PAV(m) => m.colname(),
         }
     }
 }

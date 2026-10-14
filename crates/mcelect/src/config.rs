@@ -693,6 +693,24 @@ mod tests {
     }
 
     #[test]
+    fn pav_defaults_to_approval_ballots() {
+        let config = multi_winner_with_committee_methods(&["PAV = {}", "PAV = { ranks = 10 }"]);
+        let colnames: Vec<String> = config
+            .committee_methods
+            .iter()
+            .map(MultiWinMethod::colname)
+            .collect();
+        assert_eq!(colnames, ["pav_2", "pav_10"]);
+        assert!(config.validate().is_ok());
+
+        let invalid = multi_winner_with_committee_methods(&["PAV = { ranks = 1 }"]);
+        assert_eq!(
+            invalid.validate().unwrap_err(),
+            "`committee_methods` entry 1: PAV needs ranks >= 2, not 1"
+        );
+    }
+
+    #[test]
     fn sequential_wraps_any_single_winner_method() {
         let config = multi_winner_with_committee_methods(&[
             "Sequential = { InstantRunoff = {} }",
