@@ -85,7 +85,7 @@ __all__ = [
     "PluralityTopN",
     "TopStandings",
     "Sequential",
-    "PAV",
+    "Harmonic",
     # Committee welfare
     "Welfare",
     "Owa",
@@ -417,19 +417,23 @@ class Sequential(_RootVariant[Method]):
     TAG: ClassVar[str] = "Sequential"
 
 
-class PAV(_Variant):
-    """Proportional Approval Voting: the committee with the most voter
-    satisfaction, each voter's members counting 1, 1/2, 1/3, ... best first.
+class Harmonic(_Variant):
+    """Warren Smith's harmonic voting: the committee with the most voter
+    satisfaction, each voter's members counting 1/k, 1/(1 + k), 1/(2 + k), ...
+    best first. The defaults (approval ballots, k = 1) make it Proportional
+    Approval Voting, column "pav"; otherwise the column is "harm_<ranks>".
     Found by an exact search, which can be slow for a large field."""
 
-    TAG: ClassVar[str] = "PAV"
+    TAG: ClassVar[str] = "Harmonic"
 
     ranks: int | None = None
     """Scores on a ballot, 0 to ranks - 1. Rust default: 2, approval ballots."""
+    k: float | None = None
+    """Smith's delta, from 0.5 to 1. Rust default: 1."""
     colname: str | None = None
 
 
-MultiWinMethod = _tagged_union(RRV, PluralityTopN, TopStandings, Sequential, PAV)
+MultiWinMethod = _tagged_union(RRV, PluralityTopN, TopStandings, Sequential, Harmonic)
 """A multi-winner voting method."""
 
 

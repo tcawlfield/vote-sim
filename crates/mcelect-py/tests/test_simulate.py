@@ -66,12 +66,13 @@ def test_more_committee_methods():
             {"TopStandings": {"Plurality": {"strat": "Strategic"}}},
             {"Sequential": {"InstantRunoff": {}}},
             {"Sequential": {"STAR": {"strat": "Strategic"}}},
-            {"PAV": {}},
+            {"Harmonic": {}},
+            {"Harmonic": {"ranks": 10, "k": 0.5}},
         ],
     }
     table = mcelect.simulate(config, 10)
     for row in table.column("methods").to_pylist():
-        assert set(row) == {"top_rp_h", "top_pl_s", "seq_IRV_h", "seq_star_6_s", "pav_2"}
+        assert set(row) == {"top_rp_h", "top_pl_s", "seq_IRV_h", "seq_star_6_s", "pav", "harm_10"}
         for committee in row.values():
             winners = committee["winners"]
             assert len(winners) == config["committee_size"]

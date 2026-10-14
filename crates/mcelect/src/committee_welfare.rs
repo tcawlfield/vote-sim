@@ -398,7 +398,8 @@ impl WelfareEval {
 /// keeps only their best `width` members' utilities: just one for
 /// Chamberlin-Courant.
 ///
-/// The "utilities" can be anything in [0, 1] per voter and candidate: PAV
+/// The "utilities" can be anything in [0, 1] per voter and candidate: the
+/// [`Harmonic`](crate::methods::Harmonic) voting method (PAV among them)
 /// searches the same way over approval or score ballots.
 pub(crate) struct OwaSearch {
     /// The weights, `k` of them, best member first.

@@ -52,7 +52,9 @@ TopStandings = { RP = { strat = "Honest" } }
 [[committee_methods]]
 Sequential = { InstantRunoff = {} }
 
-# Proportional Approval Voting, found by an exact search over committees (slow
-# for a large field). ranks above 2 (the default) uses score ballots instead.
+# Warren Smith's harmonic voting, found by an exact search over committees
+# (slow for a large field). The defaults, approval ballots (ranks = 2) and
+# k = 1, make it Proportional Approval Voting (column "pav"); Smith suggests
+# trying k = 0.5. Other settings get the column "harm_<ranks>".
 [[committee_methods]]
-PAV = {}
+Harmonic = {}
