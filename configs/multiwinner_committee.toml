@@ -15,6 +15,9 @@ Likability = { mean = 0.1 }
 [considerations.electorate]
 dimensions = 2
 distance_function = { "q_gaussian_2" = 1.0 }
+# Candidates scatter as a Gaussian around their faction's center by default;
+# "Uniform" spreads them evenly within candidate_spread of it instead.
+# candidate_distribution = "Uniform"
 
 [[considerations.electorate.factions]]
 popularity = 0.4

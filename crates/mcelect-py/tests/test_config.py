@@ -79,6 +79,7 @@ def every_variant_config() -> Config:
             Electorate(
                 dimensions=2,
                 distance_function=QGaussian2(1.5),
+                candidate_distribution="Uniform",
                 factions=[
                     Faction(
                         popularity=0.6,
@@ -193,6 +194,7 @@ def test_rust_aliases_are_accepted_and_written_canonically():
                     "electorate": {
                         "dimensions": 1,
                         "distance_function": {"q_gaussian_2": 1.0},
+                        "candidate_distribution": "uniform",
                         "factions": [
                             {
                                 "popularity": 1.0,
@@ -211,6 +213,7 @@ def test_rust_aliases_are_accepted_and_written_canonically():
     assert dumped["considerations"][1]["Electorate"]["distance_function"] == {
         "QGaussian2": 1.0
     }
+    assert dumped["considerations"][1]["Electorate"]["candidate_distribution"] == "Uniform"
 
     euclid = Electorate.model_validate(
         {

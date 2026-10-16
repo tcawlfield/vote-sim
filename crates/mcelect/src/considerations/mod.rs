@@ -11,7 +11,7 @@ mod irrational;
 mod issues;
 mod likability;
 
-pub use electorate::{DistanceFunction, Electorate, ElectorateSim, Faction};
+pub use electorate::{DistanceFunction, Electorate, ElectorateSim, Faction, PositionDistribution};
 pub use irrational::{Irrational, IrrationalSim};
 pub use issues::{Issue, IssuesSim, new_issues_sim};
 pub use likability::{Likability, LikabilitySim};
