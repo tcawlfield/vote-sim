@@ -36,8 +36,8 @@ use crate::sim::Sim;
 /// Harmonic = { ranks = 10, k = 0.5 }  # column harm_10
 /// ```
 ///
-/// `k` isn't part of the column name (a value like 0.5 would put a `.` in
-/// it); give each a `colname` to compare several `k`.
+/// As for RRV, `k` isn't part of the column name; give each a `colname` to
+/// compare several `k`.
 ///
 /// The best committee is found exactly, by a branch-and-bound search over all
 /// of them (the same search as for Harmonic committee welfare); that can be

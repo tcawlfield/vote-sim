@@ -14,6 +14,23 @@ for concepts (considerations, utilities, VSE) and NOTES.md for naming and the to
   changed config must stay valid.
 - `results/`, `study/` — analysis notebooks; not part of the build.
 
+## Architecture notes
+
+- Single-winner methods implement `MethodSim::elect(sim, poll) -> &Standings`: every
+  candidate exactly once, winner first. Scores are method-specific; only the order is
+  shared. Add every new method to `every_method()` in `methods/mod.rs`'s tests; the
+  standings property test and the committee adapters' tests iterate over it.
+- Committee methods implement `MWMethodSim`. Any single-winner method becomes one through
+  `TopStandings` (first k of one election) or `Sequential` (a fresh election per seat,
+  on a reduced `Sim` built with `Sim::take_from_primary`); both use `Standalone`.
+- `committee_welfare.rs`: W̄ has a closed form (`rank_weights`). W* is found by top-k
+  (equal weights), branch and bound in `OwaSearch` (non-increasing weights only; the
+  bound relies on submodularity), or an exhaustive search. The `Harmonic` voting method
+  reuses `OwaSearch` on ballots.
+- Sims allocate their buffers once, in `new_sim` or on the first trial when the size
+  depends on the committee, and reuse them. This is a convention rather than a measured
+  need, but keep buffers with the sim that uses them.
+
 ## Commands
 
 ```sh
@@ -29,7 +46,11 @@ uv sync --extra test --reinstall-package mcelect   # rebuild the extension after
 uv run --extra test pytest tests -q
 
 cargo run --release -p mcelect-cli -- -c configs/default.toml -t 1000 -o out.parquet
+cargo bench -p mcelect --bench committee_welfare   # committee welfare searches vs a trial
 ```
+
+`cargo run` rebuilds first; running `target/release/mcelect` directly can use a stale
+binary.
 
 uv caches the built extension: after changing Rust code, `--reinstall-package mcelect` is
 needed or the tests run against the stale build. The Python sources are installed
@@ -72,6 +93,21 @@ consideration, or config field:
   unit tests share helpers in `methods/test_utils.rs`.
 - Sanity cross-check: with a single 1-D issue consideration there should be no Condorcet
   cycles.
+- Randomness: elections draw from the runner's RNG, and methods must never consume it
+  (`ties_never_change_the_elections`). Tally-based methods settle ties for first with a
+  private `tie_rng` seeded from their column name (`tallies::tie_rng`). No
+  `rand::random()` or global RNG in library code.
+- Validation: parameter constraints go in the struct's `validate()`, which
+  `Config::validate` calls and reports with the entry's position
+  ("`methods` entry 2: Range needs nranks >= 2, not 1"). Test the exact message.
+- Default column names include only integer parameters; floating-point ones (RRV's and
+  Harmonic's `k`, STAR's stretch factor) are left out, and users set `colname` to tell
+  such variants apart.
+- The bindings return plain Arrow and stay neutral about analysis tooling (Awkward,
+  Polars, DuckDB). Analysis measures such as the Gallagher index belong in a separate
+  analysis library, not in this crate.
+- A refactor meant to leave results unchanged should be checked by diffing seeded
+  `TrialRunner` output over `configs/` before and after.
 
 ## Git
 
