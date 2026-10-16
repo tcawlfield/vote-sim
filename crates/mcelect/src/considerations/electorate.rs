@@ -5,13 +5,14 @@
 
 use super::ConsiderationSim;
 use crate::{out_types::ElectorateInfo, sim::Sim};
-use ndarray::Array2;
+use ndarray::{Array2, ArrayViewMut1};
 use rand::{Rng, RngExt as _};
 use rand_distr::StandardNormal;
 
 /// An Electorate consideration is an N-dimensional issue space in which voters and candidates
-/// are divided into factions. Each faction has a center and a spread (isotropic Gaussian) for
-/// both voters and candidates. Voter utility is a function of the distance between a voter
+/// are divided into factions. Each faction has a center and a spread for both voters and
+/// candidates: voters scatter as an isotropic Gaussian, candidates as one too or uniformly
+/// (see `candidate_distribution`). Voter utility is a function of the distance between a voter
 /// and candidate in the issue space, optionally with a special in-group likability bonus for
 /// candidates in the voter's own faction.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -23,6 +24,10 @@ pub struct Electorate {
     /// How a voter/candidate distance becomes a perceived utility.
     #[serde(default)]
     pub distance_function: DistanceFunction,
+    /// How candidates scatter around their faction's center: Gaussian (the
+    /// default), or uniformly within `candidate_spread` of it.
+    #[serde(default)]
+    pub candidate_distribution: PositionDistribution,
     /// List of the separate factions.
     pub factions: Vec<Faction>,
 }
@@ -41,7 +46,9 @@ pub struct Faction {
     pub candidate_center: Option<Vec<f64>>,
     /// Std-dev of the (isotropic Gaussian) scatter of voters around the center.
     pub voter_spread: f64,
-    /// Scatter of candidates around their center. Defaults to `voter_spread`.
+    /// Scatter of candidates around their center: the standard deviation for a
+    /// Gaussian `candidate_distribution`, the maximum distance for a uniform
+    /// one. Defaults to `voter_spread`.
     #[serde(default)]
     pub candidate_spread: Option<f64>,
     /// Upper bound of the extra per-candidate likability bonus that only voters
@@ -77,6 +84,64 @@ pub enum DistanceFunction {
     QGaussian2(f64),
 }
 
+/// How positions scatter around a faction's center, `spread` setting the scale.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, Default, PartialEq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum PositionDistribution {
+    /// Each coordinate normal around the center, `spread` its standard deviation.
+    #[default]
+    #[serde(alias = "gaussian")]
+    Gaussian,
+    /// Uniform over the ball of radius `spread` around the center: an interval
+    /// in 1-D, a disk in 2-D.
+    ///
+    /// Drawn by rejection: a point uniform in the surrounding cube, drawn
+    /// again until it falls in the ball. The share kept falls fast with
+    /// dimension -- 79% in 2-D, 52% in 3-D, but 16% in 5-D and 0.25% in 10-D --
+    /// so beyond 3 dimensions prefer Gaussian. (Scaling a Gaussian vector to
+    /// length `spread * U^(1/D)` would be exact in any dimension, if that's
+    /// ever needed.)
+    #[serde(alias = "uniform")]
+    Uniform,
+}
+
+impl PositionDistribution {
+    /// Draw a position around `center` into `pos`.
+    fn draw<R: Rng + ?Sized>(
+        &self,
+        rng: &mut R,
+        center: &[f64],
+        spread: f64,
+        mut pos: ArrayViewMut1<f64>,
+    ) {
+        match self {
+            PositionDistribution::Gaussian => {
+                for (p, &c) in pos.iter_mut().zip(center) {
+                    let z: f64 = rng.sample(StandardNormal);
+                    *p = c + z * spread;
+                }
+            }
+            PositionDistribution::Uniform => {
+                // An offset uniform in the unit cube, until it's in the unit ball.
+                loop {
+                    let mut dist_sq = 0.0;
+                    for p in pos.iter_mut() {
+                        let x: f64 = rng.random_range(-1.0..=1.0);
+                        *p = x;
+                        dist_sq += x * x;
+                    }
+                    if dist_sq <= 1.0 {
+                        break;
+                    }
+                }
+                for (p, &c) in pos.iter_mut().zip(center) {
+                    *p = c + *p * spread;
+                }
+            }
+        }
+    }
+}
+
 impl DistanceFunction {
     /// Utility for a given *squared* voter/candidate distance.
     fn utility(&self, dist_sq: f64) -> f64 {
@@ -91,6 +156,7 @@ impl DistanceFunction {
 pub struct ElectorateSim {
     dims: usize,
     distance_scaling: DistanceFunction,
+    cand_distribution: PositionDistribution,
     factions: Vec<Faction>,
     /// Inclusive cumulative sum of `popularity`; last entry is `total_popularity`.
     popularity_cdf: Vec<f64>,
@@ -166,6 +232,7 @@ impl Electorate {
         ElectorateSim {
             dims: self.dimensions,
             distance_scaling: self.distance_function.clone(),
+            cand_distribution: self.candidate_distribution,
             factions: self.factions.clone(),
             popularity_cdf,
             total_popularity: ttl_popularity,
@@ -194,10 +261,8 @@ impl ConsiderationSim for ElectorateSim {
             let faction = &self.factions[ifac];
             let center = faction.candidate_center();
             let spread = faction.candidate_spread();
-            for (pos, &c) in self.cand_positions.row_mut(icand).iter_mut().zip(center) {
-                let z: f64 = rng.sample(StandardNormal);
-                *pos = c + z * spread;
-            }
+            self.cand_distribution
+                .draw(rng, center, spread, self.cand_positions.row_mut(icand));
             self.in_group_like[icand] = draw_ceiling(rng, faction.in_group_likability_ceiling);
         }
         log::debug!("candidate faction numbers: {:?}", self.cand_factions);
@@ -309,6 +374,80 @@ mod tests {
     }
 
     #[test]
+    fn candidate_distribution_defaults_to_gaussian_and_accepts_lowercase() {
+        let parse = |extra: &str| -> Electorate {
+            serde_json::from_str(&format!(
+                r#"{{"dimensions": 1, {extra} "factions": [{{"popularity": 1.0, "voter_center": [0.0], "voter_spread": 1.0}}]}}"#
+            ))
+            .unwrap()
+        };
+        assert_eq!(
+            parse("").candidate_distribution,
+            PositionDistribution::Gaussian
+        );
+        for name in ["Uniform", "uniform"] {
+            assert_eq!(
+                parse(&format!(r#""candidate_distribution": "{name}","#)).candidate_distribution,
+                PositionDistribution::Uniform
+            );
+        }
+    }
+
+    /// Uniform positions stay within `spread` of the center and fill the ball
+    /// evenly: half its volume lies within `spread * (1/2)^(1/D)`, so about
+    /// half the points should too.
+    #[test]
+    fn uniform_positions_fill_the_ball_around_the_center() {
+        let mut rng = StdRng::seed_from_u64(6);
+        let n = 20_000;
+        for center in [vec![0.5], vec![1.0, -2.0], vec![0.0, 3.0, -1.0]] {
+            let dims = center.len();
+            let spread = 0.5;
+            let half_volume_radius = spread * 0.5f64.powf(1.0 / dims as f64);
+            let mut pos = ndarray::Array1::zeros(dims);
+            let mut inner = 0;
+            let mut sum = vec![0.0; dims];
+            for _ in 0..n {
+                PositionDistribution::Uniform.draw(&mut rng, &center, spread, pos.view_mut());
+                let dist = pos
+                    .iter()
+                    .zip(&center)
+                    .map(|(p, c)| (p - c).powi(2))
+                    .sum::<f64>()
+                    .sqrt();
+                assert!(dist <= spread, "{dims}-D: {pos} is {dist} from {center:?}");
+                inner += (dist <= half_volume_radius) as usize;
+                for (s, p) in sum.iter_mut().zip(&pos) {
+                    *s += p;
+                }
+            }
+            let inner_share = inner as f64 / n as f64;
+            assert!((inner_share - 0.5).abs() < 0.02, "{dims}-D: {inner_share}");
+            for (s, c) in sum.iter().zip(&center) {
+                assert_abs_diff_eq!(s / n as f64, *c, epsilon = 0.01);
+            }
+        }
+    }
+
+    /// The default draws exactly what it always has -- one standard normal per
+    /// coordinate, in order -- so existing configs give the same elections.
+    #[test]
+    fn gaussian_positions_draw_what_they_always_have() {
+        let center = [1.0, -2.0, 0.5];
+        let spread = 0.7;
+        let mut pos = ndarray::Array1::zeros(3);
+        let mut rng = StdRng::seed_from_u64(9);
+        let mut by_hand = StdRng::seed_from_u64(9);
+        for _ in 0..100 {
+            PositionDistribution::Gaussian.draw(&mut rng, &center, spread, pos.view_mut());
+            for (p, &c) in pos.iter().zip(&center) {
+                let z: f64 = by_hand.sample(StandardNormal);
+                assert_eq!(*p, c + z * spread);
+            }
+        }
+    }
+
+    #[test]
     fn candidate_geometry_falls_back_to_voter_geometry() {
         let mut f = faction([1.0, 2.0], 1.0);
         f.voter_spread = 0.7;
@@ -325,6 +464,7 @@ mod tests {
         Electorate {
             dimensions,
             distance_function: DistanceFunction::NegativeEuclidean,
+            candidate_distribution: PositionDistribution::Gaussian,
             factions,
         }
     }
@@ -424,6 +564,7 @@ mod tests {
         let params = Electorate {
             dimensions: 2,
             distance_function: DistanceFunction::NegativeEuclidean,
+            candidate_distribution: PositionDistribution::Gaussian,
             factions: vec![Faction {
                 voter_spread: 0.0,
                 candidate_spread: Some(3.0),
@@ -454,6 +595,7 @@ mod tests {
         let params = Electorate {
             dimensions: 2,
             distance_function: DistanceFunction::NegativeEuclidean,
+            candidate_distribution: PositionDistribution::Gaussian,
             factions: vec![
                 Faction {
                     in_group_likability_ceiling: 5.0,
@@ -489,6 +631,7 @@ mod tests {
         let params = Electorate {
             dimensions: 2,
             distance_function: DistanceFunction::QGaussian2(0.5),
+            candidate_distribution: PositionDistribution::Gaussian,
             factions: vec![
                 Faction {
                     voter_spread: 1.0,

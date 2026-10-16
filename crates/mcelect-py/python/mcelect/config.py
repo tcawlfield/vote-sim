@@ -68,6 +68,7 @@ __all__ = [
     "Faction",
     "DistanceFunction",
     "QGaussian2",
+    "PositionDistribution",
     # Single-winner methods
     "Method",
     "Plurality",
@@ -245,6 +246,20 @@ DistanceFunction = Annotated[
 ``"NegativeEuclidean"`` (negative Euclidean distance) or a `QGaussian2`."""
 
 
+def _canonical_position_name(value: Any) -> Any:
+    aliases = {"gaussian": "Gaussian", "uniform": "Uniform"}
+    return aliases.get(value, value) if isinstance(value, str) else value
+
+
+PositionDistribution = Annotated[
+    Literal["Gaussian", "Uniform"],
+    BeforeValidator(_canonical_position_name),
+]
+"""How positions scatter around a faction's center: ``"Gaussian"``, with the
+spread as standard deviation, or ``"Uniform"`` within the spread of it (best
+kept to 3 dimensions or fewer)."""
+
+
 class Faction(_Strict):
     """One faction of an `Electorate`."""
 
@@ -257,7 +272,9 @@ class Faction(_Strict):
     voter_spread: float
     """Std-dev of the scatter of voters around the center."""
     candidate_spread: float | None = None
-    """Scatter of candidates around their center. Rust default: `voter_spread`."""
+    """Scatter of candidates around their center: the standard deviation for a
+    Gaussian `candidate_distribution`, the maximum distance for a uniform one.
+    Rust default: `voter_spread`."""
     in_group_likability_ceiling: float | None = None
     """Upper bound of the likability bonus seen only by voters in the candidate's
     own faction. Rust default: 0."""
@@ -273,6 +290,9 @@ class Electorate(_Variant):
     """Dimensionality of the issue space. Every `*_center` must be this long."""
     distance_function: DistanceFunction | None = None
     """Rust default: "NegativeEuclidean"."""
+    candidate_distribution: PositionDistribution | None = None
+    """How candidates scatter around their faction's center. Rust default:
+    "Gaussian"."""
     factions: list[Faction]
 
 
